@@ -67,7 +67,7 @@ class MSH_Contextual_Meta_Generator {
         'first-responder' => ['first responder', 'firefighter', 'paramedic', 'police', 'dispatcher']
     ];
 
-    public function detect_context($attachment_id) {
+    public function detect_context($attachment_id, $ignore_manual = false) {
         $context = [
             'type' => 'clinical',
             'page_type' => null,
@@ -84,8 +84,10 @@ class MSH_Contextual_Meta_Generator {
         ];
 
         $manual = get_post_meta($attachment_id, '_msh_context', true);
+        $manual = is_string($manual) ? trim($manual) : '';
+        $context['manual_value'] = $manual;
 
-        if (!empty($manual)) {
+        if (!$ignore_manual && $manual !== '') {
             $context['type'] = sanitize_text_field($manual);
             $context['manual'] = true;
         }
@@ -1030,6 +1032,7 @@ class MSH_Image_Optimizer {
         add_action('wp_ajax_msh_remove_filename_suggestion', array($this, 'ajax_remove_filename_suggestion'));
         add_action('wp_ajax_msh_preview_meta_text', array($this, 'ajax_preview_meta_text'));
         add_action('wp_ajax_msh_save_edited_meta', array($this, 'ajax_save_edited_meta'));
+        add_action('wp_ajax_msh_update_context', array($this, 'ajax_update_context'));
 
         $this->contextual_meta_generator = new MSH_Contextual_Meta_Generator();
 
@@ -2359,6 +2362,60 @@ class MSH_Image_Optimizer {
         $result['suggested_filename'] = $suggested_filename;
 
         return $result;
+    }
+
+    /**
+     * AJAX: Update manual context selection directly from analyzer UI
+     */
+    public function ajax_update_context() {
+        check_ajax_referer('msh_image_optimizer', 'nonce');
+
+        if (!current_user_can('manage_options')) {
+            wp_die('Unauthorized');
+        }
+
+        $attachment_id = isset($_POST['attachment_id']) ? intval($_POST['attachment_id']) : 0;
+        if ($attachment_id <= 0) {
+            wp_send_json_error(__('Invalid attachment ID.', 'medicross-child'));
+        }
+
+        $raw_context = isset($_POST['context']) ? wp_unslash($_POST['context']) : '';
+        $new_context = sanitize_text_field($raw_context);
+
+        $choices = $this->get_context_choices();
+        if ($new_context !== '' && !array_key_exists($new_context, $choices)) {
+            wp_send_json_error(__('Invalid context selection.', 'medicross-child'));
+        }
+
+        if ($new_context !== '') {
+            update_post_meta($attachment_id, '_msh_context', $new_context);
+        } else {
+            delete_post_meta($attachment_id, '_msh_context');
+        }
+
+        // Clean up deprecated keys retained for backwards compatibility.
+        delete_post_meta($attachment_id, '_msh_manual_edit');
+        delete_post_meta($attachment_id, 'msh_context_last_manual_update');
+
+        // Refresh auto-detected context for comparison badges.
+        $auto_context = $this->contextual_meta_generator->detect_context($attachment_id, true);
+        if (!empty($auto_context['type'])) {
+            update_post_meta($attachment_id, '_msh_auto_context', $auto_context['type']);
+        } else {
+            delete_post_meta($attachment_id, '_msh_auto_context');
+        }
+
+        $image_data = $this->analyze_single_image($attachment_id);
+        if (!is_array($image_data) || isset($image_data['error'])) {
+            $error_message = is_array($image_data) && isset($image_data['error'])
+                ? $image_data['error']
+                : __('Unable to refresh analyzer data.', 'medicross-child');
+            wp_send_json_error($error_message);
+        }
+
+        wp_send_json_success([
+            'image' => $image_data,
+        ]);
     }
 
     /**

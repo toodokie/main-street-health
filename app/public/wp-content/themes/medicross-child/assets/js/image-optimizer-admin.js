@@ -6,6 +6,17 @@
 (function($) {
     'use strict';
     
+    const CONTEXT_CHOICES = [
+        { value: '', label: 'Auto-detect (default)' },
+        { value: 'clinical', label: 'Clinical / Treatment' },
+        { value: 'team', label: 'Team Member' },
+        { value: 'testimonial', label: 'Patient Testimonial' },
+        { value: 'service-icon', label: 'Service Icon' },
+        { value: 'facility', label: 'Facility / Clinic' },
+        { value: 'equipment', label: 'Equipment' },
+        { value: 'business', label: 'Business / General' }
+    ];
+
     let imageData = [];
     let isProcessing = false;
     let currentBatch = [];
@@ -128,6 +139,24 @@
             if (confirm('Deep Library Scan will analyze all 748 images for comprehensive duplicate detection. This takes 30-60 seconds but finds all duplicates that Quick Scan misses. Continue?')) {
                 startDeepLibraryScan();
             }
+        });
+
+        $(document).on('click', '.edit-context-inline', function(e) {
+            e.preventDefault();
+            const $summary = $(this).closest('.context-summary');
+            openContextEditor($summary);
+        });
+
+        $(document).on('click', '.inline-context-cancel', function(e) {
+            e.preventDefault();
+            const $summary = $(this).closest('.context-summary');
+            closeContextEditor($summary);
+        });
+
+        $(document).on('click', '.inline-context-save', function(e) {
+            e.preventDefault();
+            const $button = $(this);
+            saveContextSelection($button);
         });
     }
     
@@ -302,6 +331,9 @@
         const isOptimized = statusInfo.key === 'optimized';
         const contextMetaPreview = renderContextMetaPreview(image);
         const contextSummary = renderContextSummary(image);
+        const attachmentId = image.ID || image.id || '';
+        const manualContext = image.manual_context || '';
+        const autoContext = image.auto_context || '';
 
         // Suggested filename - make it editable with keep current option
         const suggestedFilename = image.suggested_filename || '';
@@ -324,7 +356,7 @@
             currentFilename;
         
         return `
-            <tr class="result-row ${priorityClass}" data-priority="${image.priority}" data-issues="${issues.map(i => i.type).join(',')}" data-optimized="${isOptimized}" data-status="${statusInfo.key}">
+            <tr class="result-row ${priorityClass}" data-attachment-id="${attachmentId}" data-manual-context="${manualContext}" data-auto-context="${autoContext}" data-priority="${image.priority}" data-issues="${issues.map(i => i.type).join(',')}" data-optimized="${isOptimized}" data-status="${statusInfo.key}">
                 <td><input type="checkbox" class="image-checkbox" data-id="${image.ID}" value="${image.ID}"></td>
                 <td>
                     ${thumbnail}
@@ -522,14 +554,195 @@
             highlightParts.push(`Page: ${escapeHtml(context.page_title)}`);
         }
 
+        const attachmentId = image.ID || image.id || '';
         const chipsHtml = chips.join(' ');
-        const highlightsHtml = highlightParts.length ? `<span class="msh-context-highlights">${highlightParts.join(' • ')}</span>` : '';
+        const highlightsHtml = highlightParts.length ? `<div class="msh-context-highlights">${highlightParts.join(' • ')}</div>` : '';
+        const editButton = `<button type="button" class="button-link edit-context-inline" aria-label="Edit context" title="Edit context"><span class="dashicons dashicons-edit"></span></button>`;
+        const selectedValue = manualContext || '';
+        const optionsHtml = CONTEXT_CHOICES.map(choice => {
+            const selected = choice.value === selectedValue ? ' selected' : '';
+            return `<option value="${choice.value}"${selected}>${escapeHtml(choice.label)}</option>`;
+        }).join('');
 
-        if (!chipsHtml && !highlightsHtml) {
-            return 'Context: Unknown';
+        const editorHtml = `
+            <div class="context-inline-editor hidden">
+                <label class="screen-reader-text" for="context-inline-${attachmentId}">Image Context</label>
+                <select id="context-inline-${attachmentId}" class="context-inline-select">
+                    ${optionsHtml}
+                </select>
+                <button type="button" class="button button-small button-primary inline-context-save">Save</button>
+                <button type="button" class="button button-small inline-context-cancel">Cancel</button>
+            </div>
+        `;
+
+        const chipMarkup = chipsHtml || '<span class="msh-context-chip pending">Context Pending</span>';
+
+        return `
+            <div class="context-summary" data-attachment-id="${attachmentId}">
+                <div class="context-summary-controls">
+                    ${chipMarkup}
+                    ${editButton}
+                </div>
+                ${highlightsHtml}
+                ${editorHtml}
+            </div>
+        `;
+    }
+
+    function findImageById(attachmentId) {
+        const numericId = parseInt(attachmentId, 10);
+        if (Number.isNaN(numericId)) {
+            return null;
         }
 
-        return `${chipsHtml}${highlightsHtml ? `<br>${highlightsHtml}` : ''}`;
+        return imageData.find((item) => parseInt(item.ID || item.id, 10) === numericId) || null;
+    }
+
+    function closeContextEditor($summary) {
+        if (!$summary || !$summary.length) {
+            return;
+        }
+
+        $summary.removeClass('is-editing');
+        const $editor = $summary.find('.context-inline-editor');
+        $editor.addClass('hidden');
+
+        const $saveButton = $summary.find('.inline-context-save');
+        const originalText = $saveButton.data('original-text');
+        if (originalText) {
+            $saveButton.text(originalText);
+        }
+        $saveButton.prop('disabled', false);
+
+        $summary.removeData('existingSuggestion existingFilePath existingFileSize');
+    }
+
+    function closeAllContextEditors() {
+        $('.context-summary.is-editing').each(function() {
+            closeContextEditor($(this));
+        });
+    }
+
+    function openContextEditor($summary) {
+        if (!$summary || !$summary.length) {
+            return;
+        }
+
+        closeAllContextEditors();
+
+        const attachmentId = $summary.data('attachmentId');
+        const record = findImageById(attachmentId);
+        const manualValue = record && record.manual_context ? record.manual_context : '';
+        const existingSuggestion = record && record.suggested_filename ? record.suggested_filename : '';
+        const existingFilePath = record && record.file_path ? record.file_path : '';
+        const existingFileSize = record && record.current_size_mb ? record.current_size_mb : '';
+
+        const $select = $summary.find('.context-inline-select');
+        $select.val(manualValue);
+
+        $summary.addClass('is-editing');
+        $summary.find('.context-inline-editor').removeClass('hidden');
+
+        $summary.data('existingSuggestion', existingSuggestion);
+        $summary.data('existingFilePath', existingFilePath);
+        $summary.data('existingFileSize', existingFileSize);
+
+        setTimeout(() => {
+            $select.trigger('focus');
+        }, 0);
+    }
+
+    function saveContextSelection($button) {
+        if (!$button || !$button.length) {
+            return;
+        }
+
+        const $summary = $button.closest('.context-summary');
+        if (!$summary.length) {
+            return;
+        }
+
+        const attachmentId = parseInt($summary.data('attachmentId'), 10);
+        if (!attachmentId) {
+            alert('Invalid attachment reference.');
+            closeContextEditor($summary);
+            return;
+        }
+
+        const $row = $summary.closest('tr');
+        const $select = $summary.find('.context-inline-select');
+        const newContext = ($select.val() || '').toString();
+        const wasChecked = $row.find('.image-checkbox').is(':checked');
+        const originalStatus = ($row.data('status') || '').toString();
+        const originalPriority = parseInt($row.data('priority'), 10);
+        const existingSuggestion = $summary.data('existingSuggestion') || '';
+        const existingFilePath = $summary.data('existingFilePath') || '';
+        const existingFileSize = $summary.data('existingFileSize') || '';
+
+        const originalText = $button.data('original-text') || $button.text();
+        $button.data('original-text', originalText);
+        $button.text('Saving...').prop('disabled', true);
+
+        $.ajax({
+            url: mshImageOptimizer.ajaxurl,
+            type: 'POST',
+            dataType: 'json',
+            data: {
+                action: 'msh_update_context',
+                attachment_id: attachmentId,
+                context: newContext,
+                nonce: mshImageOptimizer.nonce
+            }
+        }).done(function(response) {
+            if (response && response.success && response.data && response.data.image) {
+                const updatedImage = response.data.image;
+
+                if (existingSuggestion) {
+                    updatedImage.suggested_filename = existingSuggestion;
+                }
+                if (existingFilePath) {
+                    updatedImage.file_path = existingFilePath;
+                }
+                if (existingFileSize && !updatedImage.current_size_mb) {
+                    updatedImage.current_size_mb = existingFileSize;
+                }
+
+                if (originalStatus && originalStatus !== 'optimized') {
+                    updatedImage.optimization_status = originalStatus;
+                }
+
+                if (!Number.isFinite(parseInt(updatedImage.priority, 10)) && Number.isInteger(originalPriority)) {
+                    updatedImage.priority = originalPriority;
+                }
+
+                const index = imageData.findIndex((img) => parseInt(img.ID || img.id, 10) === attachmentId);
+                if (index > -1) {
+                    imageData[index] = updatedImage;
+                } else {
+                    imageData.push(updatedImage);
+                }
+
+                const $newRow = $(createResultRow(updatedImage));
+                if (wasChecked) {
+                    $newRow.find('.image-checkbox').prop('checked', true);
+                }
+
+                $newRow.addClass('context-updated');
+                setTimeout(() => $newRow.removeClass('context-updated'), 2000);
+
+                $row.replaceWith($newRow);
+                closeAllContextEditors();
+                updateLog(`Context updated for image #${attachmentId}.`);
+                filterResults();
+            } else {
+                const errorMessage = response && response.data ? response.data : 'Unexpected response.';
+                alert(`Error updating context: ${errorMessage}`);
+                $button.text(originalText).prop('disabled', false);
+            }
+        }).fail(function() {
+            alert('Network error while saving context. Please try again.');
+            $button.text(originalText).prop('disabled', false);
+        });
     }
 
     function escapeHtml(value) {

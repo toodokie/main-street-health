@@ -250,6 +250,65 @@
     color: #55504a;
 }
 
+.context-summary-controls {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+}
+
+.context-summary.is-editing .context-summary-controls {
+    opacity: 0.6;
+}
+
+.context-summary .edit-context-inline {
+    border: none;
+    background: none;
+    padding: 0;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    color: #1d2327;
+}
+
+.context-summary .edit-context-inline:hover,
+.context-summary .edit-context-inline:focus {
+    color: #2271b1;
+}
+
+.context-summary .edit-context-inline .dashicons {
+    font-size: 14px;
+}
+
+.context-inline-editor {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+    margin-top: 6px;
+}
+
+.context-inline-editor.hidden {
+    display: none;
+}
+
+.context-inline-select {
+    min-width: 180px;
+    font-weight: 400;
+}
+
+tr.context-updated {
+    animation: contextUpdatedFlash 1.6s ease-out;
+}
+
+@keyframes contextUpdatedFlash {
+    from {
+        background-color: #fff7cc;
+    }
+    to {
+        background-color: transparent;
+    }
+}
+
 #optimization-log {
     background: #35332f;
     color: #faf9f6;
