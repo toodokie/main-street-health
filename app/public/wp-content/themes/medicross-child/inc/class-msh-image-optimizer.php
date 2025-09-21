@@ -96,11 +96,6 @@ class MSH_Contextual_Meta_Generator {
             $context['manual'] = true;
         }
 
-        if ($suggested_filename !== '') {
-            update_post_meta($attachment_id, '_msh_suggested_filename', $suggested_filename);
-        } else {
-            delete_post_meta($attachment_id, '_msh_suggested_filename');
-        }
         $attachment = get_post($attachment_id);
         $parent_id = $attachment ? (int) $attachment->post_parent : 0;
         $context['parent_id'] = $parent_id;
@@ -1478,6 +1473,12 @@ class MSH_Image_Optimizer {
         $webp_last_converted = (int) get_post_meta($attachment_id, 'msh_webp_last_converted', true);
         $metadata_last_updated = (int) get_post_meta($attachment_id, 'msh_metadata_last_updated', true);
         $source_last_compressed = (int) get_post_meta($attachment_id, 'msh_source_last_compressed', true);
+
+        if ($suggested_filename !== '') {
+            update_post_meta($attachment_id, '_msh_suggested_filename', $suggested_filename);
+        } else {
+            delete_post_meta($attachment_id, '_msh_suggested_filename');
+        }
 
         if ($is_svg) {
             $optimization_potential = [
