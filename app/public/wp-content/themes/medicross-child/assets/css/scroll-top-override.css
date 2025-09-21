@@ -1,0 +1,26 @@
+/**
+ * Scroll-to-Top Button Color Override
+ * Background: #A6C0A4 (sage green)
+ * Progress: #0F5C82 (dark blue)
+ */
+
+/* Override background circle color */
+.pxl-scroll-top:before {
+    background-color: #A6C0A4 !important; /* Sage green instead of dark navy */
+}
+
+/* Override progress indicator color */
+.pxl-scroll-top .pxl-scroll-progress-circle path {
+    stroke: #0F5C82 !important; /* Dark blue for progress */
+}
+
+/* Optional: Adjust border/ring color to complement new colors */
+.pxl-scroll-top {
+    box-shadow: inset 0 0 0 2px rgba(166, 192, 164, 0.3) !important; /* Lighter sage for subtle border */
+}
+
+/* Keep white icon on hover */
+.pxl-scroll-top:hover:before {
+    background-color: #A6C0A4 !important; /* Keep sage green on hover */
+    opacity: 0.9; /* Slight opacity change on hover for feedback */
+}

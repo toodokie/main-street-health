@@ -1,0 +1,1166 @@
+/* =============================================
+   MAIN STREET HEALTH - NAVIGATION SYSTEM
+   ============================================= */
+
+/* Navigation color variables */
+:root {
+  --nav-text-color: #0F5C82;
+  --nav-hover-color: #DBAA17;  /* Changed to yellow for text links */
+  --nav-active-color: #218E9C;
+  --btn-bg-color: #2B4666;
+  --btn-text-color: #FFFFFF;
+  --btn-hover-bg: #DBAA17;
+  --btn-hover-text: #2D3E4E;
+  
+  /* Secondary navigation colors */
+  --secondary-nav-bg: #F5F7FA;
+  --secondary-nav-text: #0F5C82;
+  --secondary-nav-hover: #DBAA17;
+  --sage: #E9EFE8;
+}
+
+/* Remove all link underlines in navigation */
+.site-header a,
+.site-header a:hover,
+.site-header a:focus,
+.site-header a:active,
+.site-header a:visited,
+.top-nav a,
+.top-nav a:hover,
+.top-nav a:focus,
+.secondary-nav a,
+.secondary-nav a:hover,
+.secondary-nav a:focus,
+.dropdown-menu a,
+.dropdown-menu a:hover,
+.dropdown-menu a:focus,
+nav a,
+nav a:hover,
+nav a:focus {
+  text-decoration: none !important;
+  border-bottom: none !important;
+  box-shadow: none !important;
+  background-image: none !important;
+  outline: none !important;
+}
+
+/* Remove any pseudo-element underlines EXCEPT our custom animated one */
+.site-header a::before,
+.secondary-nav a::before,
+.dropdown-menu a::before,
+.dropdown-menu a::after {
+  border-bottom: none !important;
+  text-decoration: none !important;
+  background-image: none !important;
+}
+
+/* Keep our custom animated underline for top nav */
+.top-nav .main-nav-links .nav-menu li a::after {
+  /* This one we want to keep for animation */
+  border-bottom: none !important;
+  text-decoration: none !important;
+}
+
+/* Mobile menu animations */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slideInLeft {
+  from {
+    opacity: 0;
+    transform: translateX(30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+/* Skip Links for Accessibility */
+.skip-link {
+  position: absolute !important;
+  left: -9999px !important;
+  top: auto !important;
+  width: 1px !important;
+  height: 1px !important;
+  overflow: hidden !important;
+  text-decoration: none !important;
+  background-color: var(--nav-text-color) !important;
+  color: white !important;
+  padding: 8px 16px !important;
+  border-radius: 4px !important;
+  z-index: 100000 !important;
+}
+
+.skip-link:focus {
+  position: absolute !important;
+  left: 6px !important;
+  top: 7px !important;
+  width: auto !important;
+  height: auto !important;
+  overflow: visible !important;
+  text-decoration: none !important;
+}
+
+/* Accessibility toolbar styling */
+.accessibility-toolbar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 10003;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 0;
+  background-color: transparent;
+}
+
+/* Adjust for WordPress admin bar */
+.admin-bar .accessibility-toolbar {
+  top: 32px;
+}
+
+/* Mobile accessibility toolbar - positioned like clothing labels on left edge at bottom (MOBILE ONLY) */
+@media (max-width: 768px) {
+  .accessibility-toolbar {
+    /* Position at left edge, bottom of screen aligned with scroll-to-top */
+    bottom: 20px;
+    left: -1px; /* Less tucked in, just edge cut off */
+    right: auto;
+    top: auto;
+    transform: none;
+    flex-direction: column;
+    gap: 6px;
+    background: transparent;
+    border-radius: 0;
+    padding: 0;
+    border: none;
+    /* Hide until scrolled 200px */
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.3s ease, visibility 0.3s ease;
+  }
+  
+  .accessibility-toolbar.scrolled {
+    opacity: 1;
+    visibility: visible;
+  }
+  
+  .accessibility-toolbar button {
+    width: 24px;
+    height: 24px;
+    font-size: 9px;
+    border-radius: 0 3px 3px 0; /* Only round right side, left edge cut off */
+    font-weight: bold;
+    padding-left: 8px; /* Move letters more to the right */
+    text-align: left; /* Align left to push text right */
+  }
+  
+  /* No adjustment needed for admin bar when at bottom */
+  .admin-bar .accessibility-toolbar {
+    bottom: 20px;
+  }
+
+  /* Nav bar accessibility icons - next to hamburger (MOBILE ONLY) */
+  .top-nav .top-nav-content {
+    position: relative;
+  }
+  
+  .top-nav .nav-accessibility-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    position: absolute;
+    right: 60px; /* Position to left of hamburger */
+    top: 50%;
+    transform: translateY(-50%);
+  }
+  
+  .top-nav .nav-accessibility-toolbar button {
+    width: 30px; /* Smaller size */
+    height: 30px;
+    font-size: 16px; /* Keep larger font for readability */
+    border-radius: 6px;
+    font-weight: bold;
+    background-color: #f5f5f5; /* Light grey background */
+    color: var(--nav-text-color); /* Blue color for letters */
+    border: 1px solid var(--nav-text-color); /* Blue border */
+    padding: 0; /* Remove all padding to ensure exact 30x30 */
+    margin: 0; /* Remove any margin */
+    box-shadow: none !important; /* No shadow effect */
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.3s ease;
+  }
+  
+  .top-nav .nav-accessibility-toolbar button:hover {
+    background-color: var(--nav-text-color); /* Blue background on hover */
+    color: white; /* White text on hover */
+  }
+  
+  .top-nav .nav-accessibility-toolbar button.active {
+    background-color: var(--nav-text-color); /* Blue background when active */
+    color: white; /* White text when active */
+  }
+}
+
+/* Hide nav accessibility toolbar on tablet and desktop */
+@media (min-width: 769px) {
+  .top-nav .nav-accessibility-toolbar {
+    display: none !important;
+  }
+}
+
+/* Hide sticky accessibility toolbar on tablet and desktop */
+@media (min-width: 769px) {
+  .accessibility-toolbar {
+    display: none !important;
+  }
+}
+
+.accessibility-toolbar button {
+  background-color: var(--nav-text-color);
+  color: white;
+  border: none;
+  width: 36px;
+  height: 36px;
+  border-radius: 6px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  transition: all 0.3s ease;
+}
+
+.accessibility-toolbar button:hover {
+  background-color: var(--nav-hover-color);
+  transform: translateY(-1px);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+}
+
+.accessibility-toolbar button:active {
+  transform: translateY(0);
+}
+
+.accessibility-toolbar button:focus {
+  outline: 2px solid var(--nav-active-color);
+  outline-offset: 2px;
+}
+
+/* Active state when accessibility feature is on */
+.accessibility-toolbar button.active {
+  background-color: var(--btn-hover-bg);
+  color: var(--btn-hover-text);
+}
+
+/* Top Navigation Bar Styles */
+.top-nav {
+  background-color: var(--background-color, #ffffff);
+  min-height: 76px;
+  padding-top: 15px;
+  padding-bottom: 15px;
+}
+
+.top-nav .top-nav-content {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 100%;
+  max-width: 1775px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+/* Logo Section (Left) */
+.top-nav .site-branding {
+  flex: 0 0 auto;
+}
+
+.top-nav .site-branding .custom-logo {
+  height: 76px;
+  width: auto;
+}
+
+.top-nav .site-branding .site-title {
+  margin: 0;
+}
+
+.top-nav .site-branding .site-title a {
+  text-decoration: none;
+  color: var(--text-color, #333);
+  font-weight: bold;
+}
+
+/* Main Navigation Links (Center) */
+.top-nav .main-nav-links {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+}
+
+.top-nav .main-nav-links .nav-menu {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  gap: 40px;
+}
+
+.top-nav .main-nav-links .nav-menu li a {
+  color: var(--nav-text-color) !important;
+  text-decoration: none !important;
+  font-family: 'Source Sans Pro', sans-serif;
+  font-weight: 600;
+  font-size: clamp(12px, 1.2vw, 14px);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  transition: color 0.3s ease;
+  position: relative;
+}
+
+/* Animated underline effect */
+.top-nav .main-nav-links .nav-menu li a::after {
+  content: '';
+  position: absolute;
+  bottom: -2px;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background-color: var(--nav-hover-color);
+  transform: scaleX(0);
+  transform-origin: right center;
+  transition: transform 0.4s ease;
+}
+
+.top-nav .main-nav-links .nav-menu li a:hover,
+.top-nav .main-nav-links .nav-menu li a:focus {
+  color: var(--nav-hover-color) !important;
+  text-decoration: none !important;
+}
+
+.top-nav .main-nav-links .nav-menu li a:hover::after,
+.top-nav .main-nav-links .nav-menu li a:focus::after {
+  transform: scaleX(1);
+  transform-origin: right center;
+}
+
+/* Remove any additional underlines from parent theme */
+.top-nav .main-nav-links .nav-menu li a {
+  border-bottom: none !important;
+  box-shadow: none !important;
+}
+
+.top-nav .main-nav-links .nav-menu li a:active,
+.top-nav .main-nav-links .nav-menu li a.current-menu-item,
+.top-nav .main-nav-links .nav-menu li a.current_page_item {
+  color: var(--nav-active-color) !important;
+  text-decoration: none !important;
+}
+
+.top-nav .main-nav-links .nav-menu li a:active::after,
+.top-nav .main-nav-links .nav-menu li a.current-menu-item::after,
+.top-nav .main-nav-links .nav-menu li a.current_page_item::after {
+  transform: scaleX(1);
+  transform-origin: right center;
+  background-color: var(--nav-active-color);
+}
+
+/* Book Appointment Button (Right) */
+.top-nav .book-appointment-section {
+  flex: 0 0 auto;
+}
+
+/* Mobile Menu Toggle (hidden on desktop by default) */
+.top-nav .nav-toggle {
+  display: none;
+}
+
+/* Show on mobile */
+@media (max-width: 1000px) {
+  .top-nav .nav-toggle {
+    display: flex !important;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    padding: 8px;
+    width: 44px;
+    height: 44px;
+    position: relative;
+    z-index: 10002;
+    pointer-events: auto !important;
+    box-shadow: none !important;
+    outline: none !important;
+  }
+  
+  .top-nav .nav-toggle:focus,
+  .top-nav .nav-toggle:active {
+    box-shadow: none !important;
+    outline: none !important;
+  }
+
+  .top-nav .nav-toggle .nav-toggle-bar {
+    display: block;
+    width: 28px;
+    height: 2px;
+    background-color: var(--nav-text-color);
+    margin: 3px 0;
+    transition: all 0.3s ease;
+    border-radius: 1px;
+    transform-origin: center;
+  }
+
+  .top-nav .nav-toggle.active .nav-toggle-bar:nth-child(1) {
+    transform: rotate(45deg) translate(6px, 6px);
+  }
+
+  .top-nav .nav-toggle.active .nav-toggle-bar:nth-child(2) {
+    opacity: 0;
+  }
+
+  .top-nav .nav-toggle.active .nav-toggle-bar:nth-child(3) {
+    transform: rotate(-45deg) translate(6px, -6px);
+  }
+}
+
+/* Secondary Navigation Bar */
+.secondary-nav {
+  height: 82px;
+  width: 100%;
+  position: relative;
+  z-index: 999;
+}
+
+.secondary-nav .secondary-nav-content {
+  background-color: var(--secondary-nav-bg);
+  border-radius: 8px;
+  box-shadow: 0 1px 3px 1px rgba(0, 0, 0, 0.15);
+  display: flex;
+  align-items: center;
+  height: 100%;
+  width: 100%;
+  padding: 0 20px;
+  max-width: 1775px;
+  margin: 0 auto;
+}
+
+.secondary-nav .secondary-nav-menu {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  justify-content: space-between;
+  width: 100%;
+}
+
+.secondary-nav .secondary-nav-menu li {
+  position: relative;
+}
+
+.secondary-nav .secondary-nav-menu li a {
+  color: var(--secondary-nav-text) !important;
+  text-decoration: none !important;
+  font-size: clamp(14px, 1.5vw, 18px);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  transition: color 0.3s ease;
+  font-weight: 600;
+  border-bottom: none !important;
+  box-shadow: none !important;
+}
+
+.secondary-nav .secondary-nav-menu li a:link,
+.secondary-nav .secondary-nav-menu li a:visited {
+  color: var(--secondary-nav-text) !important;
+  text-decoration: none !important;
+}
+
+.secondary-nav .secondary-nav-menu li a:hover,
+.secondary-nav .secondary-nav-menu li > a:hover {
+  color: #DBAA17 !important; /* Yellow color explicitly */
+  text-decoration: none !important;
+}
+
+/* Make chevron turn yellow on hover */
+.secondary-nav .secondary-nav-menu li a:hover .chevron .chevron-line {
+  background-color: #DBAA17 !important;
+}
+
+.secondary-nav .secondary-nav-menu li a:focus-visible,
+.secondary-nav .secondary-nav-menu li a:active {
+  color: var(--secondary-nav-hover) !important;
+  text-decoration: none !important;
+}
+
+.secondary-nav .secondary-nav-menu li a:focus-visible .chevron,
+.secondary-nav .secondary-nav-menu li a:active .chevron {
+  color: var(--secondary-nav-hover);
+  transform: rotate(180deg);
+}
+
+.secondary-nav .secondary-nav-menu li a:active .chevron .chevron-line {
+  background-color: #DBAA17 !important;
+}
+
+.secondary-nav .secondary-nav-menu li a .chevron {
+  position: relative;
+  width: 12px;
+  height: 8px;
+  display: inline-block;
+  transition: transform 0.3s ease;
+}
+
+.secondary-nav .secondary-nav-menu li a .chevron .chevron-line {
+  position: absolute;
+  width: 7px;
+  height: 2px;
+  background-color: currentColor;
+  transition: transform 0.3s ease;
+}
+
+.secondary-nav .secondary-nav-menu li a .chevron .chevron-line:first-child {
+  top: 2px;
+  left: 0;
+  transform: rotate(45deg);
+}
+
+.secondary-nav .secondary-nav-menu li a .chevron .chevron-line:last-child {
+  top: 2px;
+  right: 0;
+  transform: rotate(-45deg);
+}
+
+/* Active/open state - yellow color on click/open */
+.secondary-nav .secondary-nav-menu li.menu-item-open > a {
+  color: #DBAA17 !important;
+}
+
+.secondary-nav .secondary-nav-menu li.menu-item-open > a .chevron {
+  transform: rotate(180deg);
+}
+
+.secondary-nav .secondary-nav-menu li.menu-item-open > a .chevron .chevron-line {
+  background-color: #DBAA17 !important;
+}
+
+/* Dropdown menu styling */
+.secondary-nav .secondary-nav-menu li .dropdown-menu {
+  position: absolute;
+  top: 54px; /* Align with bottom of secondary nav rectangle */
+  left: 0;
+  background: white;
+  min-width: 350px;
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(-10px);
+  transition: all 0.3s ease;
+  z-index: 1000;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  overflow: hidden;
+}
+
+/* Prevent right edge dropdowns from overflowing off screen */
+.secondary-nav .secondary-nav-menu li:last-child .dropdown-menu,
+.secondary-nav .secondary-nav-menu li.align-dropdown-right .dropdown-menu {
+  left: auto;
+  right: 0;
+}
+
+.secondary-nav .secondary-nav-menu li:last-child .dropdown-menu .dropdown-content,
+.secondary-nav .secondary-nav-menu li.align-dropdown-right .dropdown-menu .dropdown-content {
+  text-align: left;
+}
+
+.secondary-nav .secondary-nav-menu li .dropdown-menu.active {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0);
+}
+
+.secondary-nav .secondary-nav-menu li .dropdown-menu .dropdown-content .dropdown-description {
+  padding: 20px 20px 16px 20px;
+  font-family: 'Source Sans Pro', sans-serif;
+  font-weight: 300;
+  font-size: clamp(16px, 1.6vw, 18px);
+  color: #7A8C99;
+  line-height: 1.4;
+}
+
+.secondary-nav .secondary-nav-menu li .dropdown-menu .dropdown-content .service-links {
+  padding: 0 20px 20px 20px;
+}
+
+.secondary-nav .secondary-nav-menu li .dropdown-menu .dropdown-content .service-links a {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 0;
+  color: var(--secondary-nav-text) !important;
+  text-decoration: none !important;
+  font-size: 16px;
+  font-weight: 400;
+  transition: color 0.3s ease;
+  border-bottom: none !important;
+  box-shadow: none !important;
+}
+
+.secondary-nav .secondary-nav-menu li .dropdown-menu .dropdown-content .service-links a:hover {
+  color: var(--secondary-nav-hover) !important;
+  text-decoration: none !important;
+}
+
+.secondary-nav .secondary-nav-menu li .dropdown-menu .dropdown-content .service-links a:hover .arrow {
+  color: var(--secondary-nav-hover);
+  transform: translateX(4px);
+}
+
+.secondary-nav .secondary-nav-menu li .dropdown-menu .dropdown-content .service-links a .arrow {
+  font-size: 18px;
+  transition: all 0.3s ease;
+}
+
+.secondary-nav .secondary-nav-menu li .dropdown-menu .dropdown-content .dropdown-footer {
+  background-color: var(--sage);
+  padding: 32px 20px;
+  border: none;
+  border-top: none;
+}
+
+.secondary-nav .secondary-nav-menu li .dropdown-menu .dropdown-content .dropdown-footer a {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  color: var(--secondary-nav-text) !important;
+  text-decoration: none !important;
+  font-size: 16px;
+  font-weight: 500;
+  transition: color 0.3s ease;
+  border: none !important;
+  border-bottom: none !important;
+  box-shadow: none !important;
+}
+
+.secondary-nav .secondary-nav-menu li .dropdown-menu .dropdown-content .dropdown-footer a:hover {
+  color: var(--secondary-nav-hover) !important;
+  text-decoration: none !important;
+}
+
+.secondary-nav .secondary-nav-menu li .dropdown-menu .dropdown-content .dropdown-footer a:hover .arrow {
+  color: var(--secondary-nav-hover);
+  transform: translateX(4px);
+}
+
+.secondary-nav .secondary-nav-menu li .dropdown-menu .dropdown-content .dropdown-footer a .arrow {
+  font-size: 18px;
+  transition: all 0.3s ease;
+}
+
+/* Hide mobile menu content on desktop */
+.mobile-menu-content {
+  display: none;
+}
+
+/* Show on mobile but hide initially */
+@media (max-width: 1000px) {
+  .mobile-menu-content {
+    display: block;
+  }
+}
+
+/* Hide desktop secondary nav on mobile - content is in mobile menu */
+@media (max-width: 1000px) {
+  .secondary-nav {
+    display: none;
+  }
+
+  .top-nav {
+    height: 72px;
+    min-height: 72px;
+    padding: 10px 0;
+    position: relative;
+    z-index: 10000;
+  }
+
+  .top-nav .top-nav-content {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: 100%;
+    z-index: 10001;
+  }
+
+  /* Logo sizing for mobile */
+  .top-nav .site-branding .custom-logo {
+    height: 52px;
+    width: auto;
+  }
+
+  /* Hide desktop navigation and button on mobile */
+  .top-nav .main-nav-links,
+  .top-nav .book-appointment-section {
+    display: none;
+  }
+
+  /* Force all secondary nav links to use larger font on mobile */
+  .secondary-nav-menu a,
+  .mobile-secondary-menu a,
+  .secondary-nav a,
+  [class*="secondary"] a {
+    font-size: 18px !important;
+    font-family: bree, 'Trebuchet MS', 'Segoe UI', sans-serif !important;
+    font-feature-settings: "salt" 1, "calt" 1, "ss01" 1, "ss02" 1, "ss03" 1, "ss04" 1, "ss05" 1 !important;
+    -webkit-font-smoothing: antialiased !important;
+    -moz-osx-font-smoothing: grayscale !important;
+  }
+
+  /* Mobile menu content positioning */
+  .top-nav .mobile-menu-content {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: white;
+    padding: 110px 20px 20px 20px;
+    z-index: 10001;
+    pointer-events: none;
+    overflow-y: auto;
+    
+    /* Right-to-left slide animation */
+    transform: translateX(100%);
+    visibility: hidden;
+    transition: all 0.6s cubic-bezier(0.25, 0.8, 0.25, 1);
+  }
+
+  /* Adjust for WordPress admin bar */
+  .admin-bar .top-nav .mobile-menu-content {
+    padding-top: 142px;
+  }
+
+  .top-nav .mobile-menu-content.active {
+    transform: translateX(0);
+    visibility: visible;
+    pointer-events: auto;
+  }
+
+  /* Staggered animation for menu items */
+  .top-nav .mobile-menu-content.active .mobile-secondary-menu .mobile-menu-item {
+    opacity: 1 !important;
+    transform: translateX(0) !important;
+  }
+
+  .top-nav .mobile-menu-content.active .mobile-secondary-menu .mobile-menu-item:nth-child(1) { transition-delay: 0.2s; }
+  .top-nav .mobile-menu-content.active .mobile-secondary-menu .mobile-menu-item:nth-child(2) { transition-delay: 0.3s; }
+  .top-nav .mobile-menu-content.active .mobile-secondary-menu .mobile-menu-item:nth-child(3) { transition-delay: 0.4s; }
+  .top-nav .mobile-menu-content.active .mobile-secondary-menu .mobile-menu-item:nth-child(4) { transition-delay: 0.5s; }
+  .top-nav .mobile-menu-content.active .mobile-secondary-menu .mobile-menu-item:nth-child(5) { transition-delay: 0.6s; }
+  .top-nav .mobile-menu-content.active .mobile-secondary-menu .mobile-menu-item:nth-child(6) { transition-delay: 0.7s; }
+
+  .top-nav .mobile-menu-content.active .mobile-top-menu,
+  .top-nav .mobile-menu-content.active .mobile-action-buttons {
+    opacity: 1 !important;
+    transform: translateX(0) !important;
+    animation: slideInLeft 0.6s ease 0.8s both;
+  }
+
+  /* Mobile menu close button */
+  .top-nav .mobile-menu-content .mobile-menu-close {
+    position: absolute;
+    top: 14px;
+    right: 8px;  /* Aligned with chevron right edge */
+    background: transparent;
+    border: none;
+    width: 44px;
+    height: 44px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    cursor: pointer;
+    z-index: 10002;
+    padding: 0;
+    box-shadow: none !important;
+    outline: none !important;
+  }
+  
+  .top-nav .mobile-menu-content .mobile-menu-close:focus,
+  .top-nav .mobile-menu-content .mobile-menu-close:active {
+    box-shadow: none !important;
+    outline: none !important;
+  }
+
+  /* Adjust for WordPress admin bar */
+  .admin-bar .top-nav .mobile-menu-content .mobile-menu-close {
+    top: 46px;
+  }
+
+  .top-nav .mobile-menu-content .mobile-menu-close .close-line {
+    width: 20px;
+    height: 2px;
+    background-color: var(--nav-text-color);
+    position: absolute;
+    transition: all 0.3s ease;
+  }
+
+  .top-nav .mobile-menu-content .mobile-menu-close .close-line:first-child {
+    transform: rotate(45deg);
+  }
+
+  .top-nav .mobile-menu-content .mobile-menu-close .close-line:last-child {
+    transform: rotate(-45deg);
+  }
+
+  .top-nav .mobile-menu-content .mobile-menu-close:hover .close-line {
+    background-color: var(--nav-hover-color);
+  }
+
+  .top-nav .mobile-menu-content .mobile-secondary-menu {
+    margin-bottom: 20px;
+  }
+
+  .top-nav .mobile-menu-content .mobile-secondary-menu .mobile-menu-item {
+    margin-bottom: 8px;
+    opacity: 0;
+    transform: translateX(30px);
+    transition: all 0.5s ease;
+  }
+
+  .top-nav .mobile-menu-content .mobile-secondary-menu .mobile-menu-item a {
+    font-family: bree, 'Trebuchet MS', 'Segoe UI', sans-serif !important;
+    font-weight: 600 !important;
+    font-feature-settings: "salt" 1, "calt" 1, "ss01" 1, "ss02" 1, "ss03" 1, "ss04" 1, "ss05" 1 !important;
+    -webkit-font-smoothing: antialiased !important;
+    -moz-osx-font-smoothing: grayscale !important;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 18px !important;
+    color: var(--btn-hover-text) !important;
+    text-decoration: none !important;
+    padding: 10px 0;
+  }
+
+  /* Super specific override for any secondary nav items in mobile */
+  .top-nav .mobile-menu-content .mobile-secondary-menu a,
+  .mobile-menu-content .mobile-secondary-menu a {
+    font-size: 18px !important;
+    font-family: bree, 'Trebuchet MS', 'Segoe UI', sans-serif !important;
+    font-feature-settings: "salt" 1, "calt" 1, "ss01" 1, "ss02" 1, "ss03" 1, "ss04" 1, "ss05" 1 !important;
+  }
+
+  .top-nav .mobile-menu-content .mobile-secondary-menu .mobile-menu-item a .mobile-chevron {
+    position: relative;
+    width: 12px;
+    height: 8px;
+    display: inline-block;
+    transition: transform 0.3s ease;
+  }
+
+  .top-nav .mobile-menu-content .mobile-secondary-menu .mobile-menu-item a .mobile-chevron .chevron-line {
+    position: absolute;
+    width: 7px;
+    height: 2px;
+    background-color: currentColor;
+    transition: transform 0.3s ease;
+  }
+
+  .top-nav .mobile-menu-content .mobile-secondary-menu .mobile-menu-item a .mobile-chevron .chevron-line:first-child {
+    top: 2px;
+    left: 0;
+    transform: rotate(45deg);
+  }
+
+  .top-nav .mobile-menu-content .mobile-secondary-menu .mobile-menu-item a .mobile-chevron .chevron-line:last-child {
+    top: 2px;
+    right: 0;
+    transform: rotate(-45deg);
+  }
+
+  .top-nav .mobile-menu-content .mobile-secondary-menu .mobile-menu-item a.active .mobile-chevron {
+    transform: rotate(180deg);
+  }
+
+  /* Mobile dropdown submenu */
+  .top-nav .mobile-menu-content .mobile-secondary-menu .mobile-dropdown {
+    display: none;
+    margin: 15px 0 20px 0;
+    background: white;
+    overflow: hidden;
+  }
+
+  .top-nav .mobile-menu-content .mobile-secondary-menu .mobile-dropdown.active {
+    display: block;
+    border: 1px solid #E4E7EC;
+    border-radius: 2px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  }
+
+  .top-nav .mobile-menu-content .mobile-secondary-menu .mobile-dropdown > a {
+    font-family: bree, sans-serif;
+    font-weight: 300;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 20px 20px;
+    font-size: 16px;
+    color: var(--btn-hover-text);
+    text-decoration: none;
+    border-bottom: none;
+    transition: background-color 0.2s ease;
+  }
+
+  .top-nav .mobile-menu-content .mobile-secondary-menu .mobile-dropdown > a:hover {
+    background-color: #F8F9FA;
+    color: var(--nav-text-color);
+  }
+
+  .top-nav .mobile-menu-content .mobile-secondary-menu .mobile-dropdown > a::after {
+    content: '→';
+    font-size: 18px;
+    color: #5A6B7B;
+  }
+
+  /* Footer link in dropdown */
+  .top-nav .mobile-menu-content .mobile-secondary-menu .mobile-dropdown .dropdown-footer {
+    background-color: var(--sage);
+    border: none;
+    border-top: none;
+  }
+
+  .top-nav .mobile-menu-content .mobile-secondary-menu .mobile-dropdown .dropdown-footer a {
+    border: none;
+    border-bottom: none;
+    color: var(--btn-hover-text);
+    font-weight: 500;
+    padding: 28px 20px;
+  }
+
+  .top-nav .mobile-menu-content .mobile-secondary-menu .mobile-dropdown .dropdown-footer a::after {
+    color: var(--btn-hover-text);
+  }
+
+  .top-nav .mobile-menu-content .mobile-secondary-menu .mobile-dropdown .dropdown-footer a:hover {
+    background-color: var(--sage);
+    color: var(--nav-text-color);
+  }
+
+  .top-nav .mobile-menu-content .mobile-secondary-menu .mobile-dropdown .dropdown-footer a:hover::after {
+    color: var(--nav-text-color);
+  }
+
+  .top-nav .mobile-menu-content .mobile-menu-separator {
+    border: none;
+    background-color: #E9EFE8;
+    height: 1px;
+    margin: 20px 0;
+  }
+
+  .top-nav .mobile-menu-content .mobile-top-menu {
+    margin-bottom: 30px;
+    opacity: 0;
+    transform: translateX(30px);
+  }
+
+  .top-nav .mobile-menu-content .mobile-top-menu a {
+    display: block;
+    padding: 6px 0 !important;
+    color: #7A8C99 !important;
+    text-decoration: none !important;
+    text-transform: uppercase !important;
+    font-size: 18px;
+    font-weight: 400;
+  }
+
+  .top-nav .mobile-menu-content .mobile-action-buttons {
+    opacity: 0;
+    transform: translateX(30px);
+  }
+
+  .top-nav .mobile-menu-content .mobile-action-buttons .mobile-book-btn,
+  .top-nav .mobile-menu-content .mobile-action-buttons .mobile-patient-form-btn {
+    display: block;
+    width: 100%;
+    text-align: center;
+    margin-bottom: 12px;
+    padding: 14px 24px;
+    border-radius: 4px;
+    font-size: 16px;
+    font-weight: 600;
+    text-decoration: none;
+    transition: all 0.3s ease;
+  }
+
+  .top-nav .mobile-menu-content .mobile-action-buttons .mobile-book-btn {
+    background-color: #2B4666;
+    color: white;
+  }
+
+  .top-nav .mobile-menu-content .mobile-action-buttons .mobile-book-btn:hover {
+    background-color: #0F5C82;
+  }
+
+  .top-nav .mobile-menu-content .mobile-action-buttons .mobile-patient-form-btn,
+  .top-nav .mobile-menu-content .mobile-action-buttons .btn-sage {
+    background-color: var(--sage) !important;
+    color: var(--btn-hover-text) !important;
+    text-transform: none !important;
+  }
+
+  .top-nav .mobile-menu-content .mobile-action-buttons .mobile-patient-form-btn:hover,
+  .top-nav .mobile-menu-content .mobile-action-buttons .btn-sage:hover {
+    background-color: var(--nav-text-color) !important;
+    color: var(--btn-text-color) !important;
+  }
+}
+
+/* Breadcrumbs */
+.breadcrumb-container {
+  padding: 20px 0;
+  background-color: #f8f9fa;
+}
+
+.breadcrumb-container .breadcrumb {
+  font-size: 14px;
+  color: #6c757d;
+}
+
+.breadcrumb-container .breadcrumb a {
+  color: var(--nav-text-color);
+  text-decoration: none;
+}
+
+.breadcrumb-container .breadcrumb a:hover {
+  color: var(--nav-hover-color);
+  text-decoration: none !important;
+}
+
+/* Progressive navigation width scaling across screen sizes */
+
+/* Large screens (1200px+) - Match header width */
+@media (min-width: 1200px) {
+  body:not(.elementor-editor-preview) .site-header .container,
+  body:not(.elementor-editor-preview) .top-nav .container,
+  body:not(.elementor-editor-preview) .secondary-nav .container,
+  body:not(.elementor-editor-preview) header .container,
+  body:not(.elementor-editor-preview) #masthead .container,
+  body:not(.elementor-editor-preview) #page .site-header .container {
+    max-width: 1775px !important;
+    width: 100% !important;
+  }
+  
+  /* Override grid.css from parent theme */
+  body:not(.elementor-editor-preview) .site-header > .container,
+  body:not(.elementor-editor-preview) .top-nav > .container,
+  body:not(.elementor-editor-preview) .secondary-nav > .container {
+    max-width: 1775px !important;
+  }
+}
+
+/* Medium-large screens (992px - 1199px) - Wider than Bootstrap but not full header */
+@media (min-width: 992px) and (max-width: 1199px) {
+  body:not(.elementor-editor-preview) .site-header .container,
+  body:not(.elementor-editor-preview) .top-nav .container,
+  body:not(.elementor-editor-preview) .secondary-nav .container,
+  body:not(.elementor-editor-preview) header .container {
+    max-width: 1400px !important;
+  }
+  
+}
+
+/* Medium screens (768px - 991px) - Comfortable tablet width */
+@media (min-width: 768px) and (max-width: 991px) {
+  body:not(.elementor-editor-preview) .site-header .container,
+  body:not(.elementor-editor-preview) .top-nav .container,
+  body:not(.elementor-editor-preview) .secondary-nav .container,
+  body:not(.elementor-editor-preview) header .container {
+    max-width: 100% !important;
+    padding-left: 20px;
+    padding-right: 20px;
+  }
+  
+}
+
+/* High specificity rules to override parent theme navigation styles */
+/* Remove ALL underlines from navigation links */
+#masthead a,
+#masthead a:hover,
+#masthead a:focus,
+#masthead a:active,
+.site-header .top-nav a,
+.site-header .secondary-nav a,
+.site-header .dropdown-menu a {
+  text-decoration: none !important;
+  border: 0 !important;
+  border-bottom: 0 !important;
+  box-shadow: none !important;
+  background-image: none !important;
+}
+
+/* Secondary nav hover state - MUST turn yellow */
+.site-header .secondary-nav .secondary-nav-menu > li > a:hover,
+.secondary-nav .secondary-nav-menu > li > a:hover,
+#page .secondary-nav .secondary-nav-menu > li > a:hover {
+  color: #DBAA17 !important;
+}
+
+/* Chevron lines turn yellow on hover */
+.site-header .secondary-nav .secondary-nav-menu > li > a:hover .chevron .chevron-line,
+.secondary-nav .secondary-nav-menu > li > a:hover .chevron .chevron-line {
+  background-color: #DBAA17 !important;
+}
+
+/* Chevron rotation when menu is open */
+.secondary-nav .secondary-nav-menu li.menu-item-open > a .chevron {
+  transform: rotate(180deg) !important;
+  transition: transform 0.3s ease !important;
+}
+
+/* Dropdown links should not have underline */
+.site-header .dropdown-menu a:hover,
+.site-header .dropdown-footer a:hover,
+.site-header .service-links a:hover {
+  text-decoration: none !important;
+  border-bottom: 0 !important;
+}
+
+/* Override parent theme grid.css container width */
+@media (min-width: 1200px) {
+  body:not(.elementor-editor-preview) .site-header .container {
+    max-width: 1775px !important;
+  }
+  
+  body:not(.elementor-editor-preview) .top-nav .container {
+    max-width: 1775px !important;
+  }
+  
+  body:not(.elementor-editor-preview) .secondary-nav .container {
+    max-width: 1775px !important;
+  }
+  
+  body:not(.elementor-editor-preview) header .container {
+    max-width: 1775px !important;
+  }
+  
+  /* Most specific selectors to override any parent theme rules */
+  body:not(.elementor-editor-preview) #masthead .container,
+  body:not(.elementor-editor-preview) .site-header > div.container {
+    max-width: 1775px !important;
+  }
+  
+}

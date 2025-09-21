@@ -1,0 +1,961 @@
+/**
+ * MSH Services List Custom Styles
+ * Custom styling for Main Street Health Services List Widget (Manual Entries)
+ */
+
+/* Base Container */
+.msh-services-list {
+    position: relative;
+    width: 100%;
+}
+
+/* Override parent theme link styles */
+.msh-services-list a,
+.msh-services-list a:hover,
+.msh-services-list a:focus,
+.msh-services-list a:active,
+.msh-services-list a:visited,
+.msh-services-list .msh-service-link,
+.msh-services-list .msh-service-link:hover,
+.msh-services-list .msh-service-link:focus,
+.msh-services-list .msh-service-link:active,
+.msh-services-list .msh-service-link:visited {
+    text-decoration: none !important;
+    border-bottom: none !important;
+    background: transparent !important;
+    background-color: transparent !important;
+    box-shadow: none !important;
+    outline: none !important;
+}
+
+/* Ultra-specific overrides to beat theme CSS */
+body .msh-services-list a:hover,
+body .msh-services-list .msh-service-link:not(.link-button):hover,
+html body .msh-services-list a:hover,
+html body .msh-services-list .msh-service-link:not(.link-button):hover {
+    text-decoration: none !important;
+    border-bottom: none !important;
+    background: transparent !important;
+    background-color: transparent !important;
+    /* Remove hardcoded color - let Elementor control it */
+}
+
+/* Service Entry - Minimal defaults, styling controlled by Elementor */
+.msh-service-entry {
+    position: relative;
+    margin-bottom: 30px;
+    padding: 0; /* Default no padding - controlled by Elementor */
+    background: transparent; /* Default transparent - controlled by Elementor */
+    border-radius: 0; /* Default no radius - controlled by Elementor */
+    box-shadow: none; /* Default no shadow - controlled by Elementor */
+    border: none; /* Default no border - controlled by Elementor */
+    transition: all 0.3s ease;
+    display: flex; /* Always flex for consistent alignment */
+    align-items: flex-start;
+    gap: 20px; /* Default gap between media and content */
+}
+
+/* Service Entry Default Layout - Horizontal */
+.msh-service-entry.media-left {
+    flex-direction: row;
+    text-align: left;
+}
+
+.msh-service-entry.media-right {
+    flex-direction: row-reverse;
+    text-align: right;
+}
+
+.msh-service-entry.media-top {
+    flex-direction: column;
+    text-align: left;
+    align-items: flex-start;
+}
+
+.msh-service-entry.media-top .msh-service-icon,
+.msh-service-entry.media-top .msh-service-image {
+    align-self: flex-start;
+}
+
+.msh-service-entry.media-center {
+    flex-direction: column;
+    text-align: center;
+    align-items: center;
+}
+
+/* No media styles - content only */
+.msh-service-entry:not(:has(.msh-service-icon)):not(:has(.msh-service-image)) {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+}
+
+/* ============================================
+   HORIZONTAL LAYOUT STYLES (Table-like)
+   ============================================ */
+
+/* Horizontal Container */
+.msh-services-horizontal {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+}
+
+/* Horizontal Item - Table row style */
+.msh-service-entry.msh-service-horizontal-item {
+    display: flex;
+    flex-direction: row;
+    align-items: stretch !important; /* stretch columns to full row height */
+    padding: 20px 0;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+    margin-bottom: 0;
+    gap: 0;
+    transition: background-color 0.3s ease;
+    min-height: 80px; /* Ensure consistent row height for proper alignment */
+}
+
+.msh-service-entry.msh-service-horizontal-item:hover {
+    background-color: rgba(0, 0, 0, 0.02);
+}
+
+.msh-service-entry.msh-service-horizontal-item:last-child {
+    border-bottom: none;
+}
+
+/* Icon/Image column - Fixed width */
+.msh-services-horizontal .msh-service-icon,
+.msh-services-horizontal .msh-service-image {
+    width: 60px;
+    height: 60px;
+    flex-shrink: 0;
+    margin-right: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* Vertically center each direct column within the row */
+.msh-services-horizontal .msh-service-horizontal-item > * {
+    align-self: stretch !important;
+    display: flex !important;
+    align-items: center !important; /* vertical center */
+}
+
+/* Title column - Fixed width */
+.msh-services-horizontal .msh-service-title {
+    width: 360px;
+    flex-shrink: 0;
+    margin: 0;
+    padding-right: 40px;
+    font-weight: 600;
+    line-height: 1.3;
+    display: flex;
+    align-items: center; /* ensure title text centers */
+}
+
+/* Description column - Flexible width */
+.msh-services-horizontal .msh-service-description {
+    flex: 1;
+    margin: 0;
+    padding-right: 24px;
+    line-height: 1.5;
+    min-width: 300px;
+    display: flex;
+    align-items: center; /* ensure description text centers */
+}
+
+/* Explainer column - Fixed width */
+.msh-services-horizontal .msh-service-explainer {
+    width: 180px;
+    flex-shrink: 0;
+    margin: 0;
+    padding-right: 24px;
+    font-size: 14px;
+    color: #218E9C;
+    display: flex;
+    align-items: center; /* ensure explainer text centers */
+}
+
+/* Link/Button column - Fixed width, right aligned */
+.msh-services-horizontal .msh-service-link {
+    width: 120px;
+    flex-shrink: 0;
+    margin: 0;
+    justify-content: flex-end;
+    text-align: right;
+    display: flex;
+    align-items: center; /* ensure link centers vertically */
+}
+
+/* Content and text containers for horizontal */
+.msh-services-horizontal .msh-service-content {
+    display: flex;
+    flex-direction: row;
+    align-items: center; /* keep inner group centered */
+    flex: 1;
+    gap: 0;
+}
+
+.msh-services-horizontal .msh-service-text {
+    display: flex;
+    flex-direction: row;
+    align-items: center; /* ensure text columns are centered */
+    flex: 1;
+    gap: 0;
+    margin-bottom: 0;
+    height: 100%;
+}
+
+/* Neutralize heading/paragraph default margins inside columns */
+.msh-services-horizontal .msh-service-horizontal-item h1,
+.msh-services-horizontal .msh-service-horizontal-item h2,
+.msh-services-horizontal .msh-service-horizontal-item h3,
+.msh-services-horizontal .msh-service-horizontal-item h4,
+.msh-services-horizontal .msh-service-horizontal-item h5,
+.msh-services-horizontal .msh-service-horizontal-item h6,
+.msh-services-horizontal .msh-service-horizontal-item p {
+    margin-top: 0 !important;
+    margin-bottom: 0 !important;
+}
+
+/* Elementor wrapper centering if present */
+.msh-services-horizontal .msh-service-horizontal-item > * > .elementor-widget-container,
+.msh-services-horizontal .msh-service-horizontal-item > * > .elementor-widget-wrap {
+    display: flex !important;
+    align-items: center !important;
+    height: 100% !important;
+}
+
+/* Hide dividers in horizontal layout */
+.msh-services-horizontal .msh-service-divider {
+    display: none;
+}
+
+/* Responsive adjustments for horizontal layout */
+@media (max-width: 1024px) {
+    .msh-services-horizontal .msh-service-title {
+        width: 280px;
+    }
+    
+    .msh-services-horizontal .msh-service-description {
+        min-width: 250px;
+    }
+    
+    .msh-services-horizontal .msh-service-explainer {
+        width: 150px;
+    }
+}
+
+@media (max-width: 900px) {
+    .msh-service-entry.msh-service-horizontal-item {
+        flex-wrap: wrap;
+    }
+
+    .msh-services-horizontal .msh-service-content {
+        flex-wrap: wrap;
+    }
+
+    .msh-services-horizontal .msh-service-title,
+    .msh-services-horizontal .msh-service-description,
+    .msh-services-horizontal .msh-service-explainer {
+        width: 100%;
+        padding-right: 0;
+    }
+
+    .msh-services-horizontal .msh-service-description,
+    .msh-services-horizontal .msh-service-explainer {
+        margin-top: 8px !important;
+    }
+
+    .msh-services-horizontal .msh-service-link {
+        width: 100%;
+        justify-content: flex-start;
+        text-align: left;
+        margin-top: 12px;
+    }
+}
+
+@media (max-width: 768px) {
+    /* Stack vertically on mobile */
+    .msh-service-entry.msh-service-horizontal-item {
+        flex-direction: column;
+        align-items: flex-start;
+        padding: 16px 0;
+        gap: 12px;
+    }
+    
+    .msh-services-horizontal .msh-service-content {
+        flex-direction: column;
+        align-items: flex-start;
+        width: 100%;
+    }
+    
+    .msh-services-horizontal .msh-service-text {
+        flex-direction: column;
+        align-items: flex-start;
+        width: 100%;
+        gap: 8px;
+    }
+    
+    .msh-services-horizontal .msh-service-title,
+    .msh-services-horizontal .msh-service-description,
+    .msh-services-horizontal .msh-service-explainer,
+    .msh-services-horizontal .msh-service-link {
+        width: 100%;
+        padding-right: 0;
+    }
+    
+    .msh-services-horizontal .msh-service-link {
+        justify-content: flex-start;
+        text-align: left;
+    }
+    
+    .msh-services-horizontal .msh-service-icon,
+    .msh-services-horizontal .msh-service-image {
+        margin-right: 0;
+        margin-bottom: 8px;
+    }
+}
+
+/* Service Content - Main container for text and links */
+.msh-service-content {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-width: 0; /* Prevents content from overflowing */
+}
+
+/* Service Text Container */
+.msh-service-text {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin-bottom: 16px;
+}
+
+/* Service Title - Basic styling, controlled by Elementor Typography */
+.msh-service-title {
+    margin: 0 0 8px 0;
+    font-weight: 600;
+    line-height: 1.3;
+    color: inherit; /* Inherit from Elementor settings */
+}
+
+/* Override margins for horizontal layout */
+.msh-services-horizontal .msh-service-title {
+    margin: 0 !important; /* Remove all margins in horizontal layout */
+}
+
+.msh-services-horizontal .msh-service-description {
+    margin: 0 !important; /* Remove all margins in horizontal layout */
+}
+
+.msh-services-horizontal .msh-service-explainer {
+    margin: 0 !important; /* Remove all margins in horizontal layout */
+}
+
+/* Service Description - Basic styling, controlled by Elementor Typography */
+.msh-service-description {
+    margin: 0;
+    line-height: 1.5;
+    color: inherit; /* Inherit from Elementor settings */
+}
+
+/* Service Explainer Text - Basic styling, controlled by Elementor Typography */
+.msh-service-explainer {
+    margin: 0;
+    line-height: 1.4;
+    font-size: 14px;
+    font-weight: 500;
+    color: #218E9C; /* Default teal color - controlled by Elementor settings */
+}
+
+/* Service Icon - Basic container, styling controlled by Elementor */
+.msh-service-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    width: 64px; /* Default size - controlled by Elementor */
+    height: 64px; /* Default size - controlled by Elementor */
+    font-size: 32px; /* Default icon size - controlled by Elementor */
+    color: inherit; /* Inherit from Elementor settings */
+    background-color: #f8f9fa; /* Default neutral background */
+    border-radius: 50%; /* Default circle shape */
+    transition: all 0.3s ease;
+}
+
+.msh-service-icon i,
+.msh-service-icon svg {
+    width: 1em;
+    height: 1em;
+}
+
+/* Icon shape variations - controlled by Elementor */
+.msh-service-icon.shape-none {
+    background: none !important;
+    border-radius: 0;
+}
+
+.msh-service-icon.shape-square {
+    border-radius: 0;
+}
+
+.msh-service-icon.shape-rounded {
+    border-radius: 8px;
+}
+
+.msh-service-icon.shape-circle {
+    border-radius: 50%;
+}
+
+/* Service Image - Basic container, styling controlled by Elementor */
+.msh-service-image {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    width: 64px; /* Default size - controlled by Elementor */
+    height: 64px; /* Default size - controlled by Elementor */
+    overflow: hidden;
+    border-radius: 8px; /* Default - controlled by Elementor */
+}
+
+.msh-service-image img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+}
+
+/* Image shape variations - controlled by Elementor */
+.msh-service-image.shape-square {
+    border-radius: 0;
+}
+
+.msh-service-image.shape-rounded {
+    border-radius: 8px;
+}
+
+.msh-service-image.shape-circle {
+    border-radius: 50%;
+}
+
+/* Service Link - Basic styling, controlled by Elementor */
+.msh-service-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 12px;
+    font-weight: 500;
+    text-decoration: none;
+    color: inherit; /* Inherit from Elementor settings */
+    transition: all 0.3s ease;
+    border: none;
+    background: transparent;
+    padding: 0;
+    cursor: pointer;
+    line-height: 1.4;
+}
+
+.msh-service-link:hover {
+    color: inherit; /* Let Elementor control hover color */
+    text-decoration: none;
+}
+
+/* Button Style Link - Enhanced styling for button appearance */
+.msh-service-link.link-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 12px 24px;
+    border: 1px solid #e0e0e0;
+    border-radius: 24px;
+    background: transparent;
+    font-weight: 500;
+    text-align: center;
+    transition: all 0.3s ease;
+    gap: 8px;
+}
+
+.msh-service-link.link-button span {
+    flex: none;
+}
+
+.msh-service-link.link-button:hover {
+    background-color: #DBAA17 !important;
+    border-color: #DBAA17 !important;
+    color: #ffffff !important;
+    text-decoration: none;
+    transform: none;
+}
+
+.msh-service-link.link-button:hover i,
+.msh-service-link.link-button:hover svg {
+    color: #ffffff !important;
+    fill: #ffffff !important;
+}
+
+.msh-service-link span {
+    flex: none;
+}
+
+.msh-service-link i,
+.msh-service-link svg {
+    font-size: 0.9em;
+    transition: transform 0.3s ease;
+    flex-shrink: 0;
+}
+
+.msh-service-link:hover i,
+.msh-service-link:hover svg {
+    transform: translateX(2px);
+}
+
+/* Link Position Variations */
+.msh-service-entry.link-inline .msh-service-link {
+    margin-top: 12px;
+}
+
+/* Stacked Left - Link appears below ALL content, left-aligned */
+.msh-service-entry.link-stacked-left {
+    flex-direction: column;
+    align-items: flex-start;
+}
+
+.msh-service-entry.link-stacked-left .msh-service-content {
+    margin-bottom: 16px;
+    width: 100%;
+}
+
+.msh-service-entry.link-stacked-left .msh-service-text {
+    margin-bottom: 0;
+    width: 100%;
+}
+
+.msh-service-entry.link-stacked-left .msh-service-link {
+    margin-top: 0;
+    align-self: flex-start;
+    text-align: left;
+}
+
+.msh-service-entry.link-stacked-left .msh-service-link.link-button {
+    align-self: flex-start;
+    justify-content: flex-start;
+}
+
+/* Stacked Center - Link appears below ALL content, center-aligned */
+.msh-service-entry.link-stacked-center {
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+}
+
+.msh-service-entry.link-stacked-center .msh-service-content {
+    margin-bottom: 16px;
+    width: 100%;
+    text-align: center;
+}
+
+.msh-service-entry.link-stacked-center .msh-service-text {
+    margin-bottom: 0;
+    width: 100%;
+}
+
+.msh-service-entry.link-stacked-center .msh-service-link {
+    margin-top: 0;
+    align-self: center;
+    text-align: center;
+}
+
+.msh-service-entry.link-stacked-center .msh-service-link.link-button {
+    align-self: center;
+    justify-content: center;
+}
+
+.msh-service-entry.link-block .msh-service-link {
+    margin-top: 16px;
+    padding: 8px 16px;
+    background: rgba(33, 142, 156, 0.1);
+    border-radius: 4px;
+    justify-content: center;
+}
+
+.msh-service-entry.link-right .msh-service-content {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.msh-service-entry.link-right .msh-service-text {
+    margin-bottom: 0;
+}
+
+.msh-service-entry.link-right .msh-service-link {
+    margin-top: 0;
+    margin-left: 16px;
+    flex-shrink: 0;
+}
+
+/* Service Divider - Fully controlled by Elementor */
+.msh-service-divider {
+    width: 100%;
+    height: 1px;
+    margin: 0; /* Reset margin - fully controlled by Elementor divider_spacing setting */
+    background: rgba(0, 0, 0, 0.1); /* Default - controlled by Elementor */
+}
+
+.msh-service-divider[data-style="dashed"] {
+    background: none;
+    border-top: 1px dashed rgba(0, 0, 0, 0.1);
+}
+
+.msh-service-divider[data-style="dotted"] {
+    background: none;
+    border-top: 1px dotted rgba(0, 0, 0, 0.1);
+}
+
+.msh-service-divider[data-style="double"] {
+    background: none;
+    border-top: 3px double rgba(0, 0, 0, 0.1);
+    height: 3px;
+}
+
+/* Responsive Design - Mobile First */
+@media (max-width: 768px) {
+    .msh-service-entry {
+        gap: 16px;
+        margin-bottom: 24px;
+    }
+    
+    .msh-service-entry.media-right {
+        flex-direction: column;
+        text-align: left;
+    }
+    
+    .msh-service-icon,
+    .msh-service-image {
+        width: 48px !important;
+        height: 48px !important;
+        font-size: 24px !important;
+    }
+    
+    .msh-service-text {
+        gap: 10px;
+        margin-bottom: 12px;
+    }
+    
+    .msh-service-entry.link-right .msh-service-content {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+    
+    .msh-service-entry.link-right .msh-service-text {
+        margin-bottom: 12px;
+    }
+    
+    .msh-service-entry.link-right .msh-service-link {
+        margin-left: 0;
+        margin-top: 12px;
+    }
+    
+    /* Ensure stacked positioning works on mobile */
+    .msh-service-entry.link-stacked-left .msh-service-content,
+    .msh-service-entry.link-stacked-center .msh-service-content {
+        margin-bottom: 12px;
+    }
+    
+    /* .msh-service-divider {
+        margin: 20px 0; -- Removed: Now controlled by Elementor responsive settings
+    } */
+}
+
+@media (max-width: 480px) {
+    .msh-service-entry {
+        gap: 12px;
+        margin-bottom: 20px;
+    }
+    
+    .msh-service-icon,
+    .msh-service-image {
+        width: 40px !important;
+        height: 40px !important;
+        font-size: 20px !important;
+    }
+    
+    .msh-service-text {
+        flex-direction: column !important;
+        align-items: flex-start !important;
+        gap: 12px !important;
+    }
+    
+    .msh-service-entry .msh-service-link {
+        align-self: flex-start !important;
+        text-align: left !important;
+    }
+}
+
+/* ============================================
+   GRID LAYOUT STYLES
+   ============================================ */
+
+/* Grid Container */
+.msh-services-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    column-gap: 30px;
+    row-gap: 30px;
+    width: 100%;
+    position: relative;
+}
+
+/* Grid Item - Inherits all base styles from .msh-service-entry */
+.msh-service-entry.msh-service-grid-item {
+    margin-bottom: 0 !important; /* Remove bottom margin in grid */
+    height: 100%; /* Take full height of grid cell */
+    display: flex;
+    flex-direction: column;
+    border-radius: 8px; /* Default card radius */
+    padding: 24px; /* Default card padding */
+    box-shadow: none !important; /* Remove ALL shadows to prevent white shading */
+    border: 1px solid rgba(0, 0, 0, 0.08); /* Slightly more visible border instead of shadow */
+    transition: all 0.3s ease;
+    cursor: pointer;
+    align-items: flex-start; /* Align content to top */
+    text-align: left; /* Default left alignment */
+    gap: 16px; /* Gap between elements */
+    position: relative; /* Ensure proper stacking context */
+    overflow: visible !important; /* Don't clip content */
+    background-clip: padding-box; /* Ensure background doesn't bleed */
+}
+
+/* Add actual background as a separate layer */
+.msh-service-entry.msh-service-grid-item:not(.has-cover-image) {
+    background-color: #ffffff !important; /* White background only when no cover image */
+}
+
+/* Grid item hover effect */
+.msh-service-entry.msh-service-grid-item:hover {
+    transform: translateY(-2px);
+    box-shadow: none; /* No shadow on hover either */
+    border-color: rgba(33, 142, 156, 0.3); /* More visible border color on hover instead */
+    background-color: #fafafa; /* Subtle background change on hover */
+}
+
+/* Grid service content - flex grow to fill available space */
+.msh-services-grid .msh-service-content {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    flex-grow: 1;
+    width: 100%;
+    position: relative; /* Ensure content is above any backgrounds */
+    z-index: 2; /* Lift content above any potential overlays */
+    background: transparent; /* Ensure no background interference */
+}
+
+/* Grid service text - main content area */
+.msh-services-grid .msh-service-text {
+    flex-grow: 1;
+    margin-bottom: 16px;
+    width: 100%;
+}
+
+/* Grid service link - push to bottom */
+.msh-services-grid .msh-service-link {
+    margin-top: auto; /* Push link to bottom of card */
+    align-self: flex-start; /* Don't stretch the link */
+}
+
+/* Icon positioning for grid */
+.msh-services-grid .msh-service-icon {
+    margin-bottom: 0; /* Remove bottom margin, using gap instead */
+    flex-shrink: 0;
+    align-self: flex-start;
+}
+
+/* Image positioning for grid */
+.msh-services-grid .msh-service-image {
+    margin-bottom: 0; /* Remove bottom margin, using gap instead */
+    flex-shrink: 0;
+    align-self: flex-start;
+}
+
+/* Grid responsive breakpoints */
+@media (max-width: 1024px) {
+    .msh-services-grid {
+        grid-template-columns: repeat(2, 1fr);
+        column-gap: 24px;
+        row-gap: 24px;
+    }
+    
+    .msh-service-entry.msh-service-grid-item {
+        padding: 20px;
+        gap: 14px;
+    }
+}
+
+@media (max-width: 768px) {
+    .msh-services-grid {
+        grid-template-columns: 1fr;
+        column-gap: 20px;
+        row-gap: 20px;
+    }
+    
+    .msh-service-entry.msh-service-grid-item {
+        padding: 18px;
+        gap: 12px;
+    }
+}
+
+/* Equal height cards - handled by CSS Grid automatically */
+/* The key is using display: flex and flex-direction: column on grid items */
+/* Combined with height: 100%, this ensures all cards in a row have the same height naturally */
+
+/* Override grid styles also apply to .msh-services-grid */
+.msh-services-grid a,
+.msh-services-grid a:hover,
+.msh-services-grid a:focus,
+.msh-services-grid a:active,
+.msh-services-grid a:visited,
+.msh-services-grid .msh-service-link:not(.link-button),
+.msh-services-grid .msh-service-link:not(.link-button):hover,
+.msh-services-grid .msh-service-link:not(.link-button):focus,
+.msh-services-grid .msh-service-link:not(.link-button):active,
+.msh-services-grid .msh-service-link:not(.link-button):visited {
+    text-decoration: none !important;
+    border-bottom: none !important;
+    background: transparent !important;
+    background-color: transparent !important;
+    box-shadow: none !important;
+    outline: none !important;
+}
+
+body .msh-services-grid a:hover,
+body .msh-services-grid .msh-service-link:not(.link-button):hover,
+html body .msh-services-grid a:hover,
+html body .msh-services-grid .msh-service-link:not(.link-button):hover {
+    text-decoration: none !important;
+    border-bottom: none !important;
+    background: transparent !important;
+    background-color: transparent !important;
+    /* Remove hardcoded color - let Elementor control it */
+}
+
+/* Ensure ALL elements in grid items are above any backgrounds */
+.msh-service-entry.msh-service-grid-item > * {
+    position: relative;
+    z-index: 2;
+}
+
+/* Override ANY Elementor widget container styles that might create overlays */
+.elementor-widget-msh_services_list .elementor-widget-container {
+    box-shadow: none !important;
+    background: transparent !important;
+}
+
+.elementor-widget-msh_services_list .elementor-widget-container::before,
+.elementor-widget-msh_services_list .elementor-widget-container::after {
+    display: none !important;
+    content: none !important;
+    box-shadow: none !important;
+    background: none !important;
+}
+
+/* Grid button link styling - Force visibility with strong contrast */
+.msh-services-grid .msh-service-link.link-button {
+    background: #ffffff !important; /* Force white background */
+    background-color: #ffffff !important; /* Double ensure white background */
+    border: 1px solid #09243C !important; /* Strong dark border for visibility */
+    color: #09243C !important; /* Dark text color */
+    position: relative; /* Ensure proper stacking context */
+    z-index: 10; /* High z-index to stay above everything */
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1) !important; /* Subtle shadow for depth */
+    margin-top: auto; /* Push to bottom but with space */
+    opacity: 1 !important; /* Force full opacity */
+    visibility: visible !important; /* Force visibility */
+}
+
+.msh-services-grid .msh-service-link.link-button:hover {
+    background-color: #DBAA17 !important;
+    background: #DBAA17 !important; /* Force gold background on hover */
+    border-color: #DBAA17 !important;
+    color: #ffffff !important;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.15) !important; /* Stronger shadow on hover */
+    z-index: 11; /* Higher z-index on hover */
+    opacity: 1 !important; /* Force full opacity on hover */
+    visibility: visible !important; /* Force visibility on hover */
+}
+
+/* =============================================
+   COVER IMAGE FUNCTIONALITY
+   ============================================= */
+
+/* Cover image background styling */
+.msh-service-entry.has-cover-image {
+    background-image: var(--cover-bg-image);
+    background-size: var(--cover-image-fit, contain);
+    background-position: center center;
+    background-repeat: no-repeat;
+    background-color: var(--cover-backdrop-color, rgba(12, 35, 55, 0.65));
+    position: relative !important;
+    color: white !important;
+    overflow: hidden !important;
+    --cover-image-fit: contain;
+    --cover-backdrop-color: rgba(12, 35, 55, 0.65);
+}
+
+/* Overlay keeps text legible */
+.msh-service-entry.has-cover-image::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: rgba(0, 0, 0, var(--cover-overlay-opacity, 0));
+    pointer-events: none;
+    z-index: 1;
+}
+
+/* Ensure content sits above overlay */
+.msh-service-entry.has-cover-image > * {
+    position: relative;
+    z-index: 2;
+}
+
+/* Alternative fit options */
+.msh-service-entry.has-cover-image.cover-contain {
+    --cover-image-fit: contain;
+}
+
+.msh-service-entry.has-cover-image.cover-cover {
+    --cover-image-fit: cover;
+}
+
+.msh-service-entry.has-cover-image.cover-fill {
+    --cover-image-fit: 100% 100%;
+}
+
+/* Content styling for cover images - no height changes */
+.msh-service-entry.has-cover-image .msh-service-content {
+    /* No flex or height changes - keep natural flow */
+}
+
+/* White text on cover images for better readability */
+.msh-service-entry.has-cover-image .msh-service-title,
+.msh-service-entry.has-cover-image .msh-service-description,
+.msh-service-entry.has-cover-image .msh-service-explainer {
+    color: white !important;
+    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.5) !important; /* Text shadow for better readability */
+}
+
+/* Cover image specific link styling */
+.msh-service-entry.has-cover-image .msh-service-link:not(.link-button) {
+    color: white !important;
+    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.5) !important;
+}
+
+.msh-service-entry.has-cover-image .msh-service-link:not(.link-button):hover {
+    color: #DBAA17 !important;
+}
+
+/* Remove all height constraints - let cards be natural size */

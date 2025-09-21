@@ -1,0 +1,116 @@
+.pxl-pricing1 {
+	.content-inner {
+		background-color: $four_color;
+		border-radius: 20px;
+		padding: 42px 37px 50px 37px;
+		@media (max-width: 575px) {
+			padding: 45px 20px 49px 20px;
+		}
+		.pxl-item--title-box {
+			padding-left: 10px;
+			font-size: 17px;
+			color: #fff;
+			@extend .ft-theme-default;
+			border-bottom: 1px solid #183248;
+			font-weight: 400;
+			display: flex;
+			column-gap: 10px;
+			padding-bottom: 16px;
+			margin-bottom: 31px;
+			svg {
+				fill: #fff;
+				width: 17px;
+				height: auto;
+			}
+		}
+		.pxl-item-description {
+			font-size: 15px;
+			line-height: 25px;
+			color: #b3c0ce;
+			margin: 13px 0 33px 0;
+			border-bottom: 1px solid #284055;
+			padding-bottom: 33px;
+		}
+		.pxl-item--price {
+			font-size: 55px;
+			line-height: 70px;
+			color: $primary_color;;
+			@extend .ft-theme-default;
+			span {
+				display: inline-block;
+				color: #fff;
+				@extend .ft-theme-default;
+				line-height: 32px;
+				font-size:15px;
+				padding: 0 24px;
+				position:relative;
+				border-radius: 5px;
+				overflow: hidden;
+				background-color: rgba(255,255,255,0.15);
+			}
+		}
+		.pxl-item--button {
+			margin-top: 46px;
+			a {
+				line-height: 55px;
+				padding: 0 34px;
+				border-radius: 13px;
+				background-color: #2e4559;
+				@extend .ft-theme-default;
+				color: #fff;
+				font-size: 15px;
+				display: flex;
+				align-items: center;
+				justify-content: space-between;
+				@include transition(all .25s cubic-bezier(.645,.045,.355,1));
+				&:hover {
+					background-color: #fff;
+					color: $secondary_color;
+				}
+			}
+		}
+		.pxl-item--feature  {
+			margin-top: 36px;
+			.content {
+				display: flex;
+				align-items: center;
+				width: 100%;
+				column-gap: 10px;
+				@extend .ft-theme-default;
+				font-size: 15px;
+				color: #fff;
+				i {
+					color: #1ede8f;
+				}
+				svg  {
+					width: 16px;
+					path{
+						fill: #1ede8f;
+					}
+				}
+			}
+			.non-active {
+				.content,svg path {
+					color: #5f6e7e;
+					fill: #5f6e7e;
+				}
+			}
+			div + div {
+				margin-top: 17px;
+			}
+		}
+	}
+	&.is-popular {
+		.content-inner{
+			background: linear-gradient(183deg, #{'rgba(var(--primary-color-rgb),0.8)'} 0%, #{'rgba(var(--primary-color-rgb),1)'} 100%);
+		}
+		.time {
+			background-color: $secondary_color !important;
+			color: #fff !important; 
+		}
+	}
+}
+
+body.rtl {
+	
+}

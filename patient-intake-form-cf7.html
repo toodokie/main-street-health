@@ -1,0 +1,604 @@
+<!-- 
+PATIENT INTAKE FORM - CONTACT FORM 7
+=====================================
+IMPORTANT SETUP INSTRUCTIONS:
+
+1. SIGNATURE FIELDS REQUIRE ONE OF THESE PLUGINS:
+   - "Contact Form 7 Signature Addon" by Breizhtorm (Free)
+   - "Signature Addon for Contact Form 7" by WP Dynamics
+   
+   Without a signature plugin, the [signature] tags will show as plain text.
+   
+2. ALTERNATIVE IF NO SIGNATURE PLUGIN:
+   Replace [signature* policy-signature] with:
+   [text* policy-signature placeholder "Type your full name as signature"]
+   
+3. FORM SETUP:
+   - Create new form in Contact Form 7
+   - Copy this entire HTML code (including styles) into the Form tab
+   - Configure Mail settings for form submissions
+-->
+
+<style>
+/* Patient Intake Form - Custom Styles */
+/* Brand Colors: #2B4666 (primary blue), #A6C0A4 (light green) */
+
+.form-contact-qrcode.patient-intake-form {
+    padding: 30px 0;
+}
+
+/* Section Titles */
+.patient-intake-form .form-section-title {
+    color: #2B4666;
+    font-size: 24px;
+    font-weight: 600;
+    margin-bottom: 25px;
+    padding-bottom: 10px;
+    border-bottom: 2px solid #A6C0A4;
+}
+
+.patient-intake-form .form-subsection-title {
+    color: #2B4666;
+    font-size: 18px;
+    font-weight: 500;
+    margin-bottom: 20px;
+    margin-top: 15px;
+}
+
+/* Input Fields */
+.patient-intake-form .input-filled {
+    margin-bottom: 20px;
+}
+
+.patient-intake-form .input-filled label {
+    display: block;
+    color: #2B4666;
+    font-weight: 500;
+    margin-bottom: 8px;
+    font-size: 14px;
+}
+
+.patient-intake-form .input-filled input[type="text"],
+.patient-intake-form .input-filled input[type="email"],
+.patient-intake-form .input-filled input[type="tel"],
+.patient-intake-form .input-filled input[type="date"],
+.patient-intake-form .input-filled select,
+.patient-intake-form .input-filled textarea {
+    width: 100%;
+    padding: 10px 15px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 14px;
+    transition: border-color 0.3s;
+}
+
+.patient-intake-form .input-filled input:focus,
+.patient-intake-form .input-filled select:focus,
+.patient-intake-form .input-filled textarea:focus {
+    border-color: #A6C0A4;
+    outline: none;
+    box-shadow: 0 0 0 2px rgba(166, 192, 164, 0.2);
+}
+
+/* Checkbox Styling - Inline Layout */
+.patient-intake-form .wpcf7-checkbox.checkbox-inline {
+    display: flex !important;
+    flex-wrap: wrap !important;
+    gap: 20px !important;
+    margin-top: 10px;
+}
+
+.patient-intake-form .wpcf7-checkbox.checkbox-inline .wpcf7-list-item {
+    display: inline-flex !important;
+    align-items: center !important;
+    margin: 0 !important;
+    flex: 0 0 auto !important;
+    min-width: 150px !important;
+}
+
+.patient-intake-form .wpcf7-checkbox.checkbox-inline .wpcf7-list-item-label {
+    margin-left: 8px;
+    color: #333;
+    font-size: 14px;
+}
+
+/* Single Checkbox Styling */
+.patient-intake-form .wpcf7-checkbox.checkbox-single .wpcf7-list-item {
+    display: flex;
+    align-items: flex-start;
+    margin: 0;
+}
+
+.patient-intake-form .wpcf7-checkbox.checkbox-single .wpcf7-list-item-label {
+    margin-left: 8px;
+    color: #333;
+    font-size: 14px;
+    line-height: 1.5;
+}
+
+/* Radio Button Styling */
+.patient-intake-form .wpcf7-radio {
+    display: flex;
+    gap: 30px;
+    margin-top: 10px;
+}
+
+.patient-intake-form .wpcf7-radio .wpcf7-list-item {
+    display: inline-flex;
+    align-items: center;
+    margin: 0;
+}
+
+.patient-intake-form .wpcf7-radio .wpcf7-list-item-label {
+    margin-left: 8px;
+    color: #333;
+    font-size: 14px;
+}
+
+/* Custom Checkbox/Radio Appearance */
+.patient-intake-form .wpcf7-checkbox input[type="checkbox"],
+.patient-intake-form .wpcf7-radio input[type="radio"] {
+    width: 18px;
+    height: 18px;
+    accent-color: #2B4666;
+    cursor: pointer;
+}
+
+/* Signature Fields */
+.patient-intake-form .signature-description {
+    font-size: 13px;
+    color: #666;
+    margin-bottom: 10px;
+    line-height: 1.4;
+}
+
+/* Signature Fields - Breizhtorm Plugin Styles */
+.patient-intake-form .patient-signature {
+    display: block !important;
+    width: 100% !important;
+    max-width: 400px !important;
+}
+
+/* Signature Canvas - Multiple selectors to catch all variations */
+.patient-intake-form canvas.wpcf7-signature,
+.patient-intake-form canvas,
+.patient-intake-form .wpcf7-form-control-signature-wrap canvas,
+.patient-intake-form .patient-signature canvas {
+    border: 1px solid #ddd !important;
+    border-radius: 18px !important;
+    background: #f8f8f8 !important;
+    cursor: crosshair !important;
+    display: block !important;
+    touch-action: none !important;
+    padding: 10px !important;
+    box-sizing: border-box !important;
+}
+
+.patient-intake-form canvas.wpcf7-signature:hover,
+.patient-intake-form canvas:hover,
+.patient-intake-form .wpcf7-form-control-signature-wrap canvas:hover,
+.patient-intake-form .patient-signature canvas:hover {
+    border-color: #A6C0A4 !important;
+}
+
+/* Signature Clear Button - Multiple selectors to catch all variations */
+.patient-intake-form input[type="button"].clear,
+.patient-intake-form button.clear,
+.patient-intake-form .clear,
+.patient-intake-form input[value="Clear"] {
+    background-color: #A6C0A4 !important;
+    color: white !important;
+    border: none !important;
+    padding: 8px 16px !important;
+    border-radius: 4px !important;
+    font-size: 14px !important;
+    cursor: pointer !important;
+    margin-top: 10px !important;
+    transition: background-color 0.3s !important;
+    display: inline-block !important;
+}
+
+.patient-intake-form input[type="button"].clear:hover,
+.patient-intake-form button.clear:hover,
+.patient-intake-form .clear:hover,
+.patient-intake-form input[value="Clear"]:hover {
+    background-color: #8fa68d !important;
+}
+
+/* Signature wrapper div created by plugin */
+.patient-intake-form .wpcf7-form-control-signature-wrap {
+    display: block !important;
+    margin-bottom: 10px !important;
+}
+
+/* Hidden input that stores signature data */
+.patient-intake-form input[type="hidden"].wpcf7-signature {
+    display: none !important;
+}
+
+/* Catch-all for any buttons in signature areas */
+.patient-intake-form .wpcf7-form-control-signature-wrap button,
+.patient-intake-form .wpcf7-form-control-signature-wrap input[type="button"] {
+    background-color: #A6C0A4 !important;
+    color: white !important;
+    border: none !important;
+    padding: 8px 16px !important;
+    border-radius: 4px !important;
+    font-size: 14px !important;
+}
+
+/* Submit Button */
+.patient-intake-form .wpcf7-submit.wpcf6-btn-abs {
+    background-color: #2B4666 !important;
+    color: white !important;
+    padding: 12px 30px;
+    border: none;
+    border-radius: 4px;
+    font-size: 16px;
+    font-weight: 500;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    transition: background-color 0.3s;
+}
+
+.patient-intake-form .wpcf7-submit.wpcf6-btn-abs:hover {
+    background-color: #1e3147 !important;
+}
+
+.patient-intake-form .wpcf7-submit.wpcf6-btn-abs svg {
+    width: 18px;
+    height: 18px;
+    fill: currentColor;
+}
+
+/* Textarea */
+.patient-intake-form textarea {
+    min-height: 100px;
+    resize: vertical;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .patient-intake-form .wpcf7-checkbox.checkbox-inline {
+        flex-direction: column !important;
+        gap: 10px !important;
+    }
+    
+    .patient-intake-form .wpcf7-checkbox.checkbox-inline .wpcf7-list-item {
+        width: 100% !important;
+    }
+    
+    .patient-intake-form .form-section-title {
+        font-size: 20px;
+    }
+    
+    .patient-intake-form .form-subsection-title {
+        font-size: 16px;
+    }
+    
+    /* Mobile signature canvas adjustments */
+    .patient-intake-form canvas.wpcf7-signature,
+    .patient-intake-form canvas,
+    .patient-intake-form .wpcf7-form-control-signature-wrap canvas,
+    .patient-intake-form .patient-signature canvas {
+        max-width: calc(100vw - 40px) !important;
+        width: 100% !important;
+        height: 150px !important;
+        box-sizing: border-box !important;
+    }
+    
+    .patient-intake-form .patient-signature {
+        max-width: 100% !important;
+        overflow: hidden !important;
+    }
+}
+
+/* Error Messages */
+.patient-intake-form .wpcf7-not-valid {
+    border-color: #c74545 !important;
+}
+
+.patient-intake-form .wpcf7-not-valid-tip,
+.patient-intake-form span.wpcf7-not-valid-tip {
+    color: #c74545 !important;
+    font-size: 13px !important;
+    margin-top: 5px !important;
+    display: block !important;
+    background: transparent !important;
+    border: none !important;
+    padding: 5px 0 !important;
+    position: relative !important;
+    left: auto !important;
+    top: auto !important;
+    width: auto !important;
+    font-weight: normal !important;
+}
+
+.patient-intake-form .wpcf7-not-valid-tip:before {
+    content: none !important;
+}
+
+/* Hide the red blocks/bars */
+.patient-intake-form .wpcf7-form-control-wrap:before,
+.patient-intake-form .wpcf7-form-control-wrap:after {
+    display: none !important;
+}
+
+/* Ensure error text is visible */
+.patient-intake-form .wpcf7-validation-errors,
+.patient-intake-form .wpcf7-response-output {
+    border: 2px solid #c74545 !important;
+    background: #fef2f2 !important;
+    color: #c74545 !important;
+    padding: 15px !important;
+    margin: 20px 0 !important;
+    border-radius: 4px !important;
+}
+</style>
+
+<div class="form-contact-qrcode online-appointment wrap-form patient-intake-form">
+    <div class="containter">
+        <div class="row">
+            <!-- Patient Information Section -->
+            <div class="col-xl-12">
+                <h3 class="form-section-title">Patient Information</h3>
+            </div>
+            
+            <div class="input-filled col-xl-6 col-lg-6 col-md-6 col-sm-6 col-xs-12">
+                <span class="wpcf7-form-control-wrap last-name">
+                    <label>Last Name*</label>
+                    [text* last-name id:last-name placeholder "Last Name..."]
+                </span>
+            </div>
+            
+            <div class="input-filled col-xl-6 col-lg-6 col-md-6 col-sm-6 col-xs-12">
+                <span class="wpcf7-form-control-wrap first-name">
+                    <label>First Name*</label>
+                    [text* first-name id:first-name placeholder "First Name..."]
+                </span>
+            </div>
+            
+            <div class="input-filled col-xl-6 col-lg-6 col-md-6 col-sm-6 col-xs-12">
+                <span class="wpcf7-form-control-wrap patient-email">
+                    <label>Patient's Email</label>
+                    [email patient-email id:patient-email placeholder "Email Address..."]
+                </span>
+            </div>
+            
+            <div class="input-filled col-xl-6 col-lg-6 col-md-6 col-sm-6 col-xs-12">
+                <span class="wpcf7-form-control-wrap date-of-birth">
+                    <label>Date of Birth</label>
+                    [date date-of-birth id:date-of-birth]
+                </span>
+            </div>
+            
+            <div class="input-filled col-xl-12">
+                <span class="wpcf7-form-control-wrap street-address">
+                    <label>Street Address</label>
+                    [text street-address id:street-address placeholder "Street Address..."]
+                </span>
+            </div>
+            
+            <div class="input-filled col-xl-4 col-lg-4 col-md-6 col-sm-6 col-xs-12">
+                <span class="wpcf7-form-control-wrap city-town">
+                    <label>City/Town</label>
+                    [text city-town id:city-town placeholder "City/Town..."]
+                </span>
+            </div>
+            
+            <div class="input-filled col-xl-4 col-lg-4 col-md-6 col-sm-6 col-xs-12">
+                <span class="wpcf7-form-control-wrap province">
+                    <label>Province</label>
+                    [text province id:province placeholder "Province..."]
+                </span>
+            </div>
+            
+            <div class="input-filled col-xl-4 col-lg-4 col-md-6 col-sm-6 col-xs-12">
+                <span class="wpcf7-form-control-wrap postal-code">
+                    <label>Postal Code</label>
+                    [text postal-code id:postal-code placeholder "Postal Code..."]
+                </span>
+            </div>
+            
+            <div class="input-filled col-xl-4 col-lg-4 col-md-6 col-sm-6 col-xs-12">
+                <span class="wpcf7-form-control-wrap home-tel">
+                    <label>Home Tel</label>
+                    [tel home-tel id:home-tel placeholder "(___) ___-____"]
+                </span>
+            </div>
+            
+            <div class="input-filled col-xl-4 col-lg-4 col-md-6 col-sm-6 col-xs-12">
+                <span class="wpcf7-form-control-wrap work-tel">
+                    <label>Work Tel</label>
+                    [tel work-tel id:work-tel placeholder "(___) ___-____"]
+                </span>
+            </div>
+            
+            <div class="input-filled col-xl-4 col-lg-4 col-md-6 col-sm-6 col-xs-12">
+                <span class="wpcf7-form-control-wrap mobile-tel">
+                    <label>Mobile Tel</label>
+                    [tel mobile-tel id:mobile-tel placeholder "(___) ___-____"]
+                </span>
+            </div>
+            
+            <div class="input-filled col-xl-6 col-lg-6 col-md-6 col-sm-6 col-xs-12">
+                <span class="wpcf7-form-control-wrap gender">
+                    <label>Gender</label>
+                    [radio gender id:gender default:Male "Male" "Female"]
+                </span>
+            </div>
+            
+            <div class="input-filled col-xl-6 col-lg-6 col-md-6 col-sm-6 col-xs-12">
+                <span class="wpcf7-form-control-wrap occupation">
+                    <label>Occupation</label>
+                    [text occupation id:occupation placeholder "Occupation..."]
+                </span>
+            </div>
+            
+            <div class="input-filled col-xl-6 col-lg-6 col-md-6 col-sm-6 col-xs-12">
+                <span class="wpcf7-form-control-wrap employer">
+                    <label>Employer</label>
+                    [text employer id:employer placeholder "Employer..."]
+                </span>
+            </div>
+            
+            <!-- Emergency Contact Section -->
+            <div class="col-xl-12">
+                <h4 class="form-subsection-title">Emergency Contact</h4>
+            </div>
+            
+            <div class="input-filled col-xl-4 col-lg-4 col-md-6 col-sm-6 col-xs-12">
+                <span class="wpcf7-form-control-wrap emergency-contact-name">
+                    <label>Emergency Contact Name</label>
+                    [text emergency-contact-name id:emergency-contact-name placeholder "Contact Name..."]
+                </span>
+            </div>
+            
+            <div class="input-filled col-xl-4 col-lg-4 col-md-6 col-sm-6 col-xs-12">
+                <span class="wpcf7-form-control-wrap emergency-contact-relationship">
+                    <label>Relationship</label>
+                    [text emergency-contact-relationship id:emergency-contact-relationship placeholder "Relationship..."]
+                </span>
+            </div>
+            
+            <div class="input-filled col-xl-4 col-lg-4 col-md-6 col-sm-6 col-xs-12">
+                <span class="wpcf7-form-control-wrap emergency-contact-tel">
+                    <label>Emergency Contact Tel</label>
+                    [tel emergency-contact-tel id:emergency-contact-tel placeholder "(___) ___-____"]
+                </span>
+            </div>
+            
+            <!-- Family Doctor Section -->
+            <div class="col-xl-12">
+                <h4 class="form-subsection-title">Family Doctor</h4>
+            </div>
+            
+            <div class="input-filled col-xl-6 col-lg-6 col-md-6 col-sm-6 col-xs-12">
+                <span class="wpcf7-form-control-wrap family-doctor-name">
+                    <label>Family Doctor Name</label>
+                    [text family-doctor-name id:family-doctor-name placeholder "Doctor Name..."]
+                </span>
+            </div>
+            
+            <div class="input-filled col-xl-6 col-lg-6 col-md-6 col-sm-6 col-xs-12">
+                <span class="wpcf7-form-control-wrap family-doctor-tel">
+                    <label>Family Doctor Tel</label>
+                    [tel family-doctor-tel id:family-doctor-tel placeholder "(___) ___-____"]
+                </span>
+            </div>
+            
+            <!-- Referral Source Section -->
+            <div class="col-xl-12">
+                <h3 class="form-section-title">How Did You Hear About Us?</h3>
+            </div>
+            
+            <div class="input-filled col-xl-12">
+                <span class="wpcf7-form-control-wrap referral-source">
+                    <label>Please check all that apply:</label>
+                    [checkbox referral-source id:referral-source class:checkbox-inline "Return Patient" "Location/Street Sign" "Website" "Family Doctor" "Internet" "Facebook/Twitter" "Local businesses" "Family/friend referral" "Other"]
+                </span>
+            </div>
+            
+            <!-- Insurance Information Section -->
+            <div class="col-xl-12">
+                <h3 class="form-section-title">Insurance Information</h3>
+            </div>
+            
+            <div class="input-filled col-xl-6 col-lg-6 col-md-6 col-sm-6 col-xs-12">
+                <span class="wpcf7-form-control-wrap insurance-company">
+                    <label>Insurance Company</label>
+                    [text insurance-company id:insurance-company placeholder "Insurance Company..."]
+                </span>
+            </div>
+            
+            <div class="input-filled col-xl-6 col-lg-6 col-md-6 col-sm-6 col-xs-12">
+                <span class="wpcf7-form-control-wrap policy-number">
+                    <label>Certificate/Policy Number</label>
+                    [text policy-number id:policy-number placeholder "Policy Number..."]
+                </span>
+            </div>
+            
+            <!-- Health History Section -->
+            <div class="col-xl-12">
+                <h3 class="form-section-title">Health History</h3>
+            </div>
+            
+            <div class="input-filled col-xl-12">
+                <span class="wpcf7-form-control-wrap health-conditions">
+                    <label>Please check any conditions that apply:</label>
+                    [checkbox health-conditions id:health-conditions class:checkbox-inline "Cardiovascular conditions" "Respiratory conditions" "Diabetes" "High blood pressure" "Cancer" "Arthritis" "Neurological conditions" "Previous surgeries" "Allergies" "Other"]
+                </span>
+            </div>
+            
+            <div class="input-filled col-xl-12">
+                <span class="wpcf7-form-control-wrap current-medications">
+                    <label>Current Medications</label>
+                    [textarea current-medications id:current-medications placeholder "Please list all current medications..."]
+                </span>
+            </div>
+            
+            <div class="input-filled col-xl-12">
+                <span class="wpcf7-form-control-wrap accident-description">
+                    <label>If related to an accident, please describe:</label>
+                    [textarea accident-description id:accident-description placeholder "Describe the accident if applicable..."]
+                </span>
+            </div>
+            
+            <!-- Consent Section -->
+            <div class="col-xl-12">
+                <h3 class="form-section-title">Consent & Agreement</h3>
+            </div>
+            
+            <div class="input-filled col-xl-12">
+                <span class="wpcf7-form-control-wrap email-consent">
+                    <label>May we communicate with you via email?</label>
+                    [radio email-consent id:email-consent default:Yes "Yes" "No"]
+                </span>
+            </div>
+            
+            <div class="input-filled col-xl-12">
+                <span class="wpcf7-form-control-wrap policy-agreement">
+                    [checkbox* policy-agreement id:policy-agreement class:checkbox-single "I acknowledge that I have read and understood the clinic policies and consent to treatment"]
+                </span>
+            </div>
+            
+            <div class="input-filled col-xl-12">
+                <span class="wpcf7-form-control-wrap privacy-consent">
+                    [checkbox* privacy-consent id:privacy-consent class:checkbox-single "I consent to the collection and use of my personal health information as outlined in the Privacy Policy"]
+                </span>
+            </div>
+            
+            <!-- Signature Fields -->
+            <div class="col-xl-12">
+                <h4 class="form-subsection-title">Signatures</h4>
+            </div>
+            
+            <div class="input-filled col-xl-6 col-lg-6 col-md-12 col-sm-12 col-xs-12">
+                <span class="wpcf7-form-control-wrap policy-signature">
+                    <label>Policy Agreement Signature*</label>
+                    <p class="signature-description">By signing below, I acknowledge that I have read and understood Main Street Health policies including the 24-hour cancellation policy.</p>
+                    [signature* policy-signature 400x200 class:patient-signature]
+                </span>
+            </div>
+            
+            <div class="input-filled col-xl-6 col-lg-6 col-md-12 col-sm-12 col-xs-12">
+                <span class="wpcf7-form-control-wrap email-consent-signature">
+                    <label>Email/Text Consent Signature*</label>
+                    <p class="signature-description">I authorize Main Street Health to send appointment reminders and health information via email/text message.</p>
+                    [signature* email-consent-signature 400x200 class:patient-signature]
+                </span>
+            </div>
+            
+            <div class="input-filled col-xl-12 your-submit">
+                <button type="submit" class="wpcf7-submit wpcf6-btn-abs">
+                    Submit Patient Intake Form
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" style="transform:scalex(-1);height:15px;" data-name="Layer 2">
+                        <path d="m22 11h-17.586l5.293-5.293a1 1 0 1 0 -1.414-1.414l-7 7a1 1 0 0 0 0 1.414l7 7a1 1 0 0 0 1.414-1.414l-5.293-5.293h17.586a1 1 0 0 0 0-2z"></path>
+                    </svg>
+                </button>
+            </div>
+        </div>
+    </div>
+</div>

@@ -1,0 +1,11 @@
+<?php
+
+class PxlSectionScale_Widget extends Pxltheme_Core_Widget_Base{
+    protected $name = 'pxl_section_scale';
+    protected $title = 'Case Section Scale';
+    protected $icon = 'eicon-animation';
+    protected $categories = array( 'pxltheme-core' );
+    protected $params = '{"sections":[{"name":"section_content","label":"Content","tab":"content","controls":[{"name":"bg_type","label":"Background Type","type":"select","options":{"img":"Image","video":"Video"},"default":"img"},{"name":"bg_img","label":"Background Image","type":"media","condition":{"bg_type":["img"]},"selectors":{"{{WRAPPER}} .pxl-section-scale .pxl-sticky-parallax":"background-image: url( {{URL}} );"}},{"name":"bg_img_position","label":"Background Image Position","type":"select","options":{"":"Default","center center":"Center Center","center left":"Center Left","center right":"Center Right","top center":"Top Center","top left":"Top Left","top right":"Top Right","bottom center":"Bottom Center","bottom left":"Bottom Left","bottom right":"Bottom Right","initial":"Custom"},"default":"","selectors":{"{{WRAPPER}} .pxl-section-scale .pxl-sticky-parallax":"background-position: {{VALUE}};"},"condition":{"bg_type":"img","bg_img[url]!":""}},{"name":"bg_img_size","label":"Background Image Size","type":"select","hide_in_inner":true,"options":{"":"Default","auto":"Auto","cover":"Cover","contain":"Contain"},"default":"","selectors":{"{{WRAPPER}} .pxl-section-scale .pxl-sticky-parallax":"background-size: {{VALUE}};"},"condition":{"bg_type":"img","bg_img[url]!":""}},{"name":"bg_video","label":"Video Link","type":"text","condition":{"bg_type":["video"]},"description":"Video file (mp4 is recommended)."},{"name":"overlay_color","label":"Overlay Color","type":"color","selectors":{"{{WRAPPER}} .pxl-section-scale .pxl-section-overlay":"background-color: {{VALUE}};"}},{"name":"shape_1","label":"Shape 1","type":"media"},{"name":"shape_2","label":"Shape 2","type":"media"}]}]}';
+    protected $styles = array(  );
+    protected $scripts = array(  );
+}

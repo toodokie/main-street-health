@@ -1,0 +1,308 @@
+.pxl-accordion {
+    .pxl-accordion--title {
+        margin-bottom: 0;
+        cursor: pointer;
+    }
+    .pxl-accordion--content {
+        display: none;
+    }
+    .pxl-icon--plus {
+        font-style: normal;
+    }
+}
+
+.pxl-accordion1 {
+    &.style1 {
+        .pxl-icon--plus {
+            right: 0;
+            width: 11px;
+            height: 11px;
+            z-index: 3;
+            position: absolute;
+            top: 50%;
+            @include transform(translate(0, -50%));
+            @include transition(all 300ms linear 0ms);
+            &:before, &:after {
+                background-color: #000;
+                @include transition(all 300ms linear 0ms);
+            }
+            &:before {
+                top: 4px;
+                left: 0px;
+            }
+            &:after {
+                top: -1px;
+                left: 5px;
+            }
+        }
+        .pxl-accordion--title {
+            font-size: 20px;
+            padding-right: 15px;
+            @extend .ft-gt;
+            font-weight: 500;
+            margin: 0;
+            color: #051b2e;
+            position: relative;
+            @include transition(all 300ms linear 0ms);
+            &:before {
+                content: '';
+                position:absolute;
+                top: -50px;
+                left: -50px;
+                right: -50px;
+                bottom: -50px;
+                opacity:0; 
+                z-index: 2;
+            }
+        }
+        .pxl-accordion--content {
+            z-index: 3;
+            margin-top: 12px;
+            padding-bottom: 11px;
+            font-size: 15px;
+            line-height: 25px;
+            color: #68747a;
+        }
+        .pxl--item {
+            overflow: hidden;
+            padding: 22px 35px;
+            @media (max-width: 575px) {
+                padding: 20px;  
+            }
+            border-radius: 20px;
+            border: 1px solid #dadee2;
+            position: relative;
+            z-index: 1;
+            @include transition(all .25s cubic-bezier(.645,.045,.355,1));
+            &.active {
+                border-bottom-width: 6px;
+                .pxl-icon--plus {
+                    &:after {
+                        transform: rotate(90deg);
+                    }
+                }
+            }
+            + .pxl--item {
+                margin-top: 23px;
+            }
+        }
+    }
+    &.style3 {
+        .pxl-icon--plus {
+            right: 0;
+            width: 11px;
+            height: 11px;
+            z-index: 3;
+            position: absolute;
+            top: 50%;
+            @include transform(translate(0, -50%));
+            @include transition(all 300ms linear 0ms);
+            &:before, &:after {
+                background-color: #051b2e;
+                @include transition(all 300ms linear 0ms);
+            }
+            &:before {
+                top: 4px;
+                left: 0px;
+            }
+            &:after {
+                top: -1px;
+                left: 5px;
+            }
+        }
+        .pxl-accordion--title {
+            font-size: 20px;
+            line-height: 30px;
+            padding-right: 15px;
+            @extend .ft-gt;
+            font-weight: 400;
+            margin: 0;
+            color: #051b2e;
+            position: relative;
+            @include transition(all 300ms linear 0ms);
+            &:before {
+                content: '';
+                position:absolute;
+                top: 0;
+                left: 0;
+                right: 0;
+                bottom: 0;
+                opacity:0; 
+                z-index: 2;
+            }
+        }
+        .pxl-accordion--content {
+            margin-top: 15px;
+            padding-bottom: 7px;
+            font-size: 15px;
+            line-height: 25px;
+            color: #68747a;
+        }
+        .pxl--item {
+            @include transition(all .25s cubic-bezier(.645,.045,.355,1));
+            padding: 21px 35px 19px 35px;
+            background-color: #ededed;
+            position: relative;
+            z-index: 1;
+            &.active {
+                .pxl-accordion--title {
+                    font-weight: 500;
+                }
+                padding-top: 34px;
+                .pxl-icon--plus {
+                    &:after {
+                        transform: rotate(90deg);
+                    }
+                }
+            }
+            + .pxl--item {
+                margin-top: 11px;
+            }
+        }
+    }
+    &.style2 {
+        .pxl-icon--plus {
+            right: 5px;
+            width: 11px;
+            height: 11px;
+            z-index: 3;
+            position: absolute;
+            top: 50%;
+            @include transition(all 300ms linear 0ms);
+            &:before, &:after {
+                background-color: #fff;
+                @include transition(all 300ms linear 0ms);
+            }
+            &:before {
+                top: 4px;
+                left: 0px;
+            }
+            &:after {
+                top: -1px;
+                left: 5px;
+            }
+        }
+        .pxl--item {
+            border: 1px solid transparent;
+            border-radius: 20px;
+            overflow: hidden;
+            .pxl-accordion--title {
+                padding: 21px 35px 20px 35px;
+                font-family: 'GT Walsheim Pro',sans-serif;
+                color: #ffffff;
+                font-size: 20px;
+                line-height: 31px;
+                background-color: #ffcc53;
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                background-color: transparent;
+                font-weight: 500;
+                position:relative;
+                @media (max-width: 575px) {
+                    padding: 16px 25px 15px 25px;
+                }
+                &:before {
+                    position: absolute;
+                    content:'';
+                    top:-1px;
+                    right:-1px;
+                    bottom: 0;
+                    left:-1px;
+                    background-color: $four_color;
+                    @include transition(all .35s cubic-bezier(.645,.045,.355,1));
+                    border-radius: 20px;
+                }
+                i {
+                    font-size: 11px;
+                    position:relative;
+                    z-index: 2;
+                    @include transition(all .25s cubic-bezier(.645,.045,.355,1));
+                }
+                .pxl-title--text {
+                    position:relative;
+                    z-index: 2;
+                }
+            }
+            .pxl-accordion--content {
+                padding: 25px 35px 39px 35px;
+                font-size: 15px;
+                line-height: 25px;
+                color: #68747a;
+                background-image: url(../img/cr5.png);
+                background-position: bottom right;
+                background-repeat: no-repeat;
+                @media (max-width: 575px) {
+                    padding: 25px 20px 30px 20px;
+                }
+                br {
+                    display: none;
+                }
+                ul {
+                    li {
+                        padding: 0;
+                        font-size: 15px;
+                        line-height: 25px;
+                        color: #68747a;
+                        &::marker {
+                            color:$four_color;
+                        }
+                        span {
+                            font-size: 17px;
+                            color: $four_color;
+                            font-family: 'GT Walsheim Pro',sans-serif;
+                        }
+                        +li {
+                            margin-top: 22px;
+                        }
+                    }
+                }
+                a {
+                    display: inline-flex;
+                    padding: 0 33px;
+                    align-items: center;
+                    color: #fff;
+                    line-height: 55px;
+                    font-size: 15px;
+                    font-family: 'GT Walsheim Pro',sans-serif;
+                    background-color: $four_color;
+                    border-radius: 13px;
+                    @include transition(all .25s cubic-bezier(.645,.045,.355,1));
+                    column-gap: 12px;
+                    &:hover {
+                        opacity: 0.8;
+                    }
+                }
+            }
+            + .pxl--item {
+                margin-top: 15px;
+            }
+            &.active {
+                padding-top: 3px;
+                border-color: #dadee2;
+                .pxl-accordion--title {
+                    &:before {
+                        top:7px;
+                        right:10px;
+                        bottom: 7px;
+                        left:10px;
+                        background-color: $primary_color;
+                    }
+                    color: $four_color;
+                }
+                .pxl-icon--plus {
+                    &:after {
+                        transform: rotate(90deg);
+                    }
+                    &:before,&:after {
+                        background-color: $secondary_color;
+                    }
+                }
+            }
+        }
+    }
+}
+
+body.rtl {
+
+}

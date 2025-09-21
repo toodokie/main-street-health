@@ -1,0 +1,44 @@
+/**
+ * GT Walsheim Pro Font Definitions
+ * Properly implemented custom fonts with performance optimization
+ */
+
+/* GT Walsheim Pro Light */
+@font-face {
+    font-family: 'GT Walsheim Pro';
+    font-weight: 300;
+    font-style: normal;
+    font-display: swap; /* Prevents FOIT, improves performance */
+    src: url('GTWalsheimPro-Light.woff2') format('woff2'),
+         url('GTWalsheimPro-Light.woff') format('woff');
+}
+
+/* GT Walsheim Pro Regular */
+@font-face {
+    font-family: 'GT Walsheim Pro';
+    font-weight: 400;
+    font-style: normal;
+    font-display: swap;
+    src: url('GTWalsheimPro-Regular.woff2') format('woff2'),
+         url('GTWalsheimPro-Regular.woff') format('woff');
+}
+
+/* GT Walsheim Pro Medium */
+@font-face {
+    font-family: 'GT Walsheim Pro';
+    font-weight: 500;
+    font-style: normal;
+    font-display: swap;
+    src: url('GTWalsheimPro-Medium.woff2') format('woff2'),
+         url('GTWalsheimPro-Medium.woff') format('woff');
+}
+
+/* GT Walsheim Pro Bold */
+@font-face {
+    font-family: 'GT Walsheim Pro';
+    font-weight: 700;
+    font-style: normal;
+    font-display: swap;
+    src: url('GTWalsheimPro-Bold.woff2') format('woff2'),
+         url('GTWalsheimPro-Bold.woff') format('woff');
+}

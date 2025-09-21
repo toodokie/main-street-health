@@ -1,0 +1,29 @@
+# Main Street Health - Deployment Exclusions
+# Created for production deployment cleanup
+
+# Backup directories - never deploy to production
+medicross-child-backup-*/
+*backup*2025-*-*-*/
+*.backup
+*-backup/
+
+# Development files
+.DS_Store
+*.log
+debug-*
+temp-*
+
+# Large archives and local exports
+*.tar
+*.tar.gz
+*.zip
+*.sql
+*.sql.gz
+
+# Local runtime/output directories
+logs/
+
+# Local development
+.env.local
+.vscode/
+node_modules/

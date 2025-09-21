@@ -1,0 +1,102 @@
+/**
+ * Custom CSS to allow Elementor to control typography colors
+ * This file removes hardcoded colors to let Elementor's editor take precedence
+ */
+
+/* Remove hardcoded heading colors - let Elementor control them */
+h1, h2, h3, h4, h5, h6 {
+  /* color: #051b2e; -- Removed to allow Elementor control */
+  color: inherit; /* Will inherit from Elementor's settings */
+  font-family: 'GT Walsheim Pro', sans-serif;
+  font-weight: 500;
+  margin: 0 0 15px;
+  clear: both;
+  line-height: 1.36364;
+}
+
+/* Body text color - let Elementor control it */
+body {
+  /* color: #68747a; -- Removed to allow Elementor control */
+  color: inherit; /* Will inherit from Elementor's global settings */
+}
+
+/* Elementor-specific overrides to ensure editor colors work */
+.elementor-widget-heading h1,
+.elementor-widget-heading h2,
+.elementor-widget-heading h3,
+.elementor-widget-heading h4,
+.elementor-widget-heading h5,
+.elementor-widget-heading h6 {
+  color: inherit !important; /* Force Elementor's color settings */
+}
+
+.elementor-widget-text-editor,
+.elementor-widget-text-editor p {
+  color: inherit !important; /* Force Elementor's color settings */
+}
+
+/* Keep font sizes but allow Elementor to override if needed */
+h1, .h1 { font-size: 52px; }
+h2, .h2 { font-size: 48px; }
+h3, .h3 { font-size: 32px; }
+h4, .h4 { font-size: 28px; }
+h5, .h5 { font-size: 22px; line-height: 1.4545; }
+h6, .h6 { font-size: 18px; }
+
+/* Elementor will override these when custom typography is set */
+.elementor-widget-heading h1.elementor-size-default,
+.elementor-widget-heading h2.elementor-size-default,
+.elementor-widget-heading h3.elementor-size-default,
+.elementor-widget-heading h4.elementor-size-default,
+.elementor-widget-heading h5.elementor-size-default,
+.elementor-widget-heading h6.elementor-size-default {
+  /* These will use Elementor's global typography settings */
+}
+
+/* Make sure links can be controlled by Elementor */
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+/* Widget titles - allow Elementor control */
+.widget .widget-title,
+.pxl-widget-title,
+.comments-title,
+.comment-reply-title {
+  color: inherit;
+}
+
+/* Keep the font family consistent but allow color override */
+.ft-gt-walsheim,
+.ft-theme-default,
+.pxl-heading .pxl-item--title,
+button,
+.button,
+input[type="submit"],
+.btn:not(.btn-stroke) {
+  font-family: 'GT Walsheim Pro', sans-serif;
+  /* Color will be inherited from parent or Elementor settings */
+}
+
+/* For Elementor editor mode - ensure colors are visible */
+body.elementor-editor-active h1,
+body.elementor-editor-active h2,
+body.elementor-editor-active h3,
+body.elementor-editor-active h4,
+body.elementor-editor-active h5,
+body.elementor-editor-active h6 {
+  color: inherit;
+}
+
+/* Paragraph text in Elementor */
+.elementor p {
+  color: inherit;
+}
+
+/* Allow Elementor's global colors to work */
+.elementor-section,
+.elementor-column,
+.elementor-widget {
+  color: inherit;
+}

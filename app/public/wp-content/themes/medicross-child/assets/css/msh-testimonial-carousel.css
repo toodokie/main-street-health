@@ -1,0 +1,395 @@
+/* MSH Testimonial Carousel Widget Styles */
+
+/* Container */
+.msh-testimonial-carousel {
+    position: relative;
+    width: 100%;
+    padding-bottom: 100px; /* Increased space for navigation */
+    overflow: visible; /* Ensure nav dots aren't clipped */
+}
+
+/* Swiper Container */
+.msh-testimonial-carousel .swiper {
+    width: 100%;
+    height: auto;
+    overflow: visible;
+}
+
+.msh-testimonial-carousel .swiper-wrapper {
+    display: flex;
+    align-items: stretch;
+}
+
+/* Testimonial Card */
+.msh-testimonial-card {
+    background: #ffffff;
+    border-radius: 16px;
+    padding: 40px 35px 35px 35px;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    position: relative;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+    border: 1px solid #f0f0f0;
+}
+
+/* Quote Icon */
+.msh-quote-icon {
+    width: auto;
+    height: auto;
+    margin-bottom: 25px;
+    text-align: center;
+}
+
+.msh-quote-icon i {
+    font-size: 64px;
+    /* Color controlled by Elementor editor */
+}
+
+/* Testimonial Content */
+.msh-testimonial-content {
+    flex: 1;
+    margin-bottom: 35px;
+    line-height: 1.7;
+    color: #4a4a4a;
+    font-size: 16px;
+    font-style: normal;
+    font-family: 'Source Sans Pro', sans-serif;
+    text-align: center;
+    min-height: 120px;
+}
+
+/* Client Info */
+.msh-client-info {
+    margin-top: auto;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+}
+
+/* Client Image */
+.msh-client-image {
+    width: 80px;
+    height: 80px;
+    border-radius: 50%;
+    overflow: hidden;
+    margin-bottom: 20px;
+    border: 3px solid #f0f0f0;
+    flex-shrink: 0;
+}
+
+.msh-client-image img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transition: transform 0.3s ease;
+}
+
+/* Client Details */
+.msh-client-details {
+    text-align: center;
+}
+
+.msh-client-name {
+    font-weight: 600;
+    font-size: 18px;
+    color: #2D3E4E;
+    margin: 0 0 5px 0;
+    font-family: 'Source Sans Pro', sans-serif;
+}
+
+.msh-client-position {
+    font-size: 14px;
+    color: #888;
+    margin: 0;
+    font-family: 'Source Sans Pro', sans-serif;
+}
+
+/* Navigation Container - Centered */
+.msh-testimonial-carousel-nav {
+    position: absolute;
+    bottom: 20px; /* Moved up from bottom to prevent cutoff */
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    padding-top: 1rem;
+    z-index: 10; /* Ensure it's above other elements */
+}
+
+/* Pagination Dots */
+.msh-testimonial-carousel .swiper-pagination {
+    position: static !important;
+    width: auto !important;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0;
+}
+
+/* Editor mode styles */
+.elementor-editor .msh-testimonial-carousel .swiper-pagination {
+    padding: 10px 0;
+}
+
+.msh-testimonial-carousel .swiper-pagination-bullet {
+    width: 10px;
+    height: 10px;
+    background: transparent;
+    border: 2px solid #D5D5D5;
+    opacity: 1;
+    margin: 0 6px !important;
+    transition: all 0.3s ease;
+    border-radius: 50%;
+    cursor: pointer;
+    position: relative;
+    overflow: hidden;
+}
+
+.msh-testimonial-carousel .swiper-pagination-bullet::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 0;
+    height: 0;
+    border-radius: 50%;
+    background: currentColor;
+    transform: translate(-50%, -50%);
+    transition: all 0.3s ease;
+}
+
+.msh-testimonial-carousel .swiper-pagination-bullet:hover {
+    transform: scale(1.2);
+    border-color: #218E9C;
+}
+
+.msh-testimonial-carousel .swiper-pagination-bullet-active {
+    width: 28px;
+    border-radius: 14px;
+    background: #218E9C;
+    border-color: #218E9C;
+    transform: scale(1);
+}
+
+.msh-testimonial-carousel .swiper-pagination-bullet-active::after {
+    width: 4px;
+    height: 4px;
+    background: white;
+    opacity: 1;
+}
+
+/* Navigation Arrows */
+.msh-testimonial-carousel-arrows {
+    display: flex;
+    gap: 8px;
+    margin-left: 20px;
+}
+
+.msh-testimonial-carousel .swiper-button-next,
+.msh-testimonial-carousel .swiper-button-prev {
+    position: static !important;
+    width: 40px;
+    height: 40px;
+    background: transparent;
+    border: 2px solid rgba(45, 62, 78, 0.2);
+    border-radius: 12px; /* Soft rounded square */
+    color: #2D3E4E;
+    transition: all 0.3s ease;
+    margin: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    font-size: 16px;
+}
+
+.msh-testimonial-carousel .swiper-button-next:hover,
+.msh-testimonial-carousel .swiper-button-prev:hover {
+    background: rgba(33, 142, 156, 0.15);
+    border-color: #218E9C;
+    color: #218E9C;
+    transform: scale(1.05);
+}
+
+.msh-testimonial-carousel .swiper-button-next::after,
+.msh-testimonial-carousel .swiper-button-prev::after {
+    font-size: 14px;
+    font-weight: bold;
+}
+
+.msh-testimonial-carousel .swiper-button-disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.msh-testimonial-carousel .swiper-button-disabled:hover {
+    transform: none;
+    background: #2D3E4E;
+}
+
+/* Hover Effects */
+.msh-testimonial-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.12);
+}
+
+.msh-testimonial-card:hover .msh-client-image img {
+    transform: scale(1.05);
+}
+
+/* Equal height for slides */
+.msh-testimonial-carousel .swiper-slide {
+    height: auto;
+}
+
+/* Responsive Design */
+@media (max-width: 1024px) {
+    .msh-testimonial-carousel {
+        padding-bottom: 70px;
+    }
+    
+    .msh-testimonial-card {
+        padding: 35px 30px 30px 30px;
+    }
+    
+    .msh-quote-icon i {
+        font-size: 56px;
+    }
+    
+    .msh-testimonial-content {
+        font-size: 15px;
+        min-height: 100px;
+    }
+    
+    .msh-client-image {
+        width: 70px;
+        height: 70px;
+    }
+    
+    .msh-client-name {
+        font-size: 17px;
+    }
+}
+
+@media (max-width: 768px) {
+    .msh-testimonial-carousel {
+        padding-bottom: 40px; /* Allow nav to flow below without extra space */
+    }
+    
+    .msh-testimonial-card {
+        padding: 30px 25px 25px 25px;
+    }
+    
+    .msh-quote-icon i {
+        font-size: 48px;
+    }
+    
+    .msh-testimonial-content {
+        font-size: 14px;
+        margin-bottom: 25px;
+        min-height: 80px;
+    }
+    
+    .msh-client-image {
+        width: 60px;
+        height: 60px;
+        margin-bottom: 15px;
+    }
+    
+    .msh-client-name {
+        font-size: 16px;
+    }
+    
+    .msh-client-position {
+        font-size: 13px;
+    }
+    
+    .msh-testimonial-carousel-nav {
+        position: static;
+        transform: none;
+        left: auto;
+        bottom: auto;
+        margin-top: 1em;
+        gap: 15px;
+        flex-direction: column;
+        align-items: center;
+        width: 100%;
+    }
+
+    .msh-testimonial-carousel .swiper-button-next,
+    .msh-testimonial-carousel .swiper-button-prev {
+        width: 28px;
+        height: 28px;
+    }
+
+    .msh-testimonial-carousel-arrows {
+        margin-left: 0;
+        gap: 12px;
+    }
+    
+    .msh-testimonial-carousel .swiper-button-next::after,
+    .msh-testimonial-carousel .swiper-button-prev::after {
+        font-size: 12px;
+    }
+}
+
+@media (max-width: 480px) {
+    .msh-testimonial-carousel {
+        padding-bottom: 50px;
+    }
+    
+    .msh-testimonial-card {
+        padding: 25px 20px 20px 20px;
+    }
+    
+    .msh-quote-icon {
+        margin-bottom: 20px;
+    }
+    
+    .msh-quote-icon i {
+        font-size: 40px;
+    }
+    
+    .msh-testimonial-content {
+        font-size: 13px;
+        margin-bottom: 20px;
+        min-height: auto;
+    }
+    
+    .msh-client-image {
+        width: 50px;
+        height: 50px;
+        margin-bottom: 12px;
+        border-width: 2px;
+    }
+    
+    .msh-client-name {
+        font-size: 15px;
+        margin-bottom: 3px;
+    }
+    
+    .msh-client-position {
+        font-size: 12px;
+    }
+    
+    .msh-testimonial-carousel .swiper-pagination-bullet {
+        width: 8px;
+        height: 8px;
+        margin: 0 4px !important;
+        border-width: 1.5px;
+    }
+    
+    .msh-testimonial-carousel .swiper-pagination-bullet-active {
+        width: 20px;
+        border-radius: 10px;
+    }
+    
+    .msh-testimonial-carousel .swiper-pagination-bullet-active::after {
+        width: 3px;
+        height: 3px;
+    }
+}

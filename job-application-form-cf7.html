@@ -1,0 +1,335 @@
+<!-- 
+JOB APPLICATION FORM - CONTACT FORM 7
+=====================================
+FORM SETUP:
+- Create new form in Contact Form 7
+- Copy this entire HTML code (including styles) into the Form tab
+- Configure Mail settings for form submissions
+- File uploads will be attached to email notifications
+-->
+
+<style>
+/* Job Application Form - Custom Styles */
+/* Brand Colors: #2B4666 (primary blue), #A6C0A4 (light green) */
+
+.form-contact-qrcode.job-application-form {
+    padding: 30px 0;
+}
+
+/* Section Titles */
+.job-application-form .form-section-title {
+    color: #2B4666;
+    font-size: 24px;
+    font-weight: 600;
+    margin-bottom: 25px;
+    padding-bottom: 10px;
+    border-bottom: 2px solid #A6C0A4;
+}
+
+.job-application-form .form-subsection-title {
+    color: #2B4666;
+    font-size: 18px;
+    font-weight: 500;
+    margin-bottom: 20px;
+    margin-top: 15px;
+}
+
+/* Input Fields */
+.job-application-form .input-filled {
+    margin-bottom: 20px;
+}
+
+.job-application-form .input-filled label {
+    display: block;
+    color: #2B4666;
+    font-weight: 500;
+    margin-bottom: 8px;
+    font-size: 14px;
+}
+
+.job-application-form .input-filled input[type="text"],
+.job-application-form .input-filled input[type="email"],
+.job-application-form .input-filled input[type="tel"],
+.job-application-form .input-filled input[type="date"],
+.job-application-form .input-filled select,
+.job-application-form .input-filled textarea {
+    width: 100%;
+    padding: 15px 20px;
+    border: 2px solid #e0e0e0;
+    border-radius: 25px;
+    font-size: 16px;
+    font-family: 'Source Sans Pro', sans-serif;
+    transition: all 0.3s ease;
+    background-color: #f8f9fa;
+    color: #333;
+}
+
+.job-application-form .input-filled input:focus,
+.job-application-form .input-filled select:focus,
+.job-application-form .input-filled textarea:focus {
+    border-color: #A6C0A4;
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(166, 192, 164, 0.2);
+    background-color: #fff;
+}
+
+.job-application-form .input-filled input::placeholder,
+.job-application-form .input-filled textarea::placeholder {
+    color: #999;
+    font-style: italic;
+}
+
+/* File Upload - Use theme's wrapper but style it properly */
+.job-application-form .wpcf7-form-control-wrap.cv-upload .pxl-file-upload-wrapper {
+    display: inline-flex !important;
+    align-items: center !important;
+    width: auto !important;
+    max-width: 100% !important;
+    padding: 8px 15px !important;
+    border: 2px solid #e0e0e0 !important;
+    border-radius: 25px !important;
+    background-color: #f8f9fa !important;
+    transition: all 0.3s ease !important;
+    height: auto !important;
+    min-height: 0 !important;
+}
+
+.job-application-form .wpcf7-form-control-wrap.cv-upload .pxl-file-upload-wrapper:hover {
+    border-color: #A6C0A4 !important;
+    background-color: #fff !important;
+}
+
+/* Style the theme's button */
+.job-application-form .wpcf7-form-control-wrap.cv-upload .pxl-file-upload-button {
+    display: inline-block !important;
+    background-color: #2B4666 !important;
+    color: white !important;
+    border: none !important;
+    border-radius: 20px !important;
+    padding: 6px 16px !important;
+    font-size: 14px !important;
+    font-weight: 500 !important;
+    font-family: 'Source Sans Pro', sans-serif !important;
+    cursor: pointer !important;
+    transition: all 0.3s ease !important;
+    margin: 0 !important;
+    height: auto !important;
+    line-height: 1.4 !important;
+}
+
+.job-application-form .pxl-file-upload-button:hover {
+    background-color: #1e3147 !important;
+}
+
+/* Style the theme's text input */
+.job-application-form .pxl-file-upload-input {
+    display: inline-block !important;
+    background: transparent !important;
+    border: none !important;
+    color: #666 !important;
+    font-size: 14px !important;
+    font-family: 'Source Sans Pro', sans-serif !important;
+    margin-left: 15px !important;
+    padding: 0 !important;
+    width: 200px !important;
+    min-width: 150px !important;
+    text-overflow: ellipsis !important;
+    overflow: hidden !important;
+    white-space: nowrap !important;
+}
+
+/* Mobile adjustments */
+@media (max-width: 480px) {
+    .job-application-form .wpcf7-form-control-wrap.cv-upload .pxl-file-upload-wrapper {
+        width: 100% !important;
+        justify-content: flex-start !important;
+    }
+    
+    .job-application-form .pxl-file-upload-input {
+        width: auto !important;
+        min-width: 100px !important;
+        flex: 1 !important;
+    }
+}
+
+/* Hide the native input since we're using theme's UI */
+.job-application-form input[type="file"] {
+    display: none !important;
+}
+
+/* Textarea */
+.job-application-form textarea {
+    min-height: 120px;
+    resize: vertical;
+    border-radius: 25px;
+}
+
+/* Submit Button */
+.job-application-form .wpcf7-submit.wpcf6-btn-abs {
+    background-color: #2B4666 !important;
+    color: white !important;
+    padding: 15px 40px;
+    border: none;
+    border-radius: 25px;
+    font-size: 18px;
+    font-weight: 600;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 12px;
+    transition: all 0.3s ease;
+    font-family: 'Source Sans Pro', sans-serif;
+    box-shadow: 0 4px 12px rgba(43, 70, 102, 0.3);
+}
+
+.job-application-form .wpcf7-submit.wpcf6-btn-abs:hover {
+    background-color: #1e3147 !important;
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(43, 70, 102, 0.4);
+}
+
+.job-application-form .wpcf7-submit.wpcf6-btn-abs svg {
+    width: 20px;
+    height: 20px;
+    fill: currentColor;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .job-application-form .form-section-title {
+        font-size: 20px;
+    }
+    
+    .job-application-form .form-subsection-title {
+        font-size: 16px;
+    }
+    
+    .job-application-form .input-filled input,
+    .job-application-form .input-filled textarea,
+    .job-application-form .file-upload-button {
+        padding: 12px 16px;
+        font-size: 14px;
+    }
+    
+    .job-application-form .wpcf7-submit.wpcf6-btn-abs {
+        width: 100%;
+        justify-content: center;
+        padding: 12px 20px;
+        font-size: 16px;
+    }
+}
+
+/* Error Messages */
+.job-application-form .wpcf7-not-valid {
+    border-color: #c74545 !important;
+}
+
+.job-application-form .wpcf7-not-valid-tip,
+.job-application-form span.wpcf7-not-valid-tip {
+    color: #c74545 !important;
+    font-size: 13px !important;
+    margin-top: 5px !important;
+    display: block !important;
+    background: transparent !important;
+    border: none !important;
+    padding: 5px 0 !important;
+    position: relative !important;
+    left: auto !important;
+    top: auto !important;
+    width: auto !important;
+    font-weight: normal !important;
+}
+
+.job-application-form .wpcf7-not-valid-tip:before {
+    content: none !important;
+}
+
+/* Hide the red blocks/bars */
+.job-application-form .wpcf7-form-control-wrap:before,
+.job-application-form .wpcf7-form-control-wrap:after {
+    display: none !important;
+}
+
+/* Ensure error text is visible */
+.job-application-form .wpcf7-validation-errors,
+.job-application-form .wpcf7-response-output {
+    border: 2px solid #c74545 !important;
+    background: #fef2f2 !important;
+    color: #c74545 !important;
+    padding: 15px !important;
+    margin: 20px 0 !important;
+    border-radius: 25px !important;
+}
+
+/* Success Message */
+.job-application-form .wpcf7-mail-sent-ok {
+    border: 2px solid #A6C0A4 !important;
+    background: #f0f9f0 !important;
+    color: #2B4666 !important;
+    padding: 15px !important;
+    margin: 20px 0 !important;
+    border-radius: 25px !important;
+}
+</style>
+
+<div class="form-contact-qrcode online-appointment wrap-form job-application-form">
+    <div class="container">
+        <div class="row">
+            
+            <div class="input-filled col-xl-6 col-lg-6 col-md-6 col-sm-12 col-xs-12">
+                <span class="wpcf7-form-control-wrap full-name">
+                    <label>Full Name*</label>
+                    [text* full-name id:full-name placeholder "*Full name..."]
+                </span>
+            </div>
+            
+            <div class="input-filled col-xl-6 col-lg-6 col-md-6 col-sm-12 col-xs-12">
+                <span class="wpcf7-form-control-wrap email-address">
+                    <label>Email Address*</label>
+                    [email* email-address id:email-address placeholder "*Email address..."]
+                </span>
+            </div>
+            
+            <div class="input-filled col-xl-6 col-lg-6 col-md-6 col-sm-12 col-xs-12">
+                <span class="wpcf7-form-control-wrap phone-number">
+                    <label>Phone Number</label>
+                    [tel phone-number id:phone-number placeholder "Phone number"]
+                </span>
+            </div>
+            
+            <div class="input-filled col-xl-6 col-lg-6 col-md-6 col-sm-12 col-xs-12">
+                <span class="wpcf7-form-control-wrap position-applying">
+                    <label>Position Applying For*</label>
+                    [text* position-applying id:position-applying placeholder "*Position Applying For"]
+                </span>
+            </div>
+            
+            <!-- Additional Information Section -->
+            <div class="input-filled col-xl-12">
+                <span class="wpcf7-form-control-wrap additional-info">
+                    <label>Additional Information</label>
+                    [textarea additional-info id:additional-info placeholder "Additional information"]
+                </span>
+            </div>
+            
+            <!-- CV Upload Section -->
+            <div class="input-filled col-xl-12">
+                <span class="wpcf7-form-control-wrap cv-upload">
+                    <label>Upload Your CV*</label>
+                    [file* cv-upload id:cv-upload filetypes:pdf|doc|docx limit:5mb]
+                </span>
+            </div>
+            
+            <!-- Submit Button -->
+            <div class="input-filled col-xl-12 your-submit">
+                <button type="submit" class="wpcf7-submit wpcf6-btn-abs">
+                    Submit
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" style="transform:scalex(-1);" data-name="Layer 2">
+                        <path d="m22 11h-17.586l5.293-5.293a1 1 0 1 0 -1.414-1.414l-7 7a1 1 0 0 0 0 1.414l7 7a1 1 0 0 0 1.414-1.414l-5.293-5.293h17.586a1 1 0 0 0 0-2z"></path>
+                    </svg>
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+

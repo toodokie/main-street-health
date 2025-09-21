@@ -1,0 +1,139 @@
+/**
+ * MSH Services List Override Styles
+ * High specificity styles to override parent theme white shading
+ */
+
+/* Remove shadows and overlays from MSH Services List elements */
+.elementor-widget-msh_services_list *,
+.elementor-widget-msh_services_list *::before,
+.elementor-widget-msh_services_list *::after,
+.msh-services-grid *,
+.msh-services-grid *::before,
+.msh-services-grid *::after,
+.msh-services-list *,
+.msh-services-list *::before,
+.msh-services-list *::after {
+    box-shadow: none !important;
+    text-shadow: none !important;
+    filter: none !important;
+    backdrop-filter: none !important;
+    -webkit-box-shadow: none !important;
+    -moz-box-shadow: none !important;
+}
+
+/* Force remove any inset shadows specifically */
+.msh-service-entry:not(.has-cover-image),
+.msh-service-entry.msh-service-grid-item:not(.has-cover-image),
+.msh-services-grid .msh-service-entry:not(.has-cover-image),
+.elementor-widget-msh_services_list .msh-service-entry:not(.has-cover-image) {
+    box-shadow: none !important;
+    -webkit-box-shadow: none !important;
+    -moz-box-shadow: none !important;
+    text-shadow: none !important;
+    filter: none !important;
+    backdrop-filter: none !important;
+    background-image: none !important;
+    background: #ffffff !important;
+    position: relative !important;
+    z-index: 1 !important;
+}
+
+/* Ensure no overlays from any source */
+.msh-service-entry:not(.has-cover-image)::before,
+.msh-service-entry:not(.has-cover-image)::after,
+.msh-service-entry:not(.has-cover-image) > *::before,
+.msh-service-entry:not(.has-cover-image) > *::after,
+.msh-services-grid::before,
+.msh-services-grid::after {
+    display: none !important;
+    content: none !important;
+    visibility: hidden !important;
+    opacity: 0 !important;
+    box-shadow: none !important;
+    background: none !important;
+    filter: none !important;
+}
+
+/* Force all content to be above any backgrounds */
+.msh-service-content,
+.msh-service-text,
+.msh-service-title,
+.msh-service-description,
+.msh-service-link {
+    position: relative !important;
+    z-index: 10 !important;
+    background: transparent !important;
+    box-shadow: none !important;
+    filter: none !important;
+}
+
+/* Specific button fixes */
+.msh-services-grid .msh-service-link,
+.msh-services-grid .msh-service-link.link-button,
+.msh-services-list .msh-service-link,
+.msh-services-list .msh-service-link.link-button {
+    position: relative !important;
+    z-index: 100 !important;
+    background: #ffffff !important;
+    box-shadow: none !important;
+    filter: none !important;
+    opacity: 1 !important;
+}
+
+/* Override any Elementor advanced settings */
+.elementor-widget-msh_services_list .elementor-widget-container {
+    box-shadow: none !important;
+    filter: none !important;
+    transform: none !important;
+    background: transparent !important;
+}
+
+/* Override with inline style attribute selector for maximum specificity */
+[class*="msh-service"][style*="box-shadow"],
+[class*="msh-service"][style*="filter"],
+[class*="msh-service"][style*="background"] {
+    box-shadow: none !important;
+    filter: none !important;
+}
+
+/* Target Elementor's own shadow classes if present */
+.elementor-box-shadow-yes .msh-service-entry,
+.elementor-box-shadow-hover .msh-service-entry,
+.elementor-drop-shadow-yes .msh-service-entry,
+.elementor-drop-shadow-hover .msh-service-entry {
+    box-shadow: none !important;
+    filter: none !important;
+}
+
+/* Remove any gradient overlays */
+.msh-service-entry.msh-service-grid-item:not(.has-cover-image) {
+    background: #ffffff !important;
+    background-color: #ffffff !important;
+    background-image: none !important;
+}
+
+/* If cover image is needed, add it back with no overlay */
+.msh-service-entry.has-cover-image {
+    background-color: transparent !important;
+    background-image: var(--cover-bg-image) !important;
+    background-size: var(--cover-image-fit, contain) !important;
+    background-position: center center !important;
+    background-repeat: no-repeat !important;
+}
+
+/* Ensure hover states don't add shadows */
+.msh-service-entry:hover,
+.msh-service-entry.msh-service-grid-item:hover,
+.msh-services-grid .msh-service-entry:hover {
+    box-shadow: none !important;
+    filter: none !important;
+    transform: translateY(-2px) !important;
+    border-color: #218E9C !important;
+}
+
+/* Last resort - use ID selector if widget has ID */
+#msh-services-list-widget *,
+[id*="msh-services"] * {
+    box-shadow: none !important;
+    filter: none !important;
+}

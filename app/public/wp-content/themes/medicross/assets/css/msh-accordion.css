@@ -1,0 +1,721 @@
+/* MSH Accordion Widget Styles */
+
+.pxl-msh-accordion {
+    width: 100%;
+    max-width: 100%;
+    display: block;
+    visibility: visible;
+    opacity: 1;
+}
+
+/* Accordion Item */
+.pxl-accordion-item {
+    border: none;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    position: relative;
+    background: #ffffff;
+}
+
+.pxl-accordion-item:hover {
+    box-shadow: none;
+}
+
+.pxl-accordion-item:last-child {
+    border-bottom: none;
+}
+
+.pxl-accordion-item.active {
+    box-shadow: none;
+}
+
+/* Remove ugly blue outline on focus */
+.pxl-accordion-header,
+.pxl-accordion-header:focus,
+.pxl-accordion-header:active,
+.pxl-accordion-toggle,
+.pxl-accordion-toggle:focus,
+.pxl-accordion-toggle:active {
+    outline: none !important;
+    box-shadow: none !important;
+}
+
+/* Minimal reset - let Elementor controls take precedence */
+.elementor-element .pxl-msh-accordion .pxl-accordion-item.active .pxl-accordion-content {
+    /* Remove any default styling to allow Elementor controls */
+}
+
+/* Remove ALL borders and dividers when accordion item is active/open */
+.elementor-element .pxl-msh-accordion .pxl-accordion-item.active {
+    border: none !important;
+    border-top: none !important;
+    border-bottom: none !important;
+}
+
+.elementor-element .pxl-msh-accordion .pxl-accordion-item.active .pxl-accordion-header {
+    border: none !important;
+    border-bottom: none !important;
+    border-top: none !important;
+    margin-bottom: 0 !important;
+}
+
+.elementor-element .pxl-msh-accordion .pxl-accordion-item.active .pxl-accordion-content {
+    border: none !important;
+    border-top: none !important;
+    border-bottom: none !important;
+    margin-top: 0 !important;
+}
+
+/* Remove any borders from the next accordion item after an open one */
+.elementor-element .pxl-msh-accordion .pxl-accordion-item.active + .pxl-accordion-item {
+    border-top: none !important;
+}
+
+/* Image Hover Effects */
+.elementor-element .pxl-msh-accordion .pxl-accordion-content img {
+    transition: all 0.3s ease;
+}
+
+/* Scale hover effect */
+.elementor-element .pxl-msh-accordion[data-image-hover="scale"] .pxl-accordion-content img:hover {
+    transform: scale(1.05);
+}
+
+/* Fade hover effect */
+.elementor-element .pxl-msh-accordion[data-image-hover="fade"] .pxl-accordion-content img:hover {
+    opacity: 0.8;
+}
+
+/* Lift hover effect */
+.elementor-element .pxl-msh-accordion[data-image-hover="lift"] .pxl-accordion-content img:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 8px 25px rgba(0,0,0,0.15);
+}
+
+
+/* Header Styles */
+.pxl-accordion-header {
+    padding: 30px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    border: none;
+    background: transparent;
+    width: 100%;
+    text-align: left;
+    position: relative;
+}
+
+.pxl-msh-accordion.msh-hover-enabled .pxl-accordion-header:hover {
+    background-color: rgba(59, 130, 246, 0.02);
+}
+
+.pxl-msh-accordion.msh-hover-enabled .pxl-accordion-header:hover .pxl-accordion-title {
+    color: #3b82f6;
+}
+
+/* Remove hardcoded hover color to let Elementor controls work */
+
+.pxl-accordion-header:focus {
+    outline: none;
+}
+
+.pxl-accordion-header-content {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 20px;
+}
+
+/* Toggle Position Variants */
+.pxl-msh-accordion.toggle-left .pxl-accordion-header-content {
+    flex-direction: row-reverse;
+}
+
+.pxl-msh-accordion.toggle-right .pxl-accordion-header-content {
+    flex-direction: row;
+}
+
+.pxl-msh-accordion.toggle-left .pxl-accordion-text {
+    text-align: left;
+    padding-left: 0;
+    padding-right: 0;
+}
+
+.pxl-msh-accordion.toggle-right .pxl-accordion-text {
+    text-align: left;
+    padding-left: 0;
+    padding-right: 0;
+}
+
+/* Text Content */
+.pxl-accordion-text {
+    flex: 1;
+}
+
+.pxl-accordion-title {
+    margin: 0 0 10px 0;
+    font-size: 1.5rem;
+    font-weight: 600;
+    line-height: 1.3;
+    color: #2c3e50;
+    transition: color 0.3s ease;
+}
+
+.pxl-accordion-description {
+    margin: 0;
+    font-size: 1.1rem;
+    line-height: 1.6;
+    transition: color 0.3s ease;
+    display: block;
+    opacity: 1;
+}
+
+/* Toggle Icon - Modern Clean Design - Colors controlled by Elementor */
+.pxl-accordion-toggle {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    border: 1px solid #e0e4e7;
+    background: #ffffff;
+    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    flex-shrink: 0;
+    position: relative;
+    cursor: pointer;
+    box-shadow: none;
+}
+
+/* Toggle Shape Variants */
+.pxl-accordion-toggle.toggle-shape-none,
+.pxl-msh-accordion .pxl-accordion-toggle.toggle-shape-none {
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    border-color: transparent !important;
+    border-width: 0 !important;
+}
+
+.pxl-accordion-toggle.toggle-shape-square {
+    border-radius: 0;
+}
+
+.pxl-accordion-toggle.toggle-shape-soft-square {
+    border-radius: 6px;
+}
+
+.pxl-accordion-toggle.toggle-shape-circle {
+    border-radius: 50%;
+}
+
+/* Plus Icon - Refined and Centered */
+.pxl-accordion-icon-plus {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 16px;
+    height: 16px;
+}
+
+.pxl-accordion-icon-plus:before,
+.pxl-accordion-icon-plus:after {
+    content: '';
+    position: absolute;
+    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    border-radius: 1px;
+}
+
+/* Horizontal line - perfectly centered */
+.pxl-accordion-icon-plus:before {
+    top: 50%;
+    left: 50%;
+    width: 12px;
+    height: 2px;
+    transform: translate(-50%, -50%);
+}
+
+/* Vertical line - perfectly centered */
+.pxl-accordion-icon-plus:after {
+    top: 50%;
+    left: 50%;
+    width: 2px;
+    height: 12px;
+    transform: translate(-50%, -50%);
+}
+
+/* Active state - shows minus icon clearly - colors controlled by Elementor */
+.pxl-accordion-item.active .pxl-accordion-toggle {
+    box-shadow: none;
+}
+
+.pxl-accordion-item.active .pxl-accordion-icon-plus:before {
+    transform: translate(-50%, -50%);
+}
+
+.pxl-accordion-item.active .pxl-accordion-icon-plus:after {
+    transform: translate(-50%, -50%) rotate(90deg) scale(0);
+    opacity: 0;
+}
+
+/* Hover state - subtle and refined, non-active items - colors controlled by Elementor */
+.pxl-msh-accordion.msh-hover-enabled .pxl-accordion-item:not(.active) .pxl-accordion-header:hover .pxl-accordion-toggle {
+    box-shadow: none;
+}
+
+/* Hover state for active items - keep minus visible - colors controlled by Elementor */
+.pxl-msh-accordion.msh-hover-enabled .pxl-accordion-item.active .pxl-accordion-header:hover .pxl-accordion-toggle {}
+
+/* Remove focus outline */
+.pxl-accordion-header:focus .pxl-accordion-toggle,
+.pxl-accordion-toggle:focus {
+    outline: none;
+}
+
+/* Content Area */
+.pxl-accordion-content {
+    background-color: transparent;
+    border-top: none;
+    overflow: hidden;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    transform-origin: top;
+}
+
+.pxl-accordion-content-inner {
+    padding: 30px;
+    opacity: 0;
+    transform: translateY(10px);
+    transition: all 0.4s ease 0.1s;
+}
+
+.pxl-accordion-item.active .pxl-accordion-content-inner {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+/* Content Type Specific Styles */
+.pxl-accordion-widget-area {
+    margin-bottom: 20px;
+}
+
+.pxl-accordion-widget-area:last-child {
+    margin-bottom: 0;
+}
+
+.pxl-accordion-widget-item {
+    margin-bottom: 25px;
+}
+
+.pxl-accordion-widget-item:last-child {
+    margin-bottom: 0;
+}
+
+.pxl-accordion-widget-title {
+    font-size: 1.2rem;
+    font-weight: 600;
+    color: #2c3e50;
+    margin-bottom: 15px;
+}
+
+.pxl-accordion-shortcode-content {
+    margin-bottom: 20px;
+}
+
+.pxl-accordion-shortcode-content:last-child {
+    margin-bottom: 0;
+}
+
+.pxl-accordion-editor-content {
+    line-height: 1.6;
+}
+
+.pxl-accordion-editor-content p {
+    margin-bottom: 15px;
+}
+
+.pxl-accordion-editor-content p:last-child {
+    margin-bottom: 0;
+}
+
+.pxl-accordion-no-widgets {
+    padding: 20px;
+    text-align: center;
+    color: #999999;
+    font-style: italic;
+    background: rgba(0, 123, 255, 0.05);
+    border-radius: 5px;
+}
+
+/* Style Variants */
+
+/* Medical Clean (Default) - Classic medical style matching your image */
+.pxl-msh-accordion-style-medical-clean .pxl-accordion-item {
+    border-radius: 0 !important;
+    border: none !important;
+    border-bottom: none !important;
+    background: #ffffff;
+}
+
+.pxl-msh-accordion-style-medical-clean .pxl-accordion-item:last-child {
+    border-bottom: none !important;
+}
+
+.pxl-msh-accordion-style-medical-clean .pxl-accordion-header {
+    background: #ffffff !important;
+    padding: 30px !important;
+}
+
+.pxl-msh-accordion.msh-hover-enabled.pxl-msh-accordion-style-medical-clean .pxl-accordion-header:hover {
+    background-color: transparent;
+}
+
+.pxl-msh-accordion-style-medical-clean .pxl-accordion-content {
+    background-color: transparent;
+    border-top: none;
+}
+
+/* Description styling controlled by Elementor */
+
+.pxl-msh-accordion-style-medical-clean .pxl-accordion-item.active {
+    /* Active state styling controlled by Elementor */
+}
+
+/* Medical Card - More distinctive card style */
+.pxl-msh-accordion-style-medical-card {
+    gap: 20px;
+    display: flex;
+    flex-direction: column;
+}
+
+.pxl-msh-accordion-style-medical-card .pxl-accordion-item {
+    border-radius: 12px !important;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.08) !important;
+    border: none !important;
+    margin-bottom: 0 !important;
+    overflow: hidden;
+    background: #ffffff;
+}
+
+.pxl-msh-accordion-style-medical-card .pxl-accordion-item:last-child {
+    border: none !important;
+}
+
+.pxl-msh-accordion-style-medical-card .pxl-accordion-header {
+    background: transparent;
+    border-radius: 12px 12px 0 0;
+    padding: 35px !important;
+}
+
+.pxl-msh-accordion-style-medical-card .pxl-accordion-content {
+    background-color: #ffffff;
+    border-radius: 0 0 12px 12px;
+    border-top: none;
+}
+
+/* Description styling controlled by Elementor */
+
+.pxl-msh-accordion-style-medical-card .pxl-accordion-item.active {
+    transform: translateY(-2px);
+    /* Box shadow controlled by Elementor */
+}
+
+/* Medical Minimal - Ultra clean minimalist style */
+.pxl-msh-accordion-style-medical-minimal .pxl-accordion-item {
+    border: none !important;
+    border-bottom: none !important;
+    border-radius: 0 !important;
+    background: transparent !important;
+}
+
+.pxl-msh-accordion-style-medical-minimal .pxl-accordion-item:last-child {
+    border-bottom: none !important;
+}
+
+.pxl-msh-accordion-style-medical-minimal .pxl-accordion-header {
+    background: transparent !important;
+    padding: 20px 0 !important;
+}
+
+.pxl-msh-accordion-style-medical-minimal .pxl-accordion-title {
+    font-weight: 500 !important;
+    font-size: 1.3rem !important;
+}
+
+.pxl-msh-accordion-style-medical-minimal .pxl-accordion-description {
+    font-size: 0.9rem !important;
+    opacity: 0.85 !important;
+    /* Color controlled by Elementor */
+}
+
+.pxl-msh-accordion-style-medical-minimal .pxl-accordion-content {
+    background-color: transparent !important;
+    border-top: none !important;
+    padding-top: 0 !important;
+}
+
+.pxl-msh-accordion-style-medical-minimal .pxl-accordion-content-inner {
+    padding: 0 0 20px 40px !important;
+}
+
+.pxl-msh-accordion-style-medical-minimal .pxl-accordion-item.active {
+    /* Border and box shadow controlled by Elementor */
+}
+
+.pxl-msh-accordion-style-medical-minimal .pxl-accordion-item.active .pxl-accordion-title {
+    color: inherit;
+}
+
+.pxl-msh-accordion-style-medical-minimal .pxl-accordion-toggle {
+    width: 30px !important;
+    height: 30px !important;
+    font-size: 16px !important;
+}
+
+.pxl-msh-accordion-style-medical-minimal .pxl-accordion-toggle.toggle-shape-none {
+    background: transparent !important;
+    border: none !important;
+    border-color: transparent !important;
+}
+
+/* Divider/Separator Styles */
+.pxl-accordion-divider {
+    width: 100%;
+    height: 0;
+    border: none;
+    border-bottom: none;
+    margin: 20px 0;
+    display: block;
+}
+
+.pxl-msh-accordion-style-medical-clean .pxl-accordion-divider {
+    border-bottom-color: transparent;
+    margin: 0;
+}
+
+.pxl-msh-accordion-style-medical-card .pxl-accordion-divider {
+    border: none;
+    margin: 20px 0;
+    background: transparent;
+}
+
+.pxl-msh-accordion-style-medical-minimal .pxl-accordion-divider {
+    border-bottom-color: transparent;
+    margin: 15px 0;
+    opacity: 0.6;
+}
+
+/* Content Layout Helpers */
+.pxl-accordion-content .row {
+    margin-left: -15px;
+    margin-right: -15px;
+}
+
+.pxl-accordion-content .col,
+.pxl-accordion-content [class*="col-"] {
+    padding-left: 15px;
+    padding-right: 15px;
+}
+
+/* Lists in Content */
+.pxl-accordion-content ul {
+    margin: 15px 0;
+    padding-left: 20px;
+}
+
+.pxl-accordion-content ul li {
+    margin-bottom: 8px;
+    line-height: 1.5;
+    font-size: inherit;
+}
+
+.pxl-accordion-content ol {
+    margin: 15px 0;
+    padding-left: 20px;
+}
+
+.pxl-accordion-content ol li {
+    margin-bottom: 8px;
+    line-height: 1.5;
+    font-size: inherit;
+}
+
+/* Two Column Layout Support */
+.pxl-accordion-two-columns {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 30px;
+    margin-top: 20px;
+}
+
+.pxl-accordion-column {
+    background: #ffffff;
+    padding: 20px;
+    border-radius: 5px;
+    border: none;
+}
+
+.pxl-accordion-column h4 {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: #2c3e50;
+    margin-bottom: 15px;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .pxl-accordion-header {
+        padding: 20px 15px;
+    }
+    
+    .pxl-accordion-content-inner {
+        padding: 20px 15px;
+    }
+    
+    .pxl-accordion-header-content {
+        gap: 15px;
+    }
+    
+    .pxl-accordion-title {
+        font-size: 1.3rem;
+    }
+    
+    .pxl-accordion-description {
+        font-size: 0.95rem;
+    }
+    
+    .pxl-accordion-toggle {
+        width: 35px;
+        height: 35px;
+        font-size: 18px;
+    }
+    
+    .pxl-accordion-toggle svg {
+        width: 18px;
+        height: 18px;
+    }
+    
+    .pxl-accordion-two-columns {
+        grid-template-columns: 1fr;
+        gap: 20px;
+    }
+    
+    .pxl-msh-accordion-style-medical-card .pxl-accordion-item {
+        margin-bottom: 10px;
+    }
+}
+
+@media (max-width: 480px) {
+    .pxl-accordion-header {
+        padding: 15px 10px;
+    }
+    
+    .pxl-accordion-content-inner {
+        padding: 15px 10px;
+    }
+    
+    .pxl-accordion-title {
+        font-size: 1.2rem;
+    }
+    
+    .pxl-accordion-description {
+        font-size: 0.9rem;
+    }
+}
+
+/* Animation Classes */
+.pxl-accordion-slide-down {
+    animation: slideDown 0.3s ease-out;
+}
+
+.pxl-accordion-slide-up {
+    animation: slideUp 0.3s ease-out;
+}
+
+@keyframes slideDown {
+    from {
+        opacity: 0;
+        max-height: 0;
+        padding-top: 0;
+        padding-bottom: 0;
+    }
+    to {
+        opacity: 1;
+        max-height: 1000px;
+        padding-top: 30px;
+        padding-bottom: 30px;
+    }
+}
+
+@keyframes slideUp {
+    from {
+        opacity: 1;
+        max-height: 1000px;
+        padding-top: 30px;
+        padding-bottom: 30px;
+    }
+    to {
+        opacity: 0;
+        max-height: 0;
+        padding-top: 0;
+        padding-bottom: 0;
+    }
+}
+
+/* Button Styling */
+.pxl-accordion-button-wrapper {
+    margin-top: 20px;
+}
+
+.pxl-accordion-button,
+.pxl-msh-accordion .pxl-accordion-button,
+.pxl-accordion-content .pxl-accordion-button {
+    display: inline-block !important;
+    text-decoration: none !important;
+    text-align: center;
+    cursor: pointer;
+    outline: none;
+    font-family: inherit;
+    line-height: 1.4;
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
+}
+
+.pxl-accordion-button:hover,
+.pxl-accordion-button:focus,
+.pxl-msh-accordion .pxl-accordion-button:hover,
+.pxl-msh-accordion .pxl-accordion-button:focus {
+    text-decoration: none !important;
+    transform: translateY(-1px);
+}
+
+.pxl-accordion-button:active {
+    transform: translateY(0);
+    box-shadow: 0 2px 4px rgba(0, 123, 255, 0.3);
+}
+
+/* Print Styles */
+@media print {
+    .pxl-msh-accordion {
+        break-inside: avoid;
+    }
+    
+    .pxl-accordion-item {
+        border: none;
+        margin-bottom: 20px;
+        break-inside: avoid;
+    }
+    
+    .pxl-accordion-header {
+        background: #f0f0f0 !important;
+    }
+    
+    .pxl-accordion-content {
+        display: block !important;
+        background: #ffffff !important;
+    }
+    
+    .pxl-accordion-toggle {
+        display: none;
+    }
+}

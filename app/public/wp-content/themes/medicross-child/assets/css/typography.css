@@ -1,0 +1,492 @@
+/* =============================================
+   MAIN STREET HEALTH - TYPOGRAPHY SYSTEM
+   ============================================= */
+
+/* 1. COLOR VARIABLES */
+:root {
+  /* Text Colors */
+  --text-color: #333333;
+  --heading-color: #2D3E4E;
+  --body-color: #2D3E4E;
+  --label-color: #7A8C99;
+  
+  /* Button Colors */
+  --btn-bg-color: #2B4666;
+  --btn-text-color: #FFFFFF;
+  --btn-hover-bg: #DBAA17;
+  --btn-hover-text: #2D3E4E;
+  
+  /* Navigation Colors */
+  --nav-text-color: #0F5C82;
+  --nav-hover-color: #DBAA17; /* Yellow for text link hovers */
+  --nav-active-color: #218E9C;
+  --secondary-nav-bg: #F5F7FA;
+  --secondary-nav-text: #0F5C82;
+  --secondary-nav-hover: #DBAA17;
+  --sage: #E9EFE8;
+}
+
+/* 2. FONT FAMILIES */
+.font-bree,
+.font-bree-regular {
+  font-family: bree, 'Trebuchet MS', 'Segoe UI', sans-serif;
+  font-weight: 400;
+  font-feature-settings: "salt" 1, "calt" 1, "ss01" 1, "ss02" 1, "ss03" 1, "ss04" 1, "ss05" 1;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  font-synthesis: none;
+}
+
+.font-bree-semibold {
+  font-family: bree, 'Trebuchet MS', 'Segoe UI', sans-serif;
+  font-weight: 600;
+  font-feature-settings: "salt" 1, "calt" 1, "ss01" 1, "ss02" 1, "ss03" 1, "ss04" 1, "ss05" 1;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* 3. HEADINGS */
+h1,
+.h1,
+body h1,
+html body h1 {
+  font-family: bree, 'Trebuchet MS', 'Segoe UI', sans-serif !important;
+  font-weight: 400 !important;
+  font-size: clamp(32px, 4.14vw, 53px) !important;
+  line-height: clamp(38px, 4.84vw, 62px) !important;
+  /* color: #2D3E4E !important; -- Removed to allow Elementor control */
+  color: inherit; /* Will inherit from Elementor's global typography settings */
+  letter-spacing: 0.02em !important;
+  font-feature-settings: "salt" 1, "calt" 1, "ss01" 1, "ss02" 1, "ss03" 1, "ss04" 1, "ss05" 1 !important;
+}
+
+h2,
+.h2,
+body h2,
+html body h2 {
+  font-family: bree, 'Trebuchet MS', 'Segoe UI', sans-serif !important;
+  font-weight: 600 !important;
+  font-size: clamp(28px, 3.28vw, 42px) !important;
+  line-height: clamp(34px, 3.91vw, 50px) !important;
+  /* color: #2D3E4E !important; -- Removed to allow Elementor control */
+  color: inherit; /* Will inherit from Elementor's global typography settings */
+  letter-spacing: -0.02em !important;
+  font-feature-settings: "salt" 1, "calt" 1, "ss01" 1, "ss02" 1, "ss03" 1, "ss04" 1, "ss05" 1 !important;
+}
+
+h3,
+.h3,
+body h3,
+html body h3 {
+  font-family: bree, 'Trebuchet MS', 'Segoe UI', sans-serif !important;
+  font-weight: 400 !important;
+  font-size: clamp(20px, 2.5vw, 28px) !important;
+  line-height: 1.4 !important;
+  /* color: #2D3E4E !important; -- Removed to allow Elementor control */
+  color: inherit; /* Will inherit from Elementor's global typography settings */
+  letter-spacing: 0.01em !important;
+  font-feature-settings: "salt" 1, "calt" 1, "ss01" 1, "ss02" 1, "ss03" 1, "ss04" 1, "ss05" 1 !important;
+}
+
+h4,
+.h4,
+body h4,
+html body h4 {
+  font-family: 'Source Sans Pro', 'Segoe UI', Tahoma, sans-serif !important;
+  font-weight: 700 !important;
+  font-size: clamp(18px, 1.88vw, 24px) !important;
+  line-height: 1.2 !important;
+  /* color: #051A2D !important; -- Removed to allow Elementor control */
+  color: inherit; /* Will inherit from Elementor's global typography settings */
+}
+
+h5,
+.h5,
+body h5,
+html body h5 {
+  font-family: 'Source Sans Pro', 'Segoe UI', Tahoma, sans-serif !important;
+  font-weight: 600 !important;
+  font-size: clamp(16px, 1.56vw, 20px) !important;
+  line-height: 1.2 !important;
+  /* color: #051A2D !important; -- Removed to allow Elementor control */
+  color: inherit; /* Will inherit from Elementor's global typography settings */
+}
+
+/* 4. BODY TEXT */
+body {
+  font-family: 'Source Sans Pro', 'Segoe UI', Tahoma, sans-serif;
+  font-weight: 400;
+  font-size: 16px;
+  line-height: 1.6;
+  /* color: #2D3E4E; -- Removed to allow Elementor control */
+  color: inherit; /* Will inherit from Elementor's global typography settings */
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+p {
+  font-family: 'Source Sans Pro', 'Segoe UI', Tahoma, sans-serif !important;
+  font-weight: 400 !important;
+  font-size: clamp(16px, 1.41vw, 18px) !important;
+  line-height: 1.6 !important;
+}
+
+/* 5. LINKS */
+a:not(.btn-primary):not(.btn-sage):not(.btn-secondary):not([class*="btn"]) {
+  font-family: 'Source Sans Pro', 'Segoe UI', Tahoma, sans-serif !important;
+  font-weight: 600 !important;
+  font-size: clamp(14px, 1.25vw, 16px) !important;
+  /* color: #2D3E4E !important; -- Removed to allow Elementor control */
+  color: inherit; /* Will inherit from Elementor's global typography settings */
+  text-decoration: none !important;
+}
+
+a:hover:not(.btn-primary):not(.btn-sage):not(.btn-secondary):not([class*="btn"]):not(.msh-service-link) {
+  color: var(--nav-hover-color) !important;
+  text-decoration: none !important;
+}
+
+/* 6. BUTTONS - Typography only for general buttons, but keep navigation button colors */
+.btn-primary,
+a.btn-primary,
+button.btn-primary {
+  font-family: bree, 'Trebuchet MS', 'Segoe UI', sans-serif !important;
+  font-weight: 400 !important;
+  font-size: clamp(14px, 1.25vw, 16px) !important;
+  line-height: 1.4 !important;
+  letter-spacing: 0.3px !important;
+  text-transform: capitalize !important;
+  padding: 12px 24px !important;
+  border-radius: 8px !important;
+  border: none !important;
+  display: inline-block !important;
+  text-decoration: none !important;
+  transition: all 0.3s ease !important;
+  cursor: pointer !important;
+  font-feature-settings: "salt" 1, "calt" 1, "ss01" 1, "ss02" 1, "ss03" 1, "ss04" 1, "ss05" 1 !important;
+}
+
+.btn-primary:hover,
+a.btn-primary:hover,
+button.btn-primary:hover {
+  transform: translateY(-1px) !important;
+  text-decoration: none !important;
+}
+
+/* Navigation-specific button styling - KEEP COLORS */
+.top-nav .btn-primary,
+.site-header .btn-primary,
+.secondary-nav .btn-primary,
+.mobile-menu-content .btn-primary {
+  color: white !important;
+  background-color: var(--btn-bg-color) !important;
+}
+
+.top-nav .btn-primary:hover,
+.site-header .btn-primary:hover,
+.secondary-nav .btn-primary:hover,
+.mobile-menu-content .btn-primary:hover {
+  background-color: var(--btn-hover-bg) !important;
+  color: var(--btn-hover-text) !important;
+}
+
+.btn-sage,
+a.btn-sage,
+button.btn-sage {
+  font-family: bree, 'Trebuchet MS', 'Segoe UI', sans-serif !important;
+  font-weight: 400 !important;
+  font-size: clamp(14px, 1.25vw, 16px) !important;
+  padding: 12px 24px !important;
+  border-radius: 8px !important;
+  border: none !important;
+  display: inline-block !important;
+  text-decoration: none !important;
+  transition: all 0.3s ease !important;
+  cursor: pointer !important;
+  font-feature-settings: "salt" 1, "calt" 1, "ss01" 1, "ss02" 1, "ss03" 1, "ss04" 1, "ss05" 1 !important;
+}
+
+.btn-sage:hover,
+a.btn-sage:hover,
+button.btn-sage:hover {
+  text-decoration: none !important;
+}
+
+/* 7. FORMS */
+label,
+.label {
+  font-family: 'Source Sans Pro', 'Segoe UI', Tahoma, sans-serif !important;
+  font-weight: 400 !important;
+  font-size: clamp(14px, 1.25vw, 16px) !important;
+  line-height: 1.5 !important;
+  /* color: #2D3E4E !important; -- Removed to allow Elementor control */
+  color: inherit; /* Will inherit from Elementor's global typography settings */
+}
+
+input,
+textarea,
+select {
+  font-family: 'Source Sans Pro', 'Segoe UI', Tahoma, sans-serif !important;
+  font-size: 16px !important;
+}
+
+/* 8. MEDICROSS THEME OVERRIDES */
+.medicross-heading,
+[class*="medicross"] h1,
+[class*="medicross"] h2,
+[class*="medicross"] h3 {
+  font-family: bree, 'Trebuchet MS', 'Segoe UI', sans-serif !important;
+  font-feature-settings: "salt" 1, "calt" 1, "ss01" 1, "ss02" 1, "ss03" 1, "ss04" 1, "ss05" 1 !important;
+}
+
+/* 9. ELEMENTOR OVERRIDES - Allow Elementor to control colors */
+.elementor-widget-heading .elementor-heading-title {
+  font-family: inherit !important;
+  color: inherit !important; /* Let Elementor control the color */
+}
+
+.elementor-widget-text-editor {
+  font-family: 'Source Sans Pro', 'Segoe UI', Tahoma, sans-serif !important;
+  color: inherit !important; /* Let Elementor control the color */
+}
+
+/* Ensure all Elementor typography elements respect color settings */
+.elementor-element h1 {
+  color: inherit; /* Allow Elementor to control H1 colors without !important */
+}
+.elementor-element h2 {
+  color: inherit; /* Allow Elementor to control H2 colors without !important */
+}
+.elementor-element h3 {
+  color: inherit; /* Allow Elementor to control H3 colors without !important */
+}
+.elementor-element h4,
+.elementor-element h5,
+.elementor-element h6,
+.elementor-element p,
+.elementor-element span,
+.elementor-element div {
+  color: inherit; /* Allow Elementor to control all element colors */
+}
+
+/* Elementor heading widget specific overrides */
+.elementor-widget-heading h1.elementor-heading-title {
+  color: inherit; /* Allow Elementor to control H1 colors without !important */
+}
+.elementor-widget-heading h2.elementor-heading-title {
+  color: inherit; /* Allow Elementor to control H2 colors without !important */
+}
+.elementor-widget-heading h3.elementor-heading-title {
+  color: inherit; /* Allow Elementor to control H3 colors without !important */
+}
+.elementor-widget-heading h4.elementor-heading-title,
+.elementor-widget-heading h5.elementor-heading-title,
+.elementor-widget-heading h6.elementor-heading-title {
+  color: inherit; /* Allow Elementor to control all heading colors */
+}
+
+/* Text editor widget override */
+.elementor-widget-text-editor p,
+.elementor-widget-text-editor div,
+.elementor-widget-text-editor span {
+  color: inherit; /* Allow Elementor to control text editor colors */
+}
+
+/* 10. ACCESSIBILITY */
+.sr-only {
+  position: absolute !important;
+  width: 1px !important;
+  height: 1px !important;
+  padding: 0 !important;
+  margin: -1px !important;
+  overflow: hidden !important;
+  clip: rect(0, 0, 0, 0) !important;
+  white-space: nowrap !important;
+  border: 0 !important;
+}
+
+/* High Contrast Mode */
+body.high-contrast {
+  --text-color: #000000;
+  --btn-bg-color: #000000;
+  --nav-text-color: #000000;
+}
+
+body.high-contrast * {
+  color: #000000 !important;
+  background-color: #ffffff !important;
+  border-color: #000000 !important;
+}
+
+/* Large Text Mode */
+body.large-text {
+  font-size: 125%;
+}
+
+body.large-text h1 { font-size: clamp(40px, 5.18vw, 66px) !important; }
+body.large-text h2 { font-size: clamp(35px, 4.1vw, 53px) !important; }
+body.large-text h3 { font-size: clamp(25px, 3.13vw, 35px) !important; }
+body.large-text p { font-size: clamp(20px, 1.76vw, 23px) !important; }
+
+/* PXL Button Text - Bree Regular 16px */
+.pxl--btn-text,
+.pxl-btn-text,
+span.pxl--btn-text,
+.pxl-button .pxl--btn-text,
+.pxl-btn .pxl--btn-text,
+[class*="pxl"] .pxl--btn-text,
+[class*="pxl-btn"] span {
+    font-family: bree, 'Trebuchet MS', 'Segoe UI', sans-serif !important;
+    font-weight: 400 !important;
+    font-size: clamp(14px, 1.25vw, 16px) !important;
+    line-height: 1.4 !important;
+    letter-spacing: 0.3px !important;
+    text-transform: capitalize !important;
+    font-feature-settings: "salt" 1, "calt" 1, "ss01" 1, "ss02" 1, "ss03" 1, "ss04" 1, "ss05" 1 !important;
+    -webkit-font-feature-settings: "salt" 1, "calt" 1, "ss01" 1, "ss02" 1, "ss03" 1, "ss04" 1, "ss05" 1 !important;
+}
+
+/* Ensure color stays white on hover */
+.pxl--btn-text:hover,
+a:hover .pxl--btn-text,
+button:hover .pxl--btn-text,
+.pxl-button:hover .pxl--btn-text {
+}
+
+/* If button has dark background on hover, adjust text */
+.btn-primary:hover .pxl--btn-text,
+[class*="pxl-btn"]:hover .pxl--btn-text {
+    color: var(--btn-hover-text) !important;
+}
+
+/* Contact Form 7 Submit Button Styling - Typography only, no hardcoded colors */
+.wpcf7-submit:not(.wpcf7-btn-abs),
+button.wpcf7-submit:not(.wpcf7-btn-abs),
+input.wpcf7-submit:not(.wpcf7-btn-abs),
+.wpcf6-btn-abs,
+button.wpcf6-btn-abs {
+    font-family: bree, 'Trebuchet MS', 'Segoe UI', sans-serif !important;
+    font-weight: 400 !important;
+    font-size: clamp(14px, 1.25vw, 16px) !important;
+    line-height: 1.4 !important;
+    letter-spacing: 0.3px !important;
+    text-transform: capitalize !important;
+    padding: 12px 24px !important;
+    border-radius: 8px !important;
+    border: none !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    text-decoration: none !important;
+    transition: all 0.3s ease !important;
+    cursor: pointer !important;
+    font-feature-settings: "salt" 1, "calt" 1, "ss01" 1, "ss02" 1, "ss03" 1, "ss04" 1, "ss05" 1 !important;
+}
+
+.wpcf7-submit:not(.wpcf7-btn-abs):hover,
+button.wpcf7-submit:not(.wpcf7-btn-abs):hover,
+input.wpcf7-submit:not(.wpcf7-btn-abs):hover,
+.wpcf6-btn-abs:hover,
+button.wpcf6-btn-abs:hover {
+    transform: translateY(-1px) !important;
+    text-decoration: none !important;
+}
+
+/* Ensure SVG icon in CF7 button inherits color */
+.wpcf7-submit:not(.wpcf7-btn-abs) svg,
+.wpcf6-btn-abs svg {
+    fill: currentColor !important;
+    color: inherit !important;
+}
+
+/* Center the CF7 button container */
+.wpcf7-form p:has(.wpcf7-submit),
+.input-filled:has(.wpcf7-submit) {
+    text-align: center !important;
+}
+
+/* PXL Button Text List Styling - Typography only, no hardcoded colors */
+.pxl-button.pxl-atc-link .pxl--btn-text,
+.pxl-atc-link .pxl--btn-text {
+    transition: color 0.3s ease;
+}
+
+.pxl-button.pxl-atc-link:hover .pxl--btn-text,
+.pxl-atc-link:hover .pxl--btn-text {
+    /* No hardcoded hover color - let Elementor control it */
+}
+
+/* PXL Item Link - Remove underline on hover */
+.pxl-item--link a:hover {
+    text-decoration: none !important;
+}
+
+/* Fix for pxl-item--link with flaticon - prevent teal color and underline */
+li.pxl-item--link a:hover,
+.pxl-item--link a:hover:not(.btn-primary):not(.btn-sage):not(.btn-secondary):not([class*="btn"]) {
+    color: inherit !important;
+    text-decoration: none !important;
+}
+
+
+/* Responsive font sizing breakdown:
+   - Mobile (< 768px): 14px
+   - Tablet (768px - 1024px): 15px  
+   - Desktop (> 1024px): 16px
+*/
+@media (max-width: 768px) {
+    .pxl--btn-text {
+        font-size: 14px !important;
+    }
+}
+
+/* Read More Button - Source Sans Pro Semibold 16px - Typography only */
+.btn-readmore,
+.btn-readmore span,
+a.btn-readmore,
+a.btn-readmore span,
+.btn-readmore > span,
+[class*="btn-readmore"] span {
+    font-family: 'Source Sans Pro', 'Segoe UI', Tahoma, sans-serif !important;
+    font-weight: 600 !important; /* Semibold */
+    font-size: clamp(14px, 1.25vw, 16px) !important;
+    line-height: 1.4 !important;
+    text-decoration: none !important;
+    letter-spacing: normal !important;
+    transition: all 0.3s ease;
+}
+
+/* Ensure link styling doesn't override */
+a.btn-readmore:link,
+a.btn-readmore:visited,
+a.btn-readmore:link span,
+a.btn-readmore:visited span {
+    font-family: 'Source Sans Pro', 'Segoe UI', Tahoma, sans-serif !important;
+    font-weight: 600 !important;
+    font-size: clamp(14px, 1.25vw, 16px) !important;
+    text-decoration: none !important;
+}
+
+/* Hover state - no color hardcoding */
+.btn-readmore:hover,
+.btn-readmore:hover span,
+a.btn-readmore:hover,
+a.btn-readmore:hover span {
+    text-decoration: none !important;
+}
+
+/* If it has an arrow or icon, maintain color */
+.btn-readmore::after,
+.btn-readmore span::after,
+.btn-readmore i,
+.btn-readmore svg {
+    color: inherit !important;
+}
+
+/* Responsive breakdown for Read More buttons */
+@media (max-width: 768px) {
+    .btn-readmore,
+    .btn-readmore span {
+        font-size: 14px !important;
+    }
+}

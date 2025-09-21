@@ -1,0 +1,154 @@
+/* =============================================
+   MSH SERVICES LINK LIST WIDGET
+   ============================================= */
+
+/* Cover Image Functionality - Simple approach */
+.msh-service-entry.has-cover-image {
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+    color: #fff;
+}
+
+.msh-service-entry.has-cover-image .msh-service-title,
+.msh-service-entry.has-cover-image .msh-service-description,
+.msh-service-entry.has-cover-image .msh-service-link {
+    color: #fff !important;
+}
+
+/* Fix first grid item width issue */
+.msh-services-grid .msh-service-entry:first-child {
+    grid-column: span 1 !important;
+    width: auto !important;
+    max-width: none !important;
+}
+
+/* Ensure all grid items respect grid columns */
+.msh-services-grid .msh-service-entry {
+    grid-column: span 1 !important;
+    min-width: 0;
+    width: auto;
+}
+
+.msh-services-link-list {
+    width: 100%;
+    font-family: 'Source Sans Pro', 'Segoe UI', Tahoma, sans-serif;
+}
+
+.service-link-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 0;
+    text-decoration: none !important;
+    border-bottom: 1px solid #E9EFE8; /* Sage color divider */
+    transition: all 0.3s ease;
+    cursor: pointer;
+}
+
+.service-link-row:hover {
+    background-color: rgba(233, 239, 232, 0.3); /* Light sage hover background */
+}
+
+.service-link-row:last-child {
+    border-bottom: none;
+}
+
+.service-name {
+    font-size: 18px;
+    font-weight: 600;
+    color: #2D3E4E;
+    transition: color 0.3s ease;
+}
+
+.learn-more {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 14px;
+    font-weight: 600;
+    color: #051B2D;
+    transition: color 0.3s ease;
+    text-decoration: none !important;
+}
+
+.service-link-row:hover .learn-more {
+    color: #218E9C; /* Teal color on hover */
+}
+
+.arrow-icon {
+    width: 20px;
+    height: 20px;
+    transition: transform 0.3s ease, color 0.3s ease;
+}
+
+.service-link-row:hover .arrow-icon {
+    transform: translateX(4px);
+    color: #218E9C;
+}
+
+/* Remove any inherited link styles */
+.service-link-row,
+.service-link-row:visited,
+.service-link-row:focus,
+.service-link-row:active {
+    text-decoration: none !important;
+    border: none !important;
+    box-shadow: none !important;
+    background-image: none !important;
+}
+
+/* Focus accessibility */
+.service-link-row:focus {
+    outline: 2px solid #218E9C;
+    outline-offset: 2px;
+    background-color: rgba(33, 142, 156, 0.1);
+}
+
+.service-link-row:focus .learn-more {
+    color: #218E9C;
+}
+
+/* Mobile responsive */
+@media (max-width: 768px) {
+    .service-link-row {
+        padding: 14px 0;
+    }
+    
+    .service-name {
+        font-size: 16px;
+    }
+    
+    .learn-more {
+        font-size: 13px;
+    }
+    
+    .arrow-icon {
+        width: 18px;
+        height: 18px;
+    }
+}
+
+/* Widget title styling */
+.widget-title {
+    margin-bottom: 20px;
+    font-family: bree, 'Trebuchet MS', 'Segoe UI', sans-serif;
+    font-weight: 600;
+    color: #2D3E4E;
+}
+
+/* Container styling for better integration */
+.msh-services-link-list {
+    background: white;
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+/* First and last item padding adjustments */
+.service-link-row:first-child {
+    padding-top: 0;
+}
+
+.service-link-row:last-child {
+    padding-bottom: 0;
+}

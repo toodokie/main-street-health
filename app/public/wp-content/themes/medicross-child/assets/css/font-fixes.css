@@ -1,0 +1,38 @@
+/**
+ * Font Loading Fixes
+ * Ensures proper fallbacks and font usage
+ */
+
+/* Global body copy should stay on Source Sans Pro */
+body,
+html {
+    font-family: 'Source Sans Pro', 'Segoe UI', Tahoma, sans-serif;
+}
+
+/* Replace legacy Inter references with the correct body font */
+*[style*="font-family: Inter"],
+*[style*="font-family: 'Inter'"] {
+    font-family: 'Source Sans Pro', 'Segoe UI', Tahoma, sans-serif !important;
+}
+
+/* Headings default to Adobe Bree unless Elementor overrides them */
+h1, h2, h3, h4, h5, h6,
+.elementor-heading-title {
+    font-family: bree, 'Trebuchet MS', 'Segoe UI', sans-serif;
+}
+
+/* Catch Elementor widgets still referencing Inter */
+.elementor-element[data-settings*="Inter"] {
+    font-family: 'Source Sans Pro', 'Segoe UI', Tahoma, sans-serif !important;
+}
+
+/* Ensure consistent font rendering across all text elements */
+p, span, div, a, li, td, th, input, button, select, textarea {
+    font-family: inherit; /* Inherit from body/headings */
+}
+
+/* Performance: Prevent layout shifts during font loading */
+.elementor-widget-heading .elementor-heading-title,
+.elementor-widget-text-editor {
+    font-display: swap;
+}

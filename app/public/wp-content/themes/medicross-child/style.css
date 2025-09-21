@@ -1,0 +1,30 @@
+/*
+Theme Name: Main Street Health
+Template: medicross
+Version: 1.0.3
+Author: The Dot Creative Agency
+Author URI: https://www.thedotcreative.co/
+Description: Custom child theme for Main Street Health
+License: ThemeForest
+License URI: https://themeforest.net/licenses
+*/
+
+/* Case Counter Widget - Prefix Styling */
+.pxl-counter .pxl-counter--prefix {
+    font-size: 34px !important;
+}
+
+/* Case Counter Widget - Number Height & Sizing Controls */
+.pxl-counter .pxl-counter--number {
+    /* Default height settings - customize as needed */
+    min-height: 60px;
+    height: auto;
+    line-height: 1.2;
+    margin-top: 0 !important;
+}
+
+/* Alternative: Fixed height option (uncomment if needed)
+.pxl-counter .pxl-counter--number {
+    height: 80px;
+    line-height: 80px;
+} */

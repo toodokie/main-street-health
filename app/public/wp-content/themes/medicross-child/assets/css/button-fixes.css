@@ -1,0 +1,818 @@
+/* =============================================
+   BUTTON FIXES - Font and Icon Updates
+   ============================================= */
+
+/* Fix font-family for btn--text inside pxl-post--button */
+.pxl-post--button .btn--readmore .btn--text,
+.pxl-post--button .btn--readmore span.btn--text,
+.pxl-post--button a.btn--readmore .btn--text,
+.pxl-post--button a.btn--readmore span.btn--text {
+    font-family: 'Source Sans Pro', 'Segoe UI', Tahoma, sans-serif !important;
+    font-weight: 600 !important;
+    font-size: clamp(14px, 1.25vw, 16px) !important;
+    line-height: 1.4 !important;
+    text-decoration: none !important;
+    letter-spacing: normal !important;
+    transition: all 0.3s ease;
+}
+
+/* Override any GT Walsheim Pro font on these elements */
+.pxl-post--button * {
+    font-family: inherit !important;
+}
+
+/* Ensure the link styling matches */
+.pxl-post--button a.btn--readmore,
+.pxl-post--button .btn--readmore {
+    font-family: 'Source Sans Pro', 'Segoe UI', Tahoma, sans-serif !important;
+    text-decoration: none !important;
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    transition: all 0.3s ease;
+}
+
+/* Hide the existing SVG icon */
+.pxl-post--button .btn--readmore svg {
+    display: none !important;
+}
+
+/* Style the flaticon-next that's in the HTML */
+.pxl-post--button .btn--readmore .flaticon-next {
+    font-size: 16px;
+    margin-left: 8px;
+    transition: transform 0.3s ease;
+    display: inline-block;
+}
+
+/* Hover effect - move arrow right */
+.pxl-post--button .btn--readmore:hover .flaticon-next {
+    transform: translateX(5px);
+}
+
+/* Alternative: Add flaticon-next via CSS if not present in HTML */
+.pxl-post--button .btn--readmore {
+    position: relative;
+}
+
+/* Force override any inline styles */
+.pxl-post--button .btn--readmore span[style*="font-family"],
+.pxl-post--button .btn--text[style*="font-family"] {
+    font-family: 'Source Sans Pro', 'Segoe UI', Tahoma, sans-serif !important;
+}
+
+/* =============================================
+   FIX PXL-POST--READMORE BUTTONS
+   Remove border/padding and style as text links
+   ============================================= */
+
+/* Override the bordered button style for pxl-post--readmore */
+.pxl-post--readmore .btn-readmore,
+.pxl-post--readmore a.btn-readmore {
+    /* Remove border and padding */
+    border: none !important;
+    border-radius: 0 !important;
+    padding: 0 !important;
+    
+    /* Change layout to inline link style */
+    width: auto !important;
+    display: inline-flex !important;
+    justify-content: flex-start !important;
+    align-items: center !important;
+    
+    /* Typography */
+    font-family: 'Source Sans Pro', 'Segoe UI', Tahoma, sans-serif !important;
+    font-weight: 600 !important;
+    font-size: clamp(14px, 1.25vw, 16px) !important;
+    line-height: 1.4 !important;
+    text-decoration: none !important;
+    
+    /* Spacing */
+    column-gap: 10px !important;
+    
+    /* Remove any background */
+    background: none !important;
+    background-color: transparent !important;
+    
+    /* Transition */
+    transition: all 0.3s ease;
+}
+
+/* Hover state for pxl-post--readmore links */
+.pxl-post--readmore .btn-readmore:hover,
+.pxl-post--readmore a.btn-readmore:hover {
+    background: none !important;
+    background-color: transparent !important;
+    border: none !important;
+    column-gap: 15px !important; /* Move arrow on hover */
+    text-decoration: none !important;
+    color: var(--product-button-hover-color) !important; /* Button hover color */
+}
+
+/* Ensure text and icon stay visible on hover */
+.pxl-post--readmore .btn-readmore:hover span,
+.pxl-post--readmore a.btn-readmore:hover span,
+.pxl-post--readmore .btn-readmore:hover i,
+.pxl-post--readmore a.btn-readmore:hover i {
+    color: var(--product-button-hover-color) !important; /* Button hover color for child elements */
+}
+
+
+/* =============================================
+   STYLE PXL-POST--ICON 
+   ============================================= */
+
+/* Style the icon containers - ONLY for the specific grid that needs custom styling */
+.pxl-grid.pxl-service-grid.pxl-service-grid-layout2.pxl-service-style1 .pxl-post--icon {
+    background: none !important;
+    background-color: transparent !important;
+    border: 1px solid var(--primary-color, #2B4666) !important;
+    border-radius: 13px !important;
+    transition: all 0.3s ease !important;
+}
+
+/* Preserve hover styling for Products & Devices cards; allow editor control */
+.pxl-grid.pxl-service-grid[data-post-type="pxl_product"] .pxl-grid-item .pxl-post--inner:hover .pxl-post--icon,
+.pxl-grid.pxl-service-grid[data-post-type="pxl_product"] .pxl-grid-item .pxl-post--icon:hover {
+    background: none !important;
+    background-color: var(--product-icon-hover-background, transparent) !important;
+    border: 1px solid var(--primary-color, #2B4666) !important;
+}
+
+/* Hover state for icon containers - ONLY for the specific grid */
+/* Set max height for SVG icons in service layouts */
+.pxl-service-grid-layout2 .pxl-grid-item:not(.custom-box) .pxl-post--inner .pxl-post--icon svg,
+.pxl-service-carousel3 .pxl-grid-item:not(.custom-box) .pxl-post--inner .pxl-post--icon svg,
+.pxl-service-grid-layout2 .pxl-swiper-slide .pxl-post--inner .pxl-post--icon svg,
+.pxl-service-carousel3 .pxl-swiper-slide .pxl-post--inner .pxl-post--icon svg {
+    height: initial !important;
+    max-height: 56px !important;
+}
+
+/* Fix for Product & Devices icons - make white icons visible by changing them to dark blue */
+/* Target both IMG and SVG since JS converts IMG to SVG */
+html body .elementor .elementor-widget-container .pxl-grid.pxl-service-grid.pxl-service-grid-layout2.pxl-service-style1 .pxl-post--icon img,
+html body .pxl-grid.pxl-service-grid.pxl-service-grid-layout2.pxl-service-style1 .pxl-post--icon img,
+html body .elementor .elementor-widget-container .pxl-grid.pxl-service-grid.pxl-service-grid-layout2.pxl-service-style1 .pxl-post--icon svg,
+html body .pxl-grid.pxl-service-grid.pxl-service-grid-layout2.pxl-service-style1 .pxl-post--icon svg {
+    filter: brightness(0) saturate(100%) invert(12%) sepia(45%) saturate(1180%) hue-rotate(195deg) brightness(98%) contrast(95%) !important;
+    -webkit-filter: brightness(0) saturate(100%) invert(12%) sepia(45%) saturate(1180%) hue-rotate(195deg) brightness(98%) contrast(95%) !important;
+    width: auto !important;
+    height: auto !important;
+    max-width: 48px !important;
+    max-height: 48px !important;
+    display: block !important;
+    opacity: 1 !important;
+    visibility: visible !important;
+    fill: var(--product-icon-color) !important;
+}
+
+/* Hover state for product images/SVGs - keep same blue color */
+html body .elementor .elementor-widget-container .pxl-grid.pxl-service-grid.pxl-service-grid-layout2.pxl-service-style1 .pxl-post--icon:hover img,
+html body .elementor .elementor-widget-container .pxl-grid.pxl-service-grid.pxl-service-grid-layout2.pxl-service-style1 .pxl-post--inner:hover .pxl-post--icon img,
+html body .pxl-grid.pxl-service-grid.pxl-service-grid-layout2.pxl-service-style1 .pxl-post--icon:hover img,
+html body .pxl-grid.pxl-service-grid.pxl-service-grid-layout2.pxl-service-style1 .pxl-post--inner:hover .pxl-post--icon img,
+html body .elementor .elementor-widget-container .pxl-grid.pxl-service-grid.pxl-service-grid-layout2.pxl-service-style1 .pxl-post--icon:hover svg,
+html body .elementor .elementor-widget-container .pxl-grid.pxl-service-grid.pxl-service-grid-layout2.pxl-service-style1 .pxl-post--inner:hover .pxl-post--icon svg,
+html body .pxl-grid.pxl-service-grid.pxl-service-grid-layout2.pxl-service-style1 .pxl-post--icon:hover svg,
+html body .pxl-grid.pxl-service-grid.pxl-service-grid-layout2.pxl-service-style1 .pxl-post--inner:hover .pxl-post--icon svg {
+    filter: brightness(0) saturate(100%) invert(12%) sepia(45%) saturate(1180%) hue-rotate(195deg) brightness(98%) contrast(95%) !important;
+    -webkit-filter: brightness(0) saturate(100%) invert(12%) sepia(45%) saturate(1180%) hue-rotate(195deg) brightness(98%) contrast(95%) !important;
+    fill: var(--product-icon-color) !important;
+}
+
+/* =============================================
+   PRODUCTS & DEVICES STYLING CONTROLS
+   ============================================= */
+
+/* Products & Devices Text Colors - Customizable via CSS Variables */
+:root {
+    --product-title-color: #333333;
+    --product-title-hover-color: #0F5C82;
+    --product-content-color: #666666;
+    --product-readmore-color: #000000; /* This fixes your black link issue */
+    --product-readmore-hover-color: #0F5C82;
+    --product-card-background: #ffffff;
+    --product-card-hover-background: #f8f9fa;
+    --product-button-hover-color: #DBAA17; /* Button text/icon hover color */
+    --product-icon-hover-background: transparent; /* Icon hover background color defaults to transparent */
+    --product-icon-color: #2B4666; /* Icon color */
+}
+
+/* Title Colors for Products & Devices */
+.pxl-grid.pxl-service-grid[data-post-type="pxl_product"] .pxl-grid-item .pxl-post--title a,
+.pxl-grid.pxl-service-grid.pxl-service-grid-layout2.pxl-service-style1 .pxl-grid-item .pxl-post--title a {
+    color: var(--product-title-color) !important;
+    transition: color 0.3s ease !important;
+}
+
+.pxl-grid.pxl-service-grid[data-post-type="pxl_product"] .pxl-grid-item .pxl-post--title a:hover,
+.pxl-grid.pxl-service-grid[data-post-type="pxl_product"] .pxl-grid-item .pxl-post--inner:hover .pxl-post--title a,
+.pxl-grid.pxl-service-grid.pxl-service-grid-layout2.pxl-service-style1 .pxl-grid-item .pxl-post--title a:hover,
+.pxl-grid.pxl-service-grid.pxl-service-grid-layout2.pxl-service-style1 .pxl-grid-item .pxl-post--inner:hover .pxl-post--title a {
+    color: var(--product-title-hover-color) !important;
+}
+
+/* Content Colors for Products & Devices */
+.pxl-grid.pxl-service-grid[data-post-type="pxl_product"] .pxl-grid-item .pxl-post--content,
+.pxl-grid.pxl-service-grid.pxl-service-grid-layout2.pxl-service-style1 .pxl-grid-item .pxl-post--content {
+    color: var(--product-content-color) !important;
+}
+
+/* Read More Link Colors for Products & Devices */
+.pxl-grid.pxl-service-grid[data-post-type="pxl_product"] .pxl-grid-item .pxl-post--readmore a,
+.pxl-grid.pxl-service-grid[data-post-type="pxl_product"] .pxl-grid-item .btn-readmore,
+.pxl-grid.pxl-service-grid.pxl-service-grid-layout2.pxl-service-style1 .pxl-grid-item .pxl-post--readmore a,
+.pxl-grid.pxl-service-grid.pxl-service-grid-layout2.pxl-service-style1 .pxl-grid-item .btn-readmore {
+    color: var(--product-readmore-color) !important;
+    transition: color 0.3s ease !important;
+}
+
+.pxl-grid.pxl-service-grid[data-post-type="pxl_product"] .pxl-grid-item .pxl-post--readmore a:hover,
+.pxl-grid.pxl-service-grid[data-post-type="pxl_product"] .pxl-grid-item .btn-readmore:hover,
+.pxl-grid.pxl-service-grid[data-post-type="pxl_product"] .pxl-grid-item .pxl-post--inner:hover .pxl-post--readmore a,
+.pxl-grid.pxl-service-grid[data-post-type="pxl_product"] .pxl-grid-item .pxl-post--inner:hover .btn-readmore,
+.pxl-grid.pxl-service-grid.pxl-service-grid-layout2.pxl-service-style1 .pxl-grid-item .pxl-post--readmore a:hover,
+.pxl-grid.pxl-service-grid.pxl-service-grid-layout2.pxl-service-style1 .pxl-grid-item .btn-readmore:hover,
+.pxl-grid.pxl-service-grid.pxl-service-grid-layout2.pxl-service-style1 .pxl-grid-item .pxl-post--inner:hover .pxl-post--readmore a,
+.pxl-grid.pxl-service-grid.pxl-service-grid-layout2.pxl-service-style1 .pxl-grid-item .pxl-post--inner:hover .btn-readmore {
+    color: var(--product-readmore-hover-color) !important;
+}
+
+/* Card Background Colors for Products & Devices */
+.pxl-grid.pxl-service-grid[data-post-type="pxl_product"] .pxl-grid-item .pxl-post--inner,
+.pxl-grid.pxl-service-grid.pxl-service-grid-layout2.pxl-service-style1 .pxl-grid-item .pxl-post--inner {
+    background-color: var(--product-card-background) !important;
+    transition: background-color 0.3s ease !important;
+}
+
+.pxl-grid.pxl-service-grid[data-post-type="pxl_product"] .pxl-grid-item .pxl-post--inner:hover,
+.pxl-grid.pxl-service-grid.pxl-service-grid-layout2.pxl-service-style1 .pxl-grid-item .pxl-post--inner:hover {
+    background-color: var(--product-card-hover-background) !important;
+}
+
+/* Hide Custom Box Option */
+.pxl-grid.pxl-service-grid.hide-custom-box .pxl-grid-item.custom-box {
+    display: none !important;
+}
+
+/* =============================================
+   CARD INTERACTION IMPROVEMENTS
+   ============================================= */
+
+/* Make entire card clickable - add overlay */
+.pxl-post--inner {
+    position: relative !important;
+    cursor: pointer !important;
+}
+
+/* Create invisible overlay that captures clicks */
+.pxl-post--inner::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 1;
+    background: transparent;
+}
+
+/* Remove text decoration from title links */
+.pxl-post--title a,
+.pxl-post--title a:hover,
+.pxl-post--title a:focus,
+.pxl-post--title a:active {
+    text-decoration: none !important;
+}
+
+/* Ensure clickable elements stay above the overlay */
+.pxl-post--readmore,
+.pxl-post--button,
+.pxl-post--readmore a,
+.pxl-post--button a {
+    position: relative !important;
+    z-index: 2 !important;
+}
+
+/* =============================================
+   EQUAL CARD HEIGHTS HANDLED VIA JS
+   Removed rigid min-height overrides on specific grid ID to avoid
+   conflicting with dynamic equalization and masonry layout.
+   ============================================= */
+
+/* =============================================
+   MASONRY GRID CARD HEIGHT AND ICON FIXES
+   ============================================= */
+
+/* Basic flexbox setup for cards */
+.pxl-grid-masonry .pxl-grid-item .pxl-post--inner,
+.pxl-service-grid .pxl-grid-item .pxl-post--inner {
+  display: flex !important;
+  flex-direction: column !important;
+  height: 100%;
+  box-sizing: border-box;
+}
+
+/* Custom box styling */
+.pxl-grid.pxl-service-grid .pxl-grid-item.custom-box .pxl-post--inner {
+  justify-content: flex-end !important;
+  align-items: flex-start !important;
+  padding: 30px !important;
+}
+
+/* Custom box content at bottom */
+.pxl-grid.pxl-service-grid .pxl-grid-item.custom-box .title-box {
+  margin-top: auto !important;
+  width: 100% !important;
+}
+
+/* Regular cards content distribution */
+.pxl-grid.pxl-service-grid .pxl-grid-item:not(.custom-box) .pxl-post--content {
+  flex: 1 1 auto !important;
+  display: flex !important;
+  flex-direction: column !important;
+}
+
+/* Push buttons to bottom in regular cards */
+.pxl-grid.pxl-service-grid .pxl-grid-item:not(.custom-box) .pxl-post--readmore,
+.pxl-grid.pxl-service-grid .pxl-grid-item:not(.custom-box) .pxl-post--button,
+.pxl-grid.pxl-service-grid .pxl-grid-item:not(.custom-box) .btn--readmore {
+  margin-top: auto !important;
+  padding-top: 15px !important;
+}
+
+/* Masonry grid icons - MORE SPECIFIC - transparent background, 1px blue border */
+body .pxl-grid.pxl-service-grid .pxl-grid-masonry .pxl-grid-item:not(.custom-box) .pxl-post--inner .pxl-post--icon,
+.elementor-widget-container .pxl-grid.pxl-service-grid .pxl-grid-masonry .pxl-grid-item .pxl-post--inner .pxl-post--icon,
+.pxl-grid[data-layout="masonry"].pxl-service-grid .pxl-grid-masonry .pxl-grid-item .pxl-post--inner .pxl-post--icon {
+  background: none !important;
+  background-color: transparent !important;
+  background-image: none !important;
+  border: 1px solid #0F5C82 !important;
+  border-radius: 13px !important;
+  transition: all 0.3s ease !important;
+}
+
+/* Fix custom-box icon styling to match other cards in default state */
+body .pxl-grid.pxl-service-grid .pxl-grid-masonry .pxl-grid-item.custom-box .pxl-post--inner .pxl-post--icon {
+  background: none !important;
+  background-color: transparent !important;
+  background-image: none !important;
+  border: 1px solid #0F5C82 !important;
+  border-radius: 13px !important;
+  transition: all 0.3s ease !important;
+}
+
+/* Fix custom-box icon color - should be blue like other cards, not white */
+body .pxl-grid.pxl-service-grid .pxl-grid-masonry .pxl-grid-item.custom-box .pxl-post--inner .pxl-post--icon i,
+body .pxl-grid.pxl-service-grid .pxl-grid-masonry .pxl-grid-item.custom-box .pxl-post--inner .pxl-post--icon svg,
+body .pxl-grid.pxl-service-grid .pxl-grid-masonry .pxl-grid-item.custom-box .pxl-post--inner .pxl-post--icon::before {
+  color: #0F5C82 !important;
+  fill: #0F5C82 !important;
+}
+
+/* Masonry grid icons hover - MORE SPECIFIC - yellow background, no border */
+body .pxl-grid.pxl-service-grid:not([data-post-type="pxl_product"]) .pxl-grid-masonry .pxl-grid-item:not(.custom-box) .pxl-post--inner:hover .pxl-post--icon,
+body .pxl-grid.pxl-service-grid:not([data-post-type="pxl_product"]) .pxl-grid-masonry .pxl-grid-item:not(.custom-box) .pxl-post--icon:hover,
+.elementor-widget-container .pxl-grid.pxl-service-grid:not([data-post-type="pxl_product"]) .pxl-grid-masonry .pxl-grid-item .pxl-post--inner:hover .pxl-post--icon,
+.elementor-widget-container .pxl-grid.pxl-service-grid:not([data-post-type="pxl_product"]) .pxl-grid-masonry .pxl-grid-item .pxl-post--icon:hover,
+.pxl-grid[data-layout="masonry"].pxl-service-grid:not([data-post-type="pxl_product"]) .pxl-grid-masonry .pxl-grid-item .pxl-post--inner:hover .pxl-post--icon,
+.pxl-grid[data-layout="masonry"].pxl-service-grid:not([data-post-type="pxl_product"]) .pxl-grid-masonry .pxl-grid-item .pxl-post--icon:hover {
+  background: #DBAA17 !important;
+  background-color: #DBAA17 !important;
+  background-image: none !important;
+  border: 1px solid transparent !important;
+  border-color: transparent !important;
+}
+
+/* Custom-box hover state - yellow background */
+body .pxl-grid.pxl-service-grid:not([data-post-type="pxl_product"]) .pxl-grid-masonry .pxl-grid-item.custom-box .pxl-post--inner:hover .pxl-post--icon,
+body .pxl-grid.pxl-service-grid:not([data-post-type="pxl_product"]) .pxl-grid-masonry .pxl-grid-item.custom-box .pxl-post--icon:hover {
+  background: #DBAA17 !important;
+  background-color: #DBAA17 !important;
+  background-image: none !important;
+  border: 1px solid transparent !important;
+  border-color: transparent !important;
+}
+
+/* Custom-box hover icon color - white on yellow background */
+body .pxl-grid.pxl-service-grid .pxl-grid-masonry .pxl-grid-item.custom-box .pxl-post--inner:hover .pxl-post--icon i,
+body .pxl-grid.pxl-service-grid .pxl-grid-masonry .pxl-grid-item.custom-box .pxl-post--inner:hover .pxl-post--icon svg,
+body .pxl-grid.pxl-service-grid .pxl-grid-masonry .pxl-grid-item.custom-box .pxl-post--inner:hover .pxl-post--icon::before {
+  color: #FFFFFF !important;
+  fill: #FFFFFF !important;
+}
+
+/* FIX: 5th card (Pre/Post Operative Care) - force icon color to match other cards */
+body .pxl-grid.pxl-service-grid .pxl-grid-masonry .pxl-grid-item:nth-child(5) .pxl-post--inner .pxl-post--icon i,
+body .pxl-grid.pxl-service-grid .pxl-grid-masonry .pxl-grid-item:nth-child(5) .pxl-post--inner .pxl-post--icon svg,
+body .pxl-grid.pxl-service-grid .pxl-grid-masonry .pxl-grid-item:nth-child(5) .pxl-post--inner .pxl-post--icon::before,
+body .pxl-grid.pxl-service-grid .pxl-grid-masonry .pxl-grid-item:nth-child(5) .pxl-post--inner .pxl-post--icon path {
+  color: #2D3E4E !important;
+  fill: #2D3E4E !important;
+}
+
+/* FIX: Container adjusts to longest card - force dynamic height adjustment */
+
+/* Force Swiper container to adjust to current slide height, not tallest slide */
+.pxl-testimonial-carousel3 .pxl-swiper-container {
+  height: auto !important; /* Override fixed height calculation */
+}
+
+.pxl-testimonial-carousel3 .pxl-swiper-wrapper {
+  height: auto !important; /* Allow wrapper to shrink/expand with content */
+  align-items: stretch !important; /* Stretch slides to match container */
+  padding: 20px 0 !important; /* Controlled padding */
+}
+
+/* Make each slide take only the height it needs */
+.pxl-testimonial-carousel3 .pxl-swiper-slide {
+  height: auto !important; /* Don't stretch to container height */
+  align-self: flex-start !important; /* Align to top instead of stretching */
+}
+
+/* Position navigation closer to content */
+.pxl-testimonial-carousel3 .pxl-swiper-bottom {
+  margin-top: 20px !important; /* Controlled spacing */
+  position: relative !important;
+}
+
+/* 5th card hover - white icon on yellow background */
+body .pxl-grid.pxl-service-grid .pxl-grid-masonry .pxl-grid-item:nth-child(5) .pxl-post--inner:hover .pxl-post--icon i,
+body .pxl-grid.pxl-service-grid .pxl-grid-masonry .pxl-grid-item:nth-child(5) .pxl-post--inner:hover .pxl-post--icon svg,
+body .pxl-grid.pxl-service-grid .pxl-grid-masonry .pxl-grid-item:nth-child(5) .pxl-post--inner:hover .pxl-post--icon::before,
+body .pxl-grid.pxl-service-grid .pxl-grid-masonry .pxl-grid-item:nth-child(5) .pxl-post--inner:hover .pxl-post--icon path {
+  color: #FFFFFF !important;
+  fill: #FFFFFF !important;
+}
+
+/* Swiper icons styling - yellow background by default, blue on hover */
+.pxl-swiper-container .pxl-post--icon,
+.pxl-carousel-inner .pxl-post--icon {
+  background: #DBAA17 !important;
+  background-color: #DBAA17 !important;
+  border: none !important;
+  transition: all 0.3s ease !important;
+}
+
+/* Swiper icons hover - blue background */
+.pxl-swiper-container .pxl-post--inner:hover .pxl-post--icon,
+.pxl-swiper-container .pxl-post--icon:hover,
+.pxl-carousel-inner .pxl-post--inner:hover .pxl-post--icon,
+.pxl-carousel-inner .pxl-post--icon:hover {
+  background: #0F5C82 !important;
+  background-color: #0F5C82 !important;
+}
+
+/* REVERTED - didn't work */
+
+/* =============================================
+   STYLE CUSTOM BOX BUTTONS  
+   ============================================= */
+
+
+/* =============================================
+   FIX CUSTOM BOX BUTTON VISIBILITY
+   ============================================= */
+
+/* Make custom-box button styled as regular custom button */
+.custom-box .button-box,
+.custom-box .btn,
+.custom-box .btn-glossy {
+    display: inline-flex !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    
+    /* Style to match top nav buttons */
+    font-family: 'Source Sans Pro', 'Segoe UI', Tahoma, sans-serif !important;
+    font-weight: 600 !important;
+    font-size: 15px !important;
+    line-height: 55px !important;
+    text-decoration: none !important;
+    letter-spacing: normal !important;
+    transition: all 0.3s ease;
+    
+    /* Button styling like top nav */
+    color: #FFFFFF !important;
+    background-color: #09243C !important;
+    border: none !important;
+    border-radius: 13px !important;
+    padding: 0 33px !important;
+    
+    /* Layout */
+    align-items: center !important;
+    justify-content: center !important;
+    text-align: center !important;
+    white-space: nowrap !important; /* Prevent text from breaking */
+    
+    /* Ensure it's positioned properly */
+    position: relative !important;
+    z-index: 2 !important;
+    
+    /* Add icon spacing if present */
+    column-gap: 11px !important;
+}
+
+/* On smaller screens, adjust button to prevent breaking */
+@media (max-width: 1200px) {
+    .custom-box .button-box,
+    .custom-box .btn,
+    .custom-box .btn-glossy {
+        font-size: 14px !important;
+        padding: 0 25px !important;
+        line-height: 48px !important;
+    }
+}
+
+@media (max-width: 992px) {
+    .custom-box .button-box,
+    .custom-box .btn,
+    .custom-box .btn-glossy {
+        font-size: 13px !important;
+        padding: 0 20px !important;
+        line-height: 44px !important;
+    }
+}
+
+/* Hover state for custom-box buttons */
+.custom-box .button-box:hover,
+.custom-box .btn:hover,
+.custom-box .btn-glossy:hover {
+    background-color: #DBAA17 !important;
+    color: #FFFFFF !important;
+    text-decoration: none !important;
+    transform: translateY(-2px) !important;
+    box-shadow: 0 4px 8px rgba(0,0,0,0.15) !important;
+}
+
+/* Style other buttons inside custom-box to match our button system */
+.custom-box a:not(.btn):not(.button-box),
+.custom-box .pxl-post--inner a:not(.btn):not(.button-box),
+.custom-box .title-box a:not(.btn):not(.button-box) {
+    font-family: 'Source Sans Pro', 'Segoe UI', Tahoma, sans-serif !important;
+    font-weight: 600 !important;
+    font-size: clamp(14px, 1.25vw, 16px) !important;
+    line-height: 1.4 !important;
+    text-decoration: none !important;
+    letter-spacing: normal !important;
+    transition: all 0.3s ease;
+    
+    /* Remove any existing button styling */
+    border: none !important;
+    border-radius: 0 !important;
+    padding: 0 !important;
+    background: none !important;
+    background-color: transparent !important;
+    
+    /* Style as inline link */
+    display: inline-flex !important;
+    align-items: center !important;
+    column-gap: 10px !important;
+}
+
+/* Hover state for custom-box buttons - EXCLUDE actual buttons */
+.custom-box a:not(.btn):not(.btn-glossy):not(.button-box):hover,
+.custom-box .pxl-post--inner a:not(.btn):not(.btn-glossy):not(.button-box):hover,
+.custom-box .title-box a:not(.btn):not(.btn-glossy):not(.button-box):hover {
+    color: #DBAA17 !important;
+    column-gap: 15px !important;
+    background: none !important;
+    text-decoration: none !important;
+}
+
+/* Add flaticon to custom-box buttons if they don't have one - EXCLUDE actual buttons */
+.custom-box a:not(.btn):not(.btn-glossy):not(.button-box):not(:has(i))::after,
+.custom-box .title-box a:not(.btn):not(.btn-glossy):not(.button-box):not(:has(i))::after {
+    content: "";
+    display: inline-block;
+    width: 16px;
+    height: 16px;
+    background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M8.59 16.59L13.17 12 8.59 7.41 10 6l6 6-6 6-1.41-1.41z"/></svg>') no-repeat center;
+    background-size: contain;
+    transition: transform 0.3s ease;
+}
+
+.custom-box a:not(.btn):not(.btn-glossy):not(.button-box):not(:has(i)):hover::after,
+.custom-box .title-box a:not(.btn):not(.btn-glossy):not(.button-box):not(:has(i)):hover::after {
+    transform: translateX(5px);
+}
+
+/* =============================================
+   PXL-LINK FIXES - Remove padding and override hover colors
+   ============================================= */
+
+/* FIX: pxl-link element padding and hover color override */
+/* Remove left/right padding and margins */
+.pxl-link-pxl_link-98a5eca-9053,
+#pxl-link-pxl_link-98a5eca-9053,
+.elementor-element-98a5eca,
+#elementor-element-98a5eca,
+.elementor-widget-pxl_link .pxl-link,
+div[id*="98a5eca"] .pxl-link,
+div[class*="98a5eca"] .pxl-link {
+  padding-left: 0 !important;
+  padding-right: 0 !important;
+  margin-left: 0 !important;
+  margin-right: 0 !important;
+}
+
+.pxl-link-pxl_link-98a5eca-9053 *,
+#pxl-link-pxl_link-98a5eca-9053 *,
+.elementor-element-98a5eca *,
+#elementor-element-98a5eca *,
+.elementor-widget-pxl_link .pxl-link *,
+div[id*="98a5eca"] .pxl-link *,
+div[class*="98a5eca"] .pxl-link * {
+  padding-left: 0 !important;
+  padding-right: 0 !important;
+  margin-left: 0 !important;
+  margin-right: 0 !important;
+}
+
+/* Override hover color to yellow instead of teal/primary */
+.pxl-link-pxl_link-98a5eca-9053 a:hover,
+#pxl-link-pxl_link-98a5eca-9053 a:hover,
+.elementor-element-98a5eca a:hover,
+#elementor-element-98a5eca a:hover,
+.elementor-widget-pxl_link .pxl-link a:hover,
+div[id*="98a5eca"] .pxl-link a:hover,
+div[class*="98a5eca"] .pxl-link a:hover {
+  color: #DBAA17 !important; /* Yellow hover color */
+  text-decoration: none !important;
+  border-bottom: none !important;
+  background: transparent !important;
+}
+
+/* Remove any underline effects */
+.pxl-link-pxl_link-98a5eca-9053 a,
+#pxl-link-pxl_link-98a5eca-9053 a,
+.elementor-element-98a5eca a,
+#elementor-element-98a5eca a,
+.elementor-widget-pxl_link .pxl-link a,
+div[id*="98a5eca"] .pxl-link a,
+div[class*="98a5eca"] .pxl-link a,
+.msh-service-link,
+.msh-service-link:hover {
+  text-decoration: none !important;
+  border-bottom: none !important;
+  background: transparent !important;
+}
+
+/* Remove pseudo-elements that might create underlines */
+.pxl-link-pxl_link-98a5eca-9053 a::before,
+.pxl-link-pxl_link-98a5eca-9053 a::after,
+#pxl-link-pxl_link-98a5eca-9053 a::before,
+#pxl-link-pxl_link-98a5eca-9053 a::after,
+.elementor-element-98a5eca a::before,
+.elementor-element-98a5eca a::after,
+#elementor-element-98a5eca a::before,
+#elementor-element-98a5eca a::after,
+.elementor-widget-pxl_link .pxl-link a::before,
+.elementor-widget-pxl_link .pxl-link a::after,
+div[id*="98a5eca"] .pxl-link a::before,
+div[id*="98a5eca"] .pxl-link a::after,
+div[class*="98a5eca"] .pxl-link a::before,
+div[class*="98a5eca"] .pxl-link a::after {
+  display: none !important;
+  content: none !important;
+}
+
+/* =============================================
+   FOOTER LINK FIXES - Exclude from overlay interference
+   ============================================= */
+
+/* Exclude footer links from the invisible overlay that captures clicks */
+.pxl-item--link,
+.pxl-item--link .pxl-post--inner,
+footer .pxl-post--inner,
+.site-footer .pxl-post--inner {
+    position: relative !important;
+}
+
+/* Remove the overlay from footer link items */
+.pxl-item--link .pxl-post--inner::after,
+footer .pxl-post--inner::after,
+.site-footer .pxl-post--inner::after {
+    display: none !important;
+    content: none !important;
+}
+
+/* Ensure footer links are clickable and styled properly */
+.pxl-item--link a,
+.pxl-item--link .pxl-item--link-inner,
+footer .pxl-item--link a,
+.site-footer .pxl-item--link a {
+    position: relative !important;
+    z-index: auto !important;
+    pointer-events: auto !important;
+    cursor: pointer !important;
+}
+
+/* Fix arrow spacing in footer links */
+.pxl-item--link .pxl-item--icon {
+    margin-right: 10px !important;
+    flex-shrink: 0 !important;
+}
+
+.pxl-item--link .pxl-item--link-inner {
+    display: flex !important;
+    align-items: center !important;
+    gap: 10px !important;
+}
+
+/* Fix hover colors for footer links */
+.pxl-item--link a:hover,
+.pxl-item--link:hover a,
+.pxl-item--link .pxl-item--link-inner:hover,
+footer .pxl-item--link a:hover,
+.site-footer .pxl-item--link a:hover {
+    color: #DBAA17 !important; /* Yellow hover color */
+    background: transparent !important;
+    text-decoration: none !important;
+}
+
+/* Ensure arrow icon also changes color on hover */
+.pxl-item--link:hover .pxl-item--icon,
+.pxl-item--link a:hover .pxl-item--icon,
+footer .pxl-item--link:hover .pxl-item--icon,
+.site-footer .pxl-item--link:hover .pxl-item--icon {
+    color: #DBAA17 !important;
+}
+
+/* =============================================
+   MIXED/SERVICE CAROUSEL CARD EQUAL HEIGHTS
+   ============================================= */
+/* Stretch slides to equal height and keep inner content balanced */
+.pxl-service-carousel .pxl-swiper-wrapper {
+    align-items: stretch !important;
+}
+.pxl-service-carousel .pxl-swiper-slide {
+    height: auto !important;
+    display: flex !important;
+}
+.pxl-service-carousel .pxl-post--inner {
+    display: flex !important;
+    flex-direction: column !important;
+    height: 100% !important;
+}
+.pxl-service-carousel .pxl-post--content {
+    flex: 1 1 auto !important;
+}
+.pxl-service-carousel .pxl-post--readmore {
+    margin-top: auto !important;
+}
+
+/* Remove any slide-level padding; spacing is controlled by Swiper gutter */
+.pxl-service-carousel .pxl-swiper-container .pxl-swiper-slide {
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+}
+
+/* =============================================
+   MSH INJURY CARDS LINK FIXES
+   ============================================= */
+
+/* Remove any inherited link styles for injury cards */
+.msh-injury-card .msh-read-more,
+.msh-injury-card .msh-read-more:visited,
+.msh-injury-card .msh-read-more:focus,
+.msh-injury-card .msh-read-more:active {
+    color: #2B4666 !important;
+    text-decoration: none !important;
+    border: none !important;
+    box-shadow: none !important;
+    background-image: none !important;
+    border-bottom: none !important;
+    text-underline-offset: 0 !important;
+    text-decoration-thickness: 0 !important;
+    text-decoration-line: none !important;
+    text-decoration-style: none !important;
+    text-decoration-color: transparent !important;
+    background: transparent !important;
+    font-weight: 500 !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    gap: 8px !important;
+    transition: color 0.3s ease !important;
+}
+
+.msh-injury-card .msh-read-more:hover {
+    color: #5CB3CC !important;
+    text-decoration: none !important;
+    border: none !important;
+    box-shadow: none !important;
+    background-image: none !important;
+    border-bottom: none !important;
+    text-decoration-line: none !important;
+    text-decoration-style: none !important;
+    text-decoration-color: transparent !important;
+    background: transparent !important;
+}
+
+/* Remove pseudo-elements that might create underlines */
+.msh-injury-card .msh-read-more::before,
+.msh-injury-card .msh-read-more::after {
+    display: none !important;
+    content: none !important;
+}

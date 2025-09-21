@@ -1,0 +1,280 @@
+/*--------------------------------------------------------------
+TEAM Carousel
+----------------------------------------------------------------
+# Team Carousel
+--------------------------------------------------------------*/
+
+
+.pxl-team-carousel1 {
+	.pxl-swiper-arrow-wrap {
+		.pxl-swiper-arrow {
+			width: 72px;
+			height: 72px;
+			background-color: $four_color !important;
+			opacity: 1;
+			border-radius: 1000px;
+			font-size: 19px;
+			&.pxl-swiper-arrow-prev {
+				left: -127px;
+			}
+			&.pxl-swiper-arrow-next {
+				right: -127px;
+			}
+			@media (max-width: 1500px) {
+				margin-top: 40px;
+			}
+		}
+	}
+	.pxl-swiper-slide {
+		.pxl-item--inner{
+			text-align: center;
+			border: 1px solid #dadee2;
+			border-bottom-width: 6px;
+			border-radius: 20px;
+			padding: 34px 33px 25px 33px;	
+			@media (max-width: 767px) {
+				padding: 15px 15px 25px 15px;	
+			}
+			.pxl-item--image {
+				position:relative;
+				height: 318px;
+				max-width: 318px;
+				width: 100%;
+				display: block;
+				background-size: cover;
+				transition: 700ms all ease 0ms;
+				margin: 0 auto;
+				border-radius: 318px;
+				background-position: center;
+				.pxl-social--wrap {
+					position:absolute;
+					display: grid;
+					right: 17px;
+					bottom: 15px;
+					span {
+						display: inline-flex;
+						width: 55px;
+						height: 55px;
+						border-radius: 1000px;
+						background-color: #fff;
+						color: $secondary_color;
+						align-items: center;
+						justify-content: center;
+						@include transition(all .3s cubic-bezier(.645,.045,.355,1));
+						transform: translatex(20px);
+						opacity: 0;
+					}
+					.pxl-social {
+						display: grid;
+						a {
+							display: inline-flex;
+							width: 55px;
+							height: 55px;
+							border-radius: 1000px;
+							background-color: $primary_color;
+							opacity: 0;
+							transform: translatex(20px);
+							color: $secondary_color;
+							align-items: center;
+							margin-bottom: 5px;
+							justify-content: center;
+							@include transition(all .3s cubic-bezier(.645,.045,.355,1));
+							&:last-child {
+								background-color: #fff;
+							}
+						}
+					}
+				}
+			}
+			.pxl-item--title {
+				font-size: 20px;
+				margin-bottom: 8px;
+				margin-top: 32px;
+			}
+			.pxl-item--position {
+				font-size: 15px;
+				color: #68747a;
+			}
+			.pxl-item--desc {
+				padding: 0 9px;
+				word-break: break-all;
+				padding-top: 22px;
+				margin-top: 25px;
+				font-size: 15px;
+				color: #051b2e;
+				line-height: 28px;
+				border-top: 1px solid #dadee2;
+			}
+			&:hover {
+				.pxl-item--image {
+					border-radius: 20px;
+					width: 100%;
+					max-width: 100%;
+				}
+				.pxl-social--wrap {
+					span {
+						transition-delay: 800ms;
+						opacity: 1;
+						transform: translatex(0px);
+					}
+					.pxl-social {
+						a {
+							transform: translatex(0px);
+							opacity: 1;
+						}
+						a:nth-child(1) {
+							transition-delay: 500ms;
+						}
+						a:nth-child(2) {
+							transition-delay:600ms;
+						}
+						a:nth-child(3) {
+							transition-delay: 700ms;
+						}
+						a:nth-child(4) {
+							transition-delay: 800ms;
+						}
+						a:nth-child(5) {
+							transition-delay: 900ms;
+						}
+						a:nth-child(6) {
+							transition-delay: 1000ms;
+						}
+					}
+				}
+			}
+		}
+	}
+	
+}
+.pxl-team-carousel2 {
+	.pxl-swiper-slide {
+		.pxl-item--inner {
+			display: flex;
+			border-radius: 8px;
+			overflow: hidden;
+			@media (max-width: 575px) {
+				display: block;
+			}
+			.pxl-item--image {
+				display: block;
+				width: 50%;
+				min-width: 50%;
+				min-height: 430px;
+				background-size: cover;
+				background-position: center;
+				@media (max-width: 575px) {
+					width: 100%;
+					min-height: 350px;
+					min-width: 100%;
+				}
+			}
+			.pxl-item--holder  {
+				width: 50%;
+				min-width: 50%;
+				padding: 45px 55px;
+				@media (max-width: 767px) {
+					padding: 45px 15px;
+				}
+				@media (max-width: 575px) {
+					width: 100%;
+					min-width: 100%;
+				}
+				display: flex;
+				align-items: center;
+				background-color: #41231c;
+			}
+			.pxl-item--title {
+				margin-bottom: 0;
+				a {
+					font-size: 25px;
+					font-family: "Marcellus",sans-serif;
+					color: #fff;
+				}
+			}
+			.level {
+				ul {
+					li {
+						font-family: "Inter",sans-serif;
+						list-style-type: none;
+						font-size: 15px;
+						color: #e8d9c4;
+						position:relative;
+						padding-left: 18px;
+						&:before {
+							position: absolute;
+							content:'';
+							top:50%;
+							background-color: #e8d9c4;
+							border-radius: 10px;
+							width: 4px;
+							height: 4px;
+							transform: translatey(-50%);
+							left:0;
+						}
+						+ li {
+							margin-top: 11px;
+						}
+					}
+				}
+			}
+			.btn-readmore {
+				float: right;
+				display: flex;
+				align-items: center;
+				justify-content: center;
+				width: 64px;
+				height: 64px;
+				border-radius: 100px;
+				background-color: #fff;
+				color: #111111;
+				@include transition(all .25s cubic-bezier(.645,.045,.355,1));
+				&:hover {
+					background-color: $primary_color;
+					color: #fff;
+				}
+			}
+			.pxl-item--position {
+				color: #fff;
+				font-size: 14px;
+				text-transform: capitalize;
+			}
+			.pxl-item--desc {
+				font-size: 15px;
+				color: #c2c2c2;
+				line-height: 25px;
+				margin-bottom: 31px;
+				margin-top: 20px;
+			}
+		}
+	}
+	&.yes-arrow {
+		.pxl-carousel-inner {
+			@media (min-width: 1500px) {
+				padding: 0 125px;
+			}
+			position:relative;
+			.pxl-swiper-arrow {
+				background-color: $primary_color !important;
+				opacity: 1 !important;
+				width: 72px;
+				height: 72px;
+				border-radius: 100px;
+				i {
+					font-size: 18px;
+				}
+			}
+			.pxl-swiper-arrow-prev {
+				left: 0 !important;
+			}
+			.pxl-swiper-arrow-next {
+				right: 0 !important;
+			}
+		}
+	}
+}
+/*--------------------------------------------------------------
+TEAM GRID
+----------------------------------------------------------------
+# Team Grid
+--------------------------------------------------------------*/

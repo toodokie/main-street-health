@@ -1,0 +1,11 @@
+<?php
+
+class PxlGalleryGrid_Widget extends Pxltheme_Core_Widget_Base{
+    protected $name = 'pxl_gallery_grid';
+    protected $title = 'Case Gallery Grid';
+    protected $icon = 'eicon-gallery-justified';
+    protected $categories = array( 'pxltheme-core' );
+    protected $params = '{"sections":[{"name":"section_content","label":"Content","tab":"content","controls":[{"name":"gallery","label":"Gallery","type":"repeater","controls":[{"name":"img","label":"Image","type":"media"},{"name":"item_width","label":"Width","type":"slider","control_type":"responsive","description":"Default: 50%","range":{"px":{"min":0,"max":1000}},"selectors":{"{{WRAPPER}} .pxl-gallery-grid {{CURRENT_ITEM}}":"max-width: {{SIZE}}%;"}},{"name":"padding_top","label":"Padding Top","type":"slider","control_type":"responsive","description":"Default: 55%","range":{"px":{"min":0,"max":1000}},"selectors":{"{{WRAPPER}} .pxl-gallery-grid {{CURRENT_ITEM}} .pxl-item--inner":"padding-top: {{SIZE}}%;"}}]},{"name":"grid_sizer","label":"Grid Sizer","type":"slider","control_type":"responsive","description":"Default: 50%","range":{"px":{"min":0,"max":1000}},"selectors":{"{{WRAPPER}} .pxl-gallery-grid .grid-sizer":"max-width: {{SIZE}}%;flex: 0 0 {{SIZE}}%"}},{"name":"img_size_popup","label":"Image Size Popup","type":"text","description":"Enter image size (Example: \"thumbnail\", \"medium\", \"large\", \"full\" or other sizes defined by theme). Alternatively enter size in pixels (Example: 200x100 (Width x Height)."},{"name":"item_width_all","label":"Items Width","type":"slider","control_type":"responsive","description":"Default: 50%","range":{"px":{"min":0,"max":1000}},"selectors":{"{{WRAPPER}} .pxl-gallery-grid .pxl-grid-item":"max-width: {{SIZE}}%;"}},{"name":"padding_top_all","label":"Items Padding Top","type":"slider","control_type":"responsive","description":"Default: 55%","range":{"px":{"min":0,"max":1000}},"selectors":{"{{WRAPPER}} .pxl-gallery-grid .pxl-grid-item .pxl-item--inner":"padding-top: {{SIZE}}%;"}}]}]}';
+    protected $styles = array(  );
+    protected $scripts = array( 'imagesloaded','isotope','pxl-post-grid' );
+}

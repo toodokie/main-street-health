@@ -1,0 +1,54 @@
+/*
+ * Elementor Icon Fixes
+ * Clean, targeted CSS for icon styling issues
+ */
+
+/* Social Media Icons - Force White Color in Circles */
+.elementor-39 .pxl-icon1 .elementor-repeater-item-280076d,
+.elementor-39 .pxl-icon1 .elementor-repeater-item-fd82df9,
+.elementor-39 .pxl-icon1 .elementor-repeater-item-4999800 {
+    color: #FFFFFF !important;
+}
+
+/* Target the actual icon elements inside */
+.elementor-39 .pxl-icon1 .elementor-repeater-item-280076d i,
+.elementor-39 .pxl-icon1 .elementor-repeater-item-fd82df9 i,
+.elementor-39 .pxl-icon1 .elementor-repeater-item-4999800 i {
+    color: #FFFFFF !important;
+}
+
+/* If using SVG icons */
+.elementor-39 .pxl-icon1 .elementor-repeater-item-280076d svg,
+.elementor-39 .pxl-icon1 .elementor-repeater-item-fd82df9 svg,  
+.elementor-39 .pxl-icon1 .elementor-repeater-item-4999800 svg {
+    fill: #FFFFFF !important;
+}
+
+.elementor-39 .pxl-icon1 .elementor-repeater-item-280076d svg path,
+.elementor-39 .pxl-icon1 .elementor-repeater-item-fd82df9 svg path,
+.elementor-39 .pxl-icon1 .elementor-repeater-item-4999800 svg path {
+    fill: #FFFFFF !important;
+}
+
+/* Override hover states to maintain white */
+.elementor-39 .pxl-icon1 .elementor-repeater-item-280076d:hover,
+.elementor-39 .pxl-icon1 .elementor-repeater-item-fd82df9:hover,
+.elementor-39 .pxl-icon1 .elementor-repeater-item-4999800:hover {
+    color: var(--e-global-color-primary) !important; /* Gold on hover is fine */
+}
+
+/* Remove underlines from social icons */
+.elementor-39 .pxl-icon1 a {
+    text-decoration: none !important;
+    border-bottom: none !important;
+}
+
+/*
+ * Contact Form 7 Button Font Fix
+ */
+.wpcf7-submit,
+.wpcf7-btn-abs,
+input.wpcf7-submit,
+input.wpcf7-btn-abs {
+    font-family: 'Source Sans Pro', 'Segoe UI', sans-serif !important;
+}

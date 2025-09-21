@@ -1,0 +1,438 @@
+{
+  "meta": {
+    "version": "1.0",
+    "last_updated": "2024-12-20",
+    "description": "Clinical keyword library for Main Street Health image meta generation"
+  },
+  "primary_keywords": [
+    "WSIB",
+    "MVA",
+    "motor vehicle accident",
+    "first responder",
+    "first responders",
+    "workplace injury",
+    "workplace injuries",
+    "return-to-work",
+    "return to work",
+    "Hamilton",
+    "Hamilton Ontario"
+  ],
+  "secondary_keywords": [
+    "physiotherapy Hamilton",
+    "Hamilton physiotherapy",
+    "chiropractic Hamilton",
+    "Hamilton chiropractic",
+    "rehabilitation Hamilton",
+    "Hamilton rehabilitation",
+    "direct billing",
+    "WSIB approved",
+    "WSIB provider",
+    "extended health benefits",
+    "Main Street Health"
+  ],
+  "clinical_actions": [
+    "assess",
+    "evaluate",
+    "examine",
+    "mobilize",
+    "strengthen",
+    "rehabilitate",
+    "treat",
+    "perform",
+    "administer",
+    "apply",
+    "conduct",
+    "guide",
+    "supervise"
+  ],
+  "body_parts": {
+    "back": {
+      "primary": "back pain",
+      "variations": [
+        "back",
+        "spine",
+        "spinal",
+        "lumbar",
+        "thoracic",
+        "lower back"
+      ],
+      "conditions": [
+        "herniated disc",
+        "spinal injury",
+        "lumbar strain",
+        "disc bulge"
+      ],
+      "keywords": [
+        "WSIB",
+        "workplace injury",
+        "lifting injury"
+      ]
+    },
+    "neck": {
+      "primary": "neck injury",
+      "variations": [
+        "neck",
+        "cervical",
+        "upper cervical",
+        "whiplash"
+      ],
+      "conditions": [
+        "whiplash",
+        "cervical strain",
+        "neck pain"
+      ],
+      "keywords": [
+        "MVA",
+        "motor vehicle accident",
+        "collision injury"
+      ]
+    },
+    "shoulder": {
+      "primary": "shoulder injury",
+      "variations": [
+        "shoulder",
+        "rotator cuff",
+        "shoulder blade",
+        "deltoid"
+      ],
+      "conditions": [
+        "rotator cuff tear",
+        "frozen shoulder",
+        "shoulder impingement"
+      ],
+      "keywords": [
+        "workplace injury",
+        "overhead work",
+        "first responder"
+      ]
+    },
+    "elbow": {
+      "primary": "elbow injury",
+      "variations": [
+        "elbow",
+        "elbow brace",
+        "elbow braces",
+        "forearm",
+        "arm brace",
+        "joint brace",
+        "orthotic",
+        "arm support",
+        "brace",
+        "braces",
+        "stabilizer"
+      ],
+      "conditions": [
+        "tennis elbow",
+        "lateral epicondylitis",
+        "medial epicondylitis",
+        "elbow strain",
+        "elbow pain"
+      ],
+      "keywords": [
+        "sports injury",
+        "orthopedic brace",
+        "rehabilitation brace",
+        "joint support"
+      ]
+    },
+    "wrist": {
+      "primary": "wrist injury",
+      "variations": [
+        "wrist",
+        "hand",
+        "carpal",
+        "forearm"
+      ],
+      "conditions": [
+        "carpal tunnel",
+        "repetitive strain",
+        "wrist sprain"
+      ],
+      "keywords": [
+        "workplace injury",
+        "repetitive work",
+        "computer work"
+      ]
+    },
+    "knee": {
+      "primary": "knee injury",
+      "variations": [
+        "knee",
+        "kneecap",
+        "patella",
+        "meniscus"
+      ],
+      "conditions": [
+        "knee sprain",
+        "meniscus tear",
+        "patella tracking"
+      ],
+      "keywords": [
+        "sports injury",
+        "workplace injury",
+        "first responder"
+      ]
+    },
+    "concussion": {
+      "primary": "concussion",
+      "variations": [
+        "concussion",
+        "head injury",
+        "brain injury",
+        "cognitive"
+      ],
+      "conditions": [
+        "post-concussion syndrome",
+        "mild TBI",
+        "concussion symptoms"
+      ],
+      "keywords": [
+        "first responder",
+        "Complete Concussion Management",
+        "return-to-duty"
+      ]
+    }
+  },
+  "equipment_indicators": {
+    "ultrasound": {
+      "description": "therapeutic ultrasound",
+      "purpose": "pain management and tissue healing",
+      "conditions": [
+        "muscle strain",
+        "tendon injury",
+        "inflammation"
+      ]
+    },
+    "exercise": {
+      "description": "therapeutic exercise equipment",
+      "purpose": "strength training and rehabilitation",
+      "conditions": [
+        "muscle weakness",
+        "range of motion",
+        "functional training"
+      ]
+    },
+    "table": {
+      "description": "treatment table",
+      "purpose": "manual therapy and assessment",
+      "conditions": [
+        "spinal manipulation",
+        "joint mobilization",
+        "soft tissue therapy"
+      ]
+    },
+    "assessment": {
+      "description": "diagnostic assessment tools",
+      "purpose": "functional evaluation and testing",
+      "conditions": [
+        "functional capacity",
+        "return-to-work",
+        "fitness for duty"
+      ]
+    }
+  },
+  "patient_types": {
+    "workplace_injury": {
+      "keywords": [
+        "WSIB",
+        "workplace injury",
+        "return-to-work",
+        "occupational health"
+      ],
+      "specializations": [
+        "functional assessment",
+        "work conditioning",
+        "ergonomic assessment"
+      ]
+    },
+    "mva_patient": {
+      "keywords": [
+        "MVA",
+        "motor vehicle accident",
+        "collision injury",
+        "whiplash"
+      ],
+      "specializations": [
+        "accident rehabilitation",
+        "insurance claims",
+        "immediate care"
+      ]
+    },
+    "first_responder": {
+      "keywords": [
+        "first responder",
+        "emergency services",
+        "duty ready",
+        "public safety"
+      ],
+      "specializations": [
+        "shift accommodation",
+        "fitness for duty",
+        "specialized injury care"
+      ]
+    },
+    "general": {
+      "keywords": [
+        "physiotherapy",
+        "chiropractic",
+        "rehabilitation",
+        "Hamilton"
+      ],
+      "specializations": [
+        "evidence-based treatment",
+        "direct billing",
+        "comprehensive care"
+      ]
+    }
+  },
+  "treatment_contexts": {
+    "assessment": {
+      "verbs": [
+        "assess",
+        "evaluate",
+        "examine",
+        "test",
+        "screen"
+      ],
+      "terminology": [
+        "functional assessment",
+        "diagnostic evaluation",
+        "baseline testing"
+      ],
+      "outcomes": [
+        "treatment planning",
+        "return-to-work clearance",
+        "progress monitoring"
+      ]
+    },
+    "treatment": {
+      "verbs": [
+        "treat",
+        "rehabilitate",
+        "strengthen",
+        "mobilize",
+        "restore"
+      ],
+      "terminology": [
+        "therapeutic intervention",
+        "evidence-based treatment",
+        "progressive rehabilitation"
+      ],
+      "outcomes": [
+        "pain relief",
+        "improved function",
+        "return to activity"
+      ]
+    },
+    "prevention": {
+      "verbs": [
+        "prevent",
+        "educate",
+        "train",
+        "condition",
+        "strengthen"
+      ],
+      "terminology": [
+        "injury prevention",
+        "ergonomic training",
+        "conditioning program"
+      ],
+      "outcomes": [
+        "risk reduction",
+        "performance enhancement",
+        "injury prevention"
+      ]
+    }
+  },
+  "business_differentiators": [
+    "WSIB approved provider",
+    "direct billing available",
+    "Complete Concussion Management certified",
+    "first responder specialized care",
+    "immediate appointment availability",
+    "multidisciplinary team approach",
+    "evidence-based treatment protocols",
+    "functional assessment expertise",
+    "return-to-work programs",
+    "extended health benefits accepted"
+  ],
+  "blacklisted_terms": [
+    "trusted partner",
+    "your trusted healthcare partner",
+    "comprehensive healthcare",
+    "comprehensive care",
+    "your solution for",
+    "we are your solution",
+    "leading provider",
+    "leading healthcare provider",
+    "healthcare services",
+    "we understand",
+    "we care",
+    "wellness journey",
+    "holistic approach",
+    "cutting-edge technology",
+    "state-of-the-art facility"
+  ],
+  "quality_indicators": {
+    "excellent": {
+      "min_score": 90,
+      "requirements": [
+        "Specific body part mentioned",
+        "Clinical action verb present",
+        "Hamilton included 2+ times",
+        "Priority keywords naturally integrated",
+        "Under character limits",
+        "No blacklisted terms"
+      ]
+    },
+    "good": {
+      "min_score": 70,
+      "requirements": [
+        "Some clinical specificity",
+        "Hamilton mentioned once",
+        "Basic keyword inclusion",
+        "Character limits respected"
+      ]
+    },
+    "poor": {
+      "min_score": 0,
+      "issues": [
+        "Generic language",
+        "Missing Hamilton reference",
+        "Character limit violations",
+        "Blacklisted terms present"
+      ]
+    }
+  },
+  "template_variations": {
+    "title": {
+      "assessment": [
+        "[CONDITION] Assessment - WSIB Rehabilitation Hamilton",
+        "[BODY_PART] Evaluation - Workplace Injury Care Hamilton",
+        "[INJURY_TYPE] Testing - Main Street Health Hamilton"
+      ],
+      "treatment": [
+        "[BODY_PART] Therapy - [INSURANCE_TYPE] Coverage Hamilton",
+        "[TREATMENT_TYPE] for [CONDITION] - Hamilton Physiotherapy",
+        "[INJURY] Rehabilitation - Return to Work Program Hamilton"
+      ],
+      "team": [
+        "[PROFESSION] - [SPECIALIZATION] Hamilton",
+        "[CREDENTIAL] - Main Street Health Team Hamilton",
+        "[SERVICE] Specialist - Hamilton Clinic"
+      ]
+    },
+    "caption": {
+      "assessment": [
+        "Physiotherapist conducts [BODY_PART] evaluation for [PATIENT_TYPE]",
+        "Clinical assessment of [CONDITION] using evidence-based protocols",
+        "Professional [BODY_PART] testing for return-to-work clearance"
+      ],
+      "treatment": [
+        "Therapist guides [BODY_PART] rehabilitation for [PATIENT_TYPE]",
+        "[PROFESSIONAL] applies [TREATMENT] for [CONDITION] recovery",
+        "Evidence-based [TREATMENT_TYPE] targeting [BODY_PART] function"
+      ]
+    }
+  }
+}

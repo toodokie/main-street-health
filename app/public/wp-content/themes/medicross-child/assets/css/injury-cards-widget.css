@@ -1,0 +1,33 @@
+/* =============================================
+   MSH INJURY CARDS WIDGET LINK OVERRIDES
+   ============================================= */
+
+/* Remove any inherited link styles - copied from working services widget */
+.msh-injury-card .card-link,
+.msh-injury-card .card-link:visited,
+.msh-injury-card .card-link:focus,
+.msh-injury-card .card-link:active {
+    color: #2B4666 !important;
+    text-decoration: none !important;
+    border: none !important;
+    box-shadow: none !important;
+    background-image: none !important;
+    border-bottom: none !important;
+    text-underline-offset: 0 !important;
+    text-decoration-thickness: 0 !important;
+    text-decoration-line: none !important;
+    text-decoration-style: none !important;
+    text-decoration-color: transparent !important;
+}
+
+.msh-injury-card .card-link:hover {
+    color: #5CB3CC !important;
+    text-decoration: none !important;
+    border: none !important;
+    box-shadow: none !important;
+    background-image: none !important;
+    border-bottom: none !important;
+    text-decoration-line: none !important;
+    text-decoration-style: none !important;
+    text-decoration-color: transparent !important;
+}

@@ -1,0 +1,37 @@
+/* =============================================
+   Container Width Override
+   Override parent theme grid.css container width
+   ============================================= */
+
+@media (min-width: 1200px) {
+    .site-header .container,
+    .top-nav .container,
+    .secondary-nav .container,
+    header .container,
+    #masthead .container,
+    body .site-header .container,
+    html body .site-header .container {
+        max-width: 1775px !important;
+        width: 100% !important;
+    }
+}
+
+@media (min-width: 992px) and (max-width: 1199px) {
+    .site-header .container,
+    .top-nav .container,
+    .secondary-nav .container,
+    header .container {
+        max-width: 1400px !important;
+    }
+}
+
+@media (min-width: 768px) and (max-width: 991px) {
+    .site-header .container,
+    .top-nav .container,
+    .secondary-nav .container,
+    header .container {
+        max-width: 100% !important;
+        padding-left: 20px;
+        padding-right: 20px;
+    }
+}
