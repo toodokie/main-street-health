@@ -95,6 +95,12 @@ class MSH_Contextual_Meta_Generator {
             $context['type'] = sanitize_text_field($manual);
             $context['manual'] = true;
         }
+
+        if ($suggested_filename !== '') {
+            update_post_meta($attachment_id, '_msh_suggested_filename', $suggested_filename);
+        } else {
+            delete_post_meta($attachment_id, '_msh_suggested_filename');
+        }
         $attachment = get_post($attachment_id);
         $parent_id = $attachment ? (int) $attachment->post_parent : 0;
         $context['parent_id'] = $parent_id;
