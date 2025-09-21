@@ -8,6 +8,10 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
+if (!class_exists('MSH_Safe_Rename_System')) {
+    require_once get_stylesheet_directory() . '/inc/class-msh-safe-rename-system.php';
+}
+
 class MSH_Contextual_Meta_Generator {
     private $business_name = 'Main Street Health';
     private $location = 'Hamilton';
@@ -1455,6 +1459,10 @@ class MSH_Image_Optimizer {
             $slug = $this->contextual_meta_generator->generate_filename_slug($attachment_id, $context_info, $extension);
             if (!empty($slug)) {
                 $suggested_filename = $this->ensure_unique_filename($slug, $extension, $attachment_id);
+                $current_basename = basename($relative_file);
+                if (strcasecmp($suggested_filename, $current_basename) === 0) {
+                    $suggested_filename = '';
+                }
             }
         }
 
@@ -2460,143 +2468,102 @@ class MSH_Image_Optimizer {
             wp_die('Unauthorized');
         }
         
+        $mode = isset($_POST['mode']) ? sanitize_text_field($_POST['mode']) : 'full';
+        $limit = isset($_POST['limit']) ? max(0, intval($_POST['limit'])) : 0;
+
         $image_ids = isset($_POST['image_ids']) ? array_map('intval', $_POST['image_ids']) : [];
-        
+
         if (empty($image_ids)) {
-            // If no specific IDs provided, get all images with suggestions
             global $wpdb;
             $image_ids = $wpdb->get_col("
-                SELECT post_id FROM {$wpdb->postmeta} 
-                WHERE meta_key = '_msh_suggested_filename' 
+                SELECT post_id FROM {$wpdb->postmeta}
+                WHERE meta_key = '_msh_suggested_filename'
                 AND meta_value != ''
             ");
         }
-        
+
+        if ($mode === 'test' && $limit > 0) {
+            $image_ids = array_slice($image_ids, 0, $limit);
+        }
+
+        if (empty($image_ids)) {
+            wp_send_json_success([
+                'results' => [],
+                'summary' => [
+                    'total' => 0,
+                    'success' => 0,
+                    'errors' => 0,
+                    'skipped' => 0
+                ]
+            ]);
+        }
+
+        $renamer = MSH_Safe_Rename_System::get_instance();
+
         $results = [];
         $success_count = 0;
         $error_count = 0;
-        
+        $skipped_count = 0;
+
         foreach ($image_ids as $attachment_id) {
             $suggested_filename = get_post_meta($attachment_id, '_msh_suggested_filename', true);
-            
+
             if (!$suggested_filename) {
                 $results[] = [
                     'id' => $attachment_id,
                     'status' => 'skipped',
                     'message' => 'No filename suggestion available'
                 ];
+                $skipped_count++;
                 continue;
             }
-            
-            // Get current file info
-            $current_file = get_attached_file($attachment_id);
-            if (!file_exists($current_file)) {
+
+            $suggested_filename = sanitize_file_name($suggested_filename);
+            $result = $renamer->rename_attachment($attachment_id, basename($suggested_filename), $mode === 'test');
+
+            if (is_wp_error($result)) {
                 $results[] = [
                     'id' => $attachment_id,
                     'status' => 'error',
-                    'message' => 'Original file not found'
+                    'message' => $result->get_error_message()
                 ];
                 $error_count++;
                 continue;
             }
-            
-            // Build new file path
-            $path_info = pathinfo($current_file);
-            $new_filename = basename($suggested_filename);
-            $new_file = $path_info['dirname'] . '/' . $new_filename;
-            
-            // Check if file already exists
-            if (file_exists($new_file) && $new_file !== $current_file) {
-                // Add number suffix to avoid conflicts
-                $counter = 1;
-                $name_parts = pathinfo($new_filename);
-                while (file_exists($new_file)) {
-                    $new_filename = $name_parts['filename'] . '-' . $counter . '.' . $name_parts['extension'];
-                    $new_file = $path_info['dirname'] . '/' . $new_filename;
-                    $counter++;
-                }
-            }
-            
-            // Skip if same name
-            if ($current_file === $new_file) {
+
+            if (!empty($result['skipped'])) {
+                delete_post_meta($attachment_id, '_msh_suggested_filename');
+
                 $results[] = [
                     'id' => $attachment_id,
                     'status' => 'skipped',
-                    'message' => 'Already has suggested filename'
+                    'message' => __('Filename already optimized', 'medicross-child')
                 ];
+                $skipped_count++;
                 continue;
             }
-            
-            // Rename the file
-            if (rename($current_file, $new_file)) {
-                // Update database references
-                $old_guid = get_post($attachment_id)->guid;
-                $new_guid = str_replace(basename($old_guid), $new_filename, $old_guid);
-                
-                // Update attachment post
-                wp_update_post([
-                    'ID' => $attachment_id,
-                    'guid' => $new_guid,
-                    'post_name' => sanitize_title(pathinfo($new_filename, PATHINFO_FILENAME))
-                ]);
-                
-                // Update metadata
-                $old_meta_file = get_post_meta($attachment_id, '_wp_attached_file', true);
-                $new_meta_file = str_replace(basename($old_meta_file), $new_filename, $old_meta_file);
-                update_post_meta($attachment_id, '_wp_attached_file', $new_meta_file);
-                
-                // Update sizes metadata
-                $metadata = wp_get_attachment_metadata($attachment_id);
-                if ($metadata && isset($metadata['file'])) {
-                    $metadata['file'] = str_replace(basename($metadata['file']), $new_filename, $metadata['file']);
-                    
-                    // Also rename thumbnail files if they exist
-                    if (!empty($metadata['sizes'])) {
-                        foreach ($metadata['sizes'] as $size => $size_data) {
-                            $old_thumb = $path_info['dirname'] . '/' . $size_data['file'];
-                            if (file_exists($old_thumb)) {
-                                $thumb_parts = pathinfo($size_data['file']);
-                                $new_thumb_name = pathinfo($new_filename, PATHINFO_FILENAME) . '-' . $size_data['width'] . 'x' . $size_data['height'] . '.' . $thumb_parts['extension'];
-                                $new_thumb = $path_info['dirname'] . '/' . $new_thumb_name;
-                                
-                                if (rename($old_thumb, $new_thumb)) {
-                                    $metadata['sizes'][$size]['file'] = $new_thumb_name;
-                                }
-                            }
-                        }
-                    }
-                    
-                    wp_update_attachment_metadata($attachment_id, $metadata);
-                }
-                
-                // Clear the suggestion after applying
-                delete_post_meta($attachment_id, '_msh_suggested_filename');
-                
-                $results[] = [
-                    'id' => $attachment_id,
-                    'status' => 'success',
-                    'old_filename' => basename($current_file),
-                    'new_filename' => $new_filename,
-                    'message' => 'Filename updated successfully'
-                ];
-                $success_count++;
-            } else {
-                $results[] = [
-                    'id' => $attachment_id,
-                    'status' => 'error',
-                    'message' => 'Failed to rename file'
-                ];
-                $error_count++;
-            }
+
+            delete_post_meta($attachment_id, '_msh_suggested_filename');
+
+            $results[] = [
+                'id' => $attachment_id,
+                'status' => 'success',
+                'old_url' => $result['old_url'],
+                'new_url' => $result['new_url'],
+                'references_updated' => $result['replaced'],
+                'message' => sprintf(__('References updated: %d', 'medicross-child'), $result['replaced'])
+            ];
+            $success_count++;
         }
-        
+
         wp_send_json_success([
             'results' => $results,
             'summary' => [
                 'total' => count($image_ids),
                 'success' => $success_count,
                 'errors' => $error_count,
-                'skipped' => count($image_ids) - $success_count - $error_count
+                'skipped' => $skipped_count,
+                'mode' => $mode
             ]
         ]);
     }

@@ -59,7 +59,10 @@ require_once get_stylesheet_directory() . '/inc/class-msh-webp-delivery.php';
 
 // Include MSH Media Cleanup Tool
 require_once get_stylesheet_directory() . '/inc/class-msh-media-cleanup.php';
+require_once get_stylesheet_directory() . '/inc/class-msh-safe-rename-system.php';
 require_once get_stylesheet_directory() . '/inc/msh-navigation-functions.php';
+
+MSH_Safe_Rename_System::get_instance();
 
 // Debug navigation menu URLs
 require_once get_stylesheet_directory() . '/debug-nav-menu-urls.php';

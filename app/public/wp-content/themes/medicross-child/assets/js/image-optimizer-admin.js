@@ -1604,52 +1604,78 @@
     }
     
     function applyFilenameSuggestions() {
-        updateLog('Starting batch filename rename...');
-        
         // Get selected image IDs or use all if none selected
         const selectedIds = [];
         $('.image-checkbox:checked').each(function() {
             selectedIds.push($(this).data('id'));
         });
-        
+
+        const totalTargets = selectedIds.length || 'all suggested';
+        updateLog(`Preparing safe rename for ${totalTargets} image(s)...`);
+
+        let mode = 'full';
+        let limit = 0;
+
+        const proceedFull = window.confirm('Run full safe rename now?\nClick “Cancel” to run a 5-file safety test first.');
+        if (!proceedFull) {
+            if (!window.confirm('Run 5-file safe test? This will rename a small sample and update references.')) {
+                updateLog('Safe rename cancelled by user.');
+                return;
+            }
+            mode = 'test';
+            limit = 5;
+        } else {
+            if (!window.confirm('This will rename files, update all references, and create backups/logs. Continue?')) {
+                updateLog('Safe rename cancelled by user.');
+                return;
+            }
+        }
+
+        updateLog(mode === 'test'
+            ? 'Running safe rename test on 5 image(s)...'
+            : 'Starting full safe rename routine (all suggested files)...');
+
         $.ajax({
             url: mshImageOptimizer.ajaxurl,
             type: 'POST',
             data: {
                 action: 'msh_apply_filename_suggestions',
                 nonce: mshImageOptimizer.nonce,
-                image_ids: selectedIds
+                image_ids: selectedIds,
+                mode: mode,
+                limit: limit
             },
             success: function(response) {
                 if (response.success) {
                     const summary = response.data.summary;
-                    updateLog(`Filename Update Complete!`);
-                    updateLog(`Successfully renamed: ${summary.success} files`);
-                    
+                    const modeLabel = summary.mode === 'test' ? 'Test run complete!' : 'Safe rename complete!';
+                    updateLog(modeLabel);
+                    updateLog(`Renamed successfully: ${summary.success}`);
+
                     if (summary.errors > 0) {
-                        updateLog(`Failed: ${summary.errors} files`);
+                        updateLog(`Errors: ${summary.errors}`);
                     }
                     if (summary.skipped > 0) {
-                        updateLog(`Skipped: ${summary.skipped} files (no suggestions or already renamed)`);
+                        updateLog(`Skipped: ${summary.skipped} (missing suggestion or unchanged)`);
                     }
-                    
-                    // Log detailed results
+
                     response.data.results.forEach(function(result) {
                         if (result.status === 'success') {
-                            updateLog(`Renamed: ${result.old_filename} → ${result.new_filename}`);
+                            updateLog(`✅ ${result.new_url} (references updated: ${result.references_updated})`);
                         } else if (result.status === 'error') {
-                            updateLog(`Failed: ID ${result.id} - ${result.message}`);
+                            updateLog(`❌ ID ${result.id}: ${result.message}`);
+                        } else {
+                            updateLog(`ℹ️ ID ${result.id}: ${result.message}`);
                         }
                     });
-                    
-                    // Refresh the image list
-                    $('#analyze-images').click();
+
+                    $('#analyze-images').trigger('click');
                 } else {
-                    updateLog('Failed to apply filename suggestions: ' + (response.data || 'Unknown error'));
+                    updateLog('Safe rename failed: ' + (response.data || 'Unknown error'));
                 }
             },
             error: function() {
-                updateLog('Network error while applying filename suggestions');
+                updateLog('Network error while applying safe rename.');
             }
         });
     }
