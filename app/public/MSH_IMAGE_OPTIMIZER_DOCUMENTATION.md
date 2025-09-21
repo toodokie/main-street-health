@@ -215,7 +215,8 @@ public function ajax_compress_images() {
 - **Batch 1 – Core Context Engine**: Introduced `MSH_Contextual_Meta_Generator` to unify context detection, service keyword mapping, and template output. Analyzer requests now return the detected context + sample metadata without persisting changes.
 - **Batch 2 – Meta Application & Filenames**: `optimize_single_image()` consumes the generator output for titles, captions, descriptions, and ALT text, while filename suggestions rely on the new slug helper with legacy uniqueness checks retained.
 - **Batch 3 – Attachment UI + Manual Override**: Media edit screens include an **Image Context** dropdown with auto/manual badges, service/asset highlights, and manual override persistence through `_msh_context`.
-- **Batch 4 – Cleanup & Legacy Removal**: Deprecated anatomy keyword heuristics and template rotation, trimmed redundant meta keys, and aligned analyzer output to show exactly what was auto-detected versus manually assigned.
+- **Batch 3.5 – Inline Overrides**: Analyzer rows now include an inline context editor that saves via AJAX, updates chips/meta immediately, and preserves existing filename suggestions.
+- **Batch 4 – Cleanup & Legacy Removal**: Deprecated anatomy keyword heuristics, trimmed redundant meta keys (no more `auto_generated` flagging), and aligned analyzer output to show exactly what was auto-detected versus manually assigned.
 
 #### Healthcare Context Customization
 The v2025 context engine relies on WordPress usage (featured images, content references, taxonomies) and explicit overrides instead of filename heuristics.
@@ -235,7 +236,7 @@ To extend the context engine:
 - `_msh_context` stores the editor-selected override; `_msh_auto_context` keeps the most recent auto-detected slug for comparison.
 - The attachment field chips indicate source (`Manual override` vs `Auto-detected`), the active context label, and optional auto suggestion when they differ.
 - When overrides change, legacy keys `_msh_manual_edit` and `msh_context_last_manual_update` are removed automatically to keep the database tidy.
-- Analyzer cards echo the same information so editors can trust what will be applied before running Batch optimizations.
+- Analyzer cards echo the same information so editors can trust what will be applied before running Batch optimizations, and the inline editor keeps manual changes visible without re-running analysis.
 
 ### Performance Considerations
 
@@ -358,6 +359,7 @@ Priority is calculated based on:
 3. Pick the desired context (Clinical, Team, Testimonial, Facility, Equipment, Service Icon, or Business).
 4. Save the attachment to persist `_msh_context`; the analyzer will show the updated context chips on the next scan.
 5. To revert to auto-detection, choose **Auto-detect (default)** and save again.
+6. Need a quick change while reviewing? Use the inline edit icon in the analyzer results to open the same dropdown, save via AJAX, and keep the row in view without re-running the full analysis.
 
 #### Filtering Results
 Use the filter checkboxes to show only:

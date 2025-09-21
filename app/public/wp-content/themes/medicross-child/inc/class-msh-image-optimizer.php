@@ -301,36 +301,6 @@ class MSH_Contextual_Meta_Generator {
             }
         }
 
-        $body_part_map = [
-            'shoulder' => 'physiotherapy',
-            'knee' => 'physiotherapy',
-            'ankle' => 'physiotherapy',
-            'hip' => 'physiotherapy',
-            'wrist' => 'physiotherapy',
-            'elbow' => 'physiotherapy',
-            'leg' => 'physiotherapy',
-            'muscle' => 'physiotherapy',
-            'exercise' => 'physiotherapy',
-            'stretch' => 'physiotherapy',
-            'spine' => 'chiropractic',
-            'back' => 'chiropractic',
-            'neck' => 'chiropractic',
-            'posture' => 'chiropractic',
-            'adjustment' => 'chiropractic',
-            'massage' => 'massage',
-            'rmt' => 'massage',
-            'acupuncture' => 'acupuncture',
-            'needle' => 'acupuncture',
-        ];
-
-        foreach ($sources as $text) {
-            foreach ($body_part_map as $keyword => $service) {
-                if (strpos($text, $keyword) !== false) {
-                    return $service;
-                }
-            }
-        }
-
         return 'rehabilitation';
     }
 
@@ -2326,7 +2296,7 @@ class MSH_Image_Optimizer {
 
         if (!empty($meta_applied)) {
             update_post_meta($attachment_id, 'msh_metadata_last_updated', (int) $timestamp);
-            update_post_meta($attachment_id, 'msh_metadata_source', 'auto_generated');
+            delete_post_meta($attachment_id, 'msh_metadata_source');
         }
 
         foreach ($meta_skipped as $field) {
