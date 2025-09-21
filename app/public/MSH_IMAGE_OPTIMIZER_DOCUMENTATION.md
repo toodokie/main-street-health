@@ -685,6 +685,12 @@ $treatment_keywords = [
 - **CSS Specificity**: Scoped styles prevent cascade performance issues
 - **Console Logging**: Only occurs during development/debugging scenarios
 
+#### Upcoming Enhancements (Planned)
+- **Bulk Context Apply**: optional toolbar to set a manual context for multiple selected images at once, powered by a `msh_bulk_context_update` AJAX endpoint.
+- **Context Distribution Reporting**: summarized counts of manual vs auto contexts to help editors prioritize review work.
+- **Analyzer Quality-of-life**: optional badges for recent overrides and filter tokens for manual/manual-diff assets.
+- **Pattern Learning (Exploratory)**: evaluate storing override patterns (filename hints, categories) for opt-in suggestions in future batches.
+
 #### Future-Proofing
 - **Status Evolution**: Easy to add new status types to validation array
 - **Theme Changes**: Scoped CSS prevents future WordPress theme conflicts
