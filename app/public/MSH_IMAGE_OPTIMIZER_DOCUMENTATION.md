@@ -686,6 +686,22 @@ $treatment_keywords = [
 - **Console Logging**: Only occurs during development/debugging scenarios
 
 #### Upcoming Enhancements (Planned)
+### Batch 5 Roadmap – Safe Filename Optimization
+
+- **Stage 1 – Analyze & Optimize (existing)**: Detect context, generate meta fields, surface filename suggestions while previewing all changes in the analyzer.
+- **Stage 2 – Safe Rename Run (new)**: Operator explicitly triggers a staged rename routine. Test mode runs a 3–5 file sample, then full execution renames files, updates WordPress metadata, rewrites references via serialization-aware search/replace, logs every change, and keeps short-lived redirects/backups as a safety net.
+- **Stage 3 – Duplicate Cleanup (existing tool)**: After Stage 2 is verified, proceed with quick/deep duplicate scans knowing references point at the optimized filenames.
+
+### Safe Rename Guardrails
+
+1. Track every rename (log attachment ID, old/new URLs, timestamp, replace counts).
+2. Update WordPress metadata first via `update_attached_file()` + `wp_generate_attachment_metadata()` (skip GUID updates if themes rely on immutability).
+3. Replace references using WordPress-aware methods (`wp search-replace` or `maybe_unserialize` loops)—never raw `REPLACE()` against tables storing serialized data.
+4. Rewrite size variants (`-150x150`, `-scaled`, etc.) alongside the base filename.
+5. Provide an operator workflow: analyzer summary, test mode, progress logs, downloadable audit trail, 24-hour backups, and verification checklist post-run.
+6. Add a 30-day redirect fallback and schedule cleanup hooks (ensure `msh_cleanup_rename_backup` handler is registered).
+
+
 - **Bulk Context Apply**: optional toolbar to set a manual context for multiple selected images at once, powered by a `msh_bulk_context_update` AJAX endpoint.
 - **Context Distribution Reporting**: summarized counts of manual vs auto contexts to help editors prioritize review work.
 - **Analyzer Quality-of-life**: optional badges for recent overrides and filter tokens for manual/manual-diff assets.
