@@ -1963,7 +1963,11 @@ class MSH_Image_Optimizer {
         // If file already has good name, clear any existing suggestion and don't generate new one
         $has_good_name = (strpos($current_basename, 'msh') !== false ||
                          strpos($current_basename, 'hamilton') !== false ||
-                         strpos($current_basename, 'main-street-health') !== false);
+                         strpos($current_basename, 'main-street-health') !== false ||
+                         // Also detect common SEO patterns our system generates
+                         preg_match('/^(rehabilitation|physiotherapy|chiropractic|acupuncture|massage|orthotics|chronic-pain|work-related|sport-injuries|motor-vehicle|patient-testimonial|bluecross|canada-life|manulife)-/', $current_basename) ||
+                         // Or files that end with attachment ID pattern (our system's signature)
+                         preg_match('/-\d{4,5}\.(jpg|jpeg|png|gif|svg|webp)$/', $current_basename));
 
         if ($has_good_name) {
             // Remove any existing suggestion for this already-optimized file
@@ -3530,10 +3534,14 @@ class MSH_Image_Optimizer {
         $extension = isset($path_info['extension']) ? strtolower($path_info['extension']) : '';
         $current_basename = strtolower($path_info['basename']);
 
-        // Skip if already has an SEO-optimized name (contains 'msh' or 'hamilton')
+        // Skip if already has an SEO-optimized name
         $has_good_name = (strpos($current_basename, 'msh') !== false ||
                          strpos($current_basename, 'hamilton') !== false ||
-                         strpos($current_basename, 'main-street-health') !== false);
+                         strpos($current_basename, 'main-street-health') !== false ||
+                         // Also detect common SEO patterns our system generates
+                         preg_match('/^(rehabilitation|physiotherapy|chiropractic|acupuncture|massage|orthotics|chronic-pain|work-related|sport-injuries|motor-vehicle|patient-testimonial|bluecross|canada-life|manulife)-/', $current_basename) ||
+                         // Or files that end with attachment ID pattern (our system's signature)
+                         preg_match('/-\d{4,5}\.(jpg|jpeg|png|gif|svg|webp)$/', $current_basename));
 
         if ($has_good_name || empty($extension)) {
             return; // Don't generate suggestions for good files or files without extensions
