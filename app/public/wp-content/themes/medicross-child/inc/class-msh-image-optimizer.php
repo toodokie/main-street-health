@@ -1506,6 +1506,9 @@ class MSH_Image_Optimizer {
 
         $this->contextual_meta_generator = new MSH_Contextual_Meta_Generator();
 
+        // Auto-generate suggestions for new uploads
+        add_action('add_attachment', array($this, 'generate_suggestion_for_new_upload'), 10, 1);
+
         add_filter('attachment_fields_to_edit', array($this, 'add_context_attachment_field'), 10, 2);
         add_filter('attachment_fields_to_save', array($this, 'save_context_attachment_field'), 10, 2);
     }
@@ -1949,8 +1952,23 @@ class MSH_Image_Optimizer {
             ? $manual_context_value
             : ($context_info['type'] ?? $auto_context_value);
         $generated_meta = $this->contextual_meta_generator->generate_meta_fields($attachment_id, $context_info);
-        // READ existing suggestion instead of generating new ones during analysis
+
+        // Get existing suggestion or generate new one if needed
         $suggested_filename = get_post_meta($attachment_id, '_msh_suggested_filename', true);
+
+        // Generate suggestion if it doesn't exist yet
+        if (empty($suggested_filename) && !$is_svg) {
+            $path_info = pathinfo($current_file);
+            $extension = strtolower($path_info['extension']);
+            $slug = $this->contextual_meta_generator->generate_filename_slug($attachment_id, $context_info, $extension);
+
+            if (!empty($slug)) {
+                $suggested_filename = $this->ensure_unique_filename($slug, $extension, $attachment_id);
+                update_post_meta($attachment_id, '_msh_suggested_filename', $suggested_filename);
+                update_post_meta($attachment_id, 'msh_filename_last_suggested', time());
+            }
+        }
+
         $quality_note = get_post_meta($attachment_id, '_msh_filename_quality_note', true);
 
         // Gather optimization metadata
@@ -3452,6 +3470,53 @@ class MSH_Image_Optimizer {
             'updates_made' => $updates_made,
             'image_id' => $image_id
         ]);
+    }
+
+    /**
+     * Auto-generate filename suggestion when new image is uploaded
+     */
+    public function generate_suggestion_for_new_upload($attachment_id) {
+        // Only process images
+        if (!wp_attachment_is_image($attachment_id)) {
+            return;
+        }
+
+        // Skip if already has a suggestion
+        $existing_suggestion = get_post_meta($attachment_id, '_msh_suggested_filename', true);
+        if (!empty($existing_suggestion)) {
+            return;
+        }
+
+        // Get current filename and extension
+        $current_file = get_attached_file($attachment_id);
+        if (!$current_file) {
+            return;
+        }
+
+        $path_info = pathinfo($current_file);
+        $extension = strtolower($path_info['extension']);
+        $current_basename = $path_info['basename'];
+
+        // Skip if already has an SEO-optimized name (contains 'msh' or 'hamilton')
+        if (strpos(strtolower($current_basename), 'msh') !== false ||
+            strpos(strtolower($current_basename), 'hamilton') !== false) {
+            return;
+        }
+
+        // Auto-detect context from filename and path
+        $context_details = $this->detect_image_context($attachment_id);
+
+        // Generate suggestion using the contextual generator
+        $slug = $this->contextual_meta_generator->generate_filename_slug($attachment_id, $context_details, $extension);
+
+        if (!empty($slug)) {
+            $suggested_filename = $this->ensure_unique_filename($slug, $extension, $attachment_id);
+            update_post_meta($attachment_id, '_msh_suggested_filename', $suggested_filename);
+            update_post_meta($attachment_id, 'msh_filename_last_suggested', time());
+
+            // Log for debugging
+            error_log("MSH Auto-Suggestion: Generated '{$suggested_filename}' for new upload '{$current_basename}' (ID: {$attachment_id})");
+        }
     }
 
     /**
