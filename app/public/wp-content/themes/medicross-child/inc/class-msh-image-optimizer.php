@@ -1960,19 +1960,27 @@ class MSH_Image_Optimizer {
         // Generate suggestion if it doesn't exist yet
         if (empty($suggested_filename)) {
             $path_info = pathinfo($current_file);
-            $extension = strtolower($path_info['extension']);
+            $extension = isset($path_info['extension']) ? strtolower($path_info['extension']) : '';
             $current_basename = strtolower($path_info['basename']);
+
+            error_log("MSH DEBUG: Analyzing file: $current_file");
+            error_log("MSH DEBUG: Extension detected: '$extension'");
+            error_log("MSH DEBUG: Basename: $current_basename");
 
             // Skip if already has SEO-optimized name (contains 'msh' or 'hamilton')
             $skip_suggestion = (strpos($current_basename, 'msh') !== false ||
                                strpos($current_basename, 'hamilton') !== false ||
                                strpos($current_basename, 'main-street-health') !== false);
 
-            if (!$skip_suggestion) {
+            error_log("MSH DEBUG: Skip suggestion? " . ($skip_suggestion ? 'YES' : 'NO'));
+
+            if (!$skip_suggestion && !empty($extension)) {
                 $slug = $this->contextual_meta_generator->generate_filename_slug($attachment_id, $context_info, $extension);
+                error_log("MSH DEBUG: Generated slug: '$slug'");
 
                 if (!empty($slug)) {
                     $suggested_filename = $this->ensure_unique_filename($slug, $extension, $attachment_id);
+                    error_log("MSH DEBUG: Final suggestion: '$suggested_filename'");
                     update_post_meta($attachment_id, '_msh_suggested_filename', $suggested_filename);
                     update_post_meta($attachment_id, 'msh_filename_last_suggested', time());
                 }
@@ -3493,28 +3501,15 @@ class MSH_Image_Optimizer {
 
         global $wpdb;
 
-        // Remove suggestions without extensions
-        $bad_count = $wpdb->query("
-            DELETE pm FROM {$wpdb->postmeta} pm
-            WHERE pm.meta_key = '_msh_suggested_filename'
-            AND pm.meta_value NOT REGEXP '\\.(jpg|png|svg|gif|webp)$'
-        ");
-
-        // Remove suggestions for already SEO-optimized files
-        $optimized_count = $wpdb->query("
-            DELETE pm FROM {$wpdb->postmeta} pm
-            JOIN {$wpdb->postmeta} pm2 ON pm.post_id = pm2.post_id
-            WHERE pm.meta_key = '_msh_suggested_filename'
-            AND pm2.meta_key = '_wp_attached_file'
-            AND (LOWER(pm2.meta_value) LIKE '%hamilton%'
-                 OR LOWER(pm2.meta_value) LIKE '%msh%'
-                 OR LOWER(pm2.meta_value) LIKE '%main-street-health%')
+        // NUCLEAR OPTION: Remove ALL suggestions to start fresh
+        $total_count = $wpdb->query("
+            DELETE FROM {$wpdb->postmeta}
+            WHERE meta_key = '_msh_suggested_filename'
         ");
 
         wp_send_json_success([
-            'message' => "Cleared {$bad_count} bad suggestions and {$optimized_count} suggestions for already-optimized files.",
-            'bad_removed' => $bad_count,
-            'optimized_removed' => $optimized_count
+            'message' => "Cleared ALL {$total_count} filename suggestions. Run 'Analyze Published Images' to regenerate.",
+            'total_removed' => $total_count
         ]);
     }
 
