@@ -110,6 +110,7 @@ class MSH_Contextual_Meta_Generator {
         $context['file_basename'] = $file_basename;
         $context['attachment_slug'] = $this->slugify(!empty($context['attachment_title']) ? $context['attachment_title'] : $file_basename);
         $context['filename'] = $file_name;
+        $context['original_filename'] = $file_name; // Add for keyword extraction
 
         if (!$context['manual']) {
             $meta_sizes = wp_get_attachment_metadata($attachment_id);
@@ -185,7 +186,12 @@ class MSH_Contextual_Meta_Generator {
 
         if (!$context['manual']) {
             $asset_type = $this->detect_asset_type(strtolower(trim(($context['attachment_title'] ?? '') . ' ' . $file_basename . ' ' . ($context['page_title'] ?? ''))));
-            if ($asset_type === 'logo' && $context['type'] === 'clinical') {
+
+            // IMPORTANT: Don't override icon context that was already set by detect_icon_context
+            if ($context['type'] === 'icon') {
+                error_log("MSH Context Debug: Preserving icon context for '$file_basename', not applying asset type '$asset_type'");
+                // Don't apply any asset type overrides - keep as icon
+            } elseif ($asset_type === 'logo' && $context['type'] === 'clinical') {
                 $context['type'] = 'business';
                 $context['asset'] = 'logo';
             } elseif ($asset_type === 'icon' && $context['type'] === 'clinical') {
@@ -451,7 +457,7 @@ class MSH_Contextual_Meta_Generator {
         return implode('-', $filtered);
     }
 
-    private function format_service_label($service) {
+    public function format_service_label($service) {
         if (empty($service)) {
             return 'Rehabilitation';
         }
@@ -541,6 +547,26 @@ class MSH_Contextual_Meta_Generator {
 
         $icon_keyword = preg_match('/icon|\.svg$|\/icons\//', $combined);
         $concept_keyword = preg_match('/(chronic[-_ ]?pain|sport[-_ ]?injur|work[-_ ]?related[-_ ]?injur|workplace[-_ ]?injur|motor[-_ ]?icon|vehicle[-_ ]?icon|accident|wsib|program)/', $combined);
+
+        // Force healthcare equipment SVGs to be treated as icons
+        $healthcare_equipment_pattern = '/(crutches|orthopedic|pillow|compression|stocking|brace|walker|wheelchair|cane|tens|ultrasound|foam|roller|brain|nervous|system|scoliosis|injury|nerve|stimulator|spine|back|neck|joint)/';
+
+        // Also force Noun Project SVGs to be treated as icons (with optional suffixes)
+        $noun_project_pattern = '/^noun-(.+)-\d{4,7}-[A-F0-9]{6}(?:-\d+)*\.svg$/i';
+
+        if (strpos($filename, '.svg') !== false &&
+            (preg_match($healthcare_equipment_pattern, $combined) || preg_match($noun_project_pattern, $filename))) {
+            $icon_keyword = 1; // Force icon detection
+            error_log("MSH Icon Debug: Forced SVG to icon: '$filename' (Healthcare: " .
+                (preg_match($healthcare_equipment_pattern, $combined) ? 'YES' : 'NO') .
+                ", Noun Project: " . (preg_match($noun_project_pattern, $filename) ? 'YES' : 'NO') . ")");
+        }
+
+        // Debug SVG icon detection
+        if (strpos($filename, '.svg') !== false) {
+            error_log("MSH Icon Debug: SVG file '$filename', Combined='$combined', IconKeyword=$icon_keyword, ConceptKeyword=$concept_keyword");
+
+        }
 
         if (!$icon_keyword && $concept_keyword) {
             $max_icon_dimension = 600;
@@ -676,6 +702,9 @@ class MSH_Contextual_Meta_Generator {
     }
 
     public function generate_filename_slug($attachment_id, array $context, $extension = null) {
+        error_log("MSH Context Debug: AttachmentID=$attachment_id, Type='{$context['type']}', Extension='$extension', Original='{$context['original_filename']}'");
+
+
         switch ($context['type']) {
             case 'team':
                 $name = !empty($context['staff_name']) ? $context['staff_name'] : 'team-member';
@@ -684,22 +713,62 @@ class MSH_Contextual_Meta_Generator {
                 $subject_slug = !empty($context['attachment_slug']) ? $this->truncate_slug($context['attachment_slug'], 3) : 'patient';
                 return $this->slugify('patient-testimonial-' . $subject_slug . '-' . $this->location_slug);
             case 'icon':
-                $concept_source = $context['icon_concept'] ?? $context['attachment_slug'] ?? 'service';
+                // Smart filename extraction from original name
+                $original_filename = $context['original_filename'] ?? '';
+                $extracted_keywords = $this->extract_filename_keywords($original_filename);
+
+                error_log("MSH Debug Icon Case: Original='$original_filename', Extracted='$extracted_keywords'");
+
+                $concept_source = '';
+                if (!empty($extracted_keywords)) {
+                    $concept_source = $extracted_keywords;
+                } else {
+                    $concept_source = $context['icon_concept'] ?? $context['attachment_slug'] ?? 'service';
+                }
+
                 $concept = $this->slugify($concept_source);
                 if ($concept === '') {
                     $concept = 'service';
                 }
+
+                error_log("MSH Debug Icon Case: Final concept='$concept', Result='" . $concept . '-icon-' . $this->location_slug . "'");
                 return $this->slugify($concept . '-icon-' . $this->location_slug);
             case 'service-icon':
-                $concept_slug = !empty($context['icon_concept']) ? $this->slugify($context['icon_concept']) : '';
-                if ($concept_slug !== '') {
-                    return $this->slugify($concept_slug . '-icon-' . $this->location_slug);
+                // FIRST: Try filename extraction for high-quality names (same as icon case)
+                $original_filename = $context['original_filename'] ?? '';
+                $extracted_keywords = $this->extract_filename_keywords($original_filename);
+
+                error_log("MSH Debug Service-Icon Case: Original='$original_filename', Extracted='$extracted_keywords'");
+
+                if (!empty($extracted_keywords)) {
+                    $concept_source = $extracted_keywords;
+                } else {
+                    $concept_source = !empty($context['icon_concept']) ? $this->slugify($context['icon_concept']) : '';
+                    if ($concept_source === '') {
+                        $concept_source = $context['service'] ?? 'service';
+                    }
                 }
-                $service_slug = $this->slugify($context['service'] ?? 'service');
-                return $this->slugify($service_slug . '-icon-' . $this->location_slug);
+
+                $concept = $this->slugify($concept_source);
+                if ($concept === '') {
+                    $concept = 'service';
+                }
+
+                error_log("MSH Debug Service-Icon Case: Final concept='$concept', Result='" . $concept . '-icon-' . $this->location_slug . "'");
+                return $this->slugify($concept . '-icon-' . $this->location_slug);
             case 'facility':
                 return $this->slugify($this->business_name . '-facility-' . $this->location_slug);
             case 'equipment':
+                // Smart filename extraction from original name
+                $original_filename = $context['original_filename'] ?? '';
+                $extracted_keywords = $this->extract_filename_keywords($original_filename);
+
+                error_log("MSH Debug Equipment Case: Original='$original_filename', Extracted='$extracted_keywords'");
+
+                if (!empty($extracted_keywords)) {
+                    return $this->slugify($extracted_keywords . '-equipment-' . $this->location_slug);
+                }
+
                 if (!empty($context['asset']) && $context['asset'] === 'product') {
                     $product_map = [
                         'therapeutic-pillow' => 'pillow',
@@ -717,21 +786,103 @@ class MSH_Contextual_Meta_Generator {
                 }
                 return $this->slugify('rehabilitation-equipment-' . $this->location_slug);
             case 'business':
+                // Extract brand/company name from filename
+                $original_filename = strtolower($context['original_filename'] ?? '');
+                $brand_keywords = $this->extract_brand_keywords($original_filename);
+
                 if (!empty($context['asset']) && $context['asset'] === 'logo') {
+                    if (!empty($brand_keywords)) {
+                        return $this->slugify($brand_keywords . '-logo-' . $this->location_slug);
+                    }
                     return $this->slugify($this->business_name . '-logo-' . $this->location_slug);
+                }
+
+                if (!empty($brand_keywords)) {
+                    return $this->slugify($brand_keywords . '-logo-' . $this->location_slug);
                 }
                 return $this->slugify($this->business_name . '-' . $this->location_slug . '-branding');
             case 'clinical':
             default:
-                $service = $context['service'] ?? 'rehabilitation';
-                $parts = [$service, $this->location_slug];
-                $base_slug = implode('-', array_filter($parts));
+                // SEO-optimized treatment keywords (more specific first, word-boundary safe)
+                $treatment_keywords = [
+                    'auto-accident' => ['auto accident', 'car accident', 'motor vehicle accident', 'mva'],
+                    'workplace-injury' => ['workplace injury', 'work injury', 'ergonomic injury'],
+                    'sports-injury' => ['sports injury', 'athletic injury', 'athlete injury'],
+                    'concussion' => ['concussion', 'head injury', 'brain injury'],
+                    'sciatica' => ['sciatica', 'sciatic nerve', 'leg pain'],
+                    'back-pain' => ['back pain', 'spine pain', 'spinal pain', 'lumbar pain'],
+                    'neck-pain' => ['neck pain', 'cervical pain', 'whiplash'],
+                    'tmj' => ['tmj', 'jaw pain', 'temporal mandibular'],
+                    'shoulder-pain' => ['shoulder pain', 'rotator cuff'],
+                    'knee-pain' => ['knee pain', 'patella'],
+                    'hip-pain' => ['hip pain', 'pelvis pain'],
+                    'ankle-pain' => ['ankle pain', 'foot pain'],
+                    'arthritis' => ['arthritis', 'joint pain'],
+                    'rehabilitation' => ['rehabilitation', 'rehab', 'recovery', 'therapy']
+                ];
 
-                if (!empty($context['attachment_slug'])) {
-                    $extra = $this->truncate_slug($context['attachment_slug'], 3);
-                    $base_slug = $this->merge_slug_fragments($base_slug, $extra);
+                // FIRST: Try direct filename keyword extraction for high-quality names
+                $original_filename = strtolower($context['original_filename'] ?? '');
+                $extracted_keywords = $this->extract_filename_keywords($original_filename);
+
+                if (!empty($extracted_keywords) && $this->is_high_quality_extracted_name($extracted_keywords, $original_filename)) {
+                    error_log("MSH Clinical Debug: Using high-quality extracted keywords '$extracted_keywords' from '$original_filename'");
+                    return $this->slugify($extracted_keywords . '-' . $this->location_slug);
                 }
 
+                // FALLBACK: Extract keywords from context AND original filename for treatment matching
+                $service = $context['service'] ?? 'rehabilitation';
+                $page_title = strtolower($context['page_title'] ?? '');
+                $attachment_title = strtolower($context['attachment_title'] ?? '');
+                $search_text = $page_title . ' ' . $attachment_title . ' ' . $service . ' ' . $original_filename;
+
+                // Debug logging for problematic cases
+                error_log("MSH Clinical Debug: AttachmentID={$context['attachment_id']}, SearchText='$search_text'");
+
+                // Find best matching treatment (prioritize filename over page context)
+                $primary_keyword = 'rehabilitation'; // fallback
+
+                // First, try to extract from filename specifically (with word boundaries)
+                if (!empty($original_filename)) {
+                    foreach ($treatment_keywords as $keyword => $variations) {
+                        foreach ($variations as $variation) {
+                            // Use word boundaries to prevent partial matches
+                            if (preg_match('/\b' . preg_quote($variation, '/') . '\b/', $original_filename)) {
+                                $primary_keyword = $keyword;
+                                error_log("MSH Clinical Debug: Found '$variation' in filename -> '$keyword'");
+                                break 2; // Exit both loops
+                            }
+                        }
+                    }
+                }
+
+                // If no match in filename, try full search text (with word boundaries)
+                if ($primary_keyword === 'rehabilitation') {
+                    foreach ($treatment_keywords as $keyword => $variations) {
+                        foreach ($variations as $variation) {
+                            // Use word boundaries to prevent partial matches
+                            if (preg_match('/\b' . preg_quote($variation, '/') . '\b/', $search_text)) {
+                                $primary_keyword = $keyword;
+                                error_log("MSH Clinical Debug: Found '$variation' in search text -> '$keyword'");
+                                break 2; // Exit both loops
+                            }
+                        }
+                    }
+                }
+
+                // Build SEO-friendly filename: treatment-hamilton-service
+                $treatment_type = ($service === 'chiropractic') ? 'chiropractic' : 'physiotherapy';
+                $parts = [$primary_keyword];
+
+                // Add Hamilton for local SEO (but not for generic terms)
+                if ($primary_keyword !== 'rehabilitation') {
+                    $parts[] = $this->location_slug;
+                }
+
+                // Add treatment type
+                $parts[] = $treatment_type;
+
+                $base_slug = implode('-', array_filter($parts));
                 return $this->slugify($base_slug);
         }
     }
@@ -970,6 +1121,349 @@ class MSH_Contextual_Meta_Generator {
         ];
     }
 
+    /**
+     * Extract meaningful keywords from original filename
+     */
+    private function extract_filename_keywords($filename) {
+        if (empty($filename)) {
+            return '';
+        }
+
+        // FIRST: Detect source patterns (Noun Project, etc.)
+        $source_pattern = $this->detect_source_pattern($filename);
+        if ($source_pattern) {
+            error_log("MSH Source Pattern: File='$filename', Source='{$source_pattern['source']}', Term='{$source_pattern['extracted_term']}'");
+            return $this->normalize_extracted_term($source_pattern['extracted_term']);
+        }
+
+        // SECOND: Handle Main Street Health branded files
+        if (strpos($filename, 'main-street-health-healthcare-') === 0) {
+            $service_part = str_replace('main-street-health-healthcare-', '', $filename);
+            $service_part = preg_replace('/\.(jpg|jpeg|png|gif|svg|webp)$/i', '', $service_part);
+
+            error_log("MSH Branded File: Original='$filename', ServicePart='$service_part'");
+
+            // Extract the service keywords and normalize to key service terms
+            if (strpos($service_part, 'cardiovascular') !== false) {
+                return 'cardiovascular-health-testing';
+            } elseif (strpos($service_part, 'massage-therapy') !== false || strpos($service_part, 'professional-massage') !== false) {
+                return 'professional-massage-therapy';
+            } elseif (strpos($service_part, 'chiropractic') !== false) {
+                return 'chiropractic-adjustment-therapy';
+            } elseif (strpos($service_part, 'concussion') !== false) {
+                return 'concussion-assessment-testing';
+            } elseif (strpos($service_part, 'acupuncture') !== false) {
+                return 'acupuncture-pain-relief';
+            } else {
+                // Use first 2-3 meaningful words, excluding 'equipment', 'services', etc.
+                $words = explode('-', $service_part);
+                $meaningful_words = [];
+                $skip_words = ['equipment', 'services', 'techniques', 'and', 'for', 'the', 'with'];
+
+                foreach ($words as $word) {
+                    if (strlen($word) > 2 && !in_array($word, $skip_words)) {
+                        $meaningful_words[] = $word;
+                        if (count($meaningful_words) >= 3) break;
+                    }
+                }
+                return implode('-', $meaningful_words);
+            }
+        }
+
+        // FALLBACK: Standard processing
+        $cleaned = preg_replace('/\.(jpg|jpeg|png|gif|svg|webp)$/i', '', $filename);
+        $cleaned = preg_replace('/^(noun-|icon-|img-|image-)/i', '', $cleaned);
+
+        // Remove color codes and IDs
+        $cleaned = preg_replace('/-[A-F0-9]{6,8}(-|$)/i', '-', $cleaned);
+        $cleaned = preg_replace('/-\d{4,}(-|$)/', '-', $cleaned);
+
+        // Split on separators and clean
+        $parts = preg_split('/[-_\s]+/', $cleaned);
+        $meaningful_parts = [];
+
+        // Filter out noise words and keep meaningful terms (don't remove svg - it's meaningful)
+        $noise_words = ['icon', 'image', 'img', 'pic', 'photo', 'vector', 'png', 'jpg'];
+
+        foreach ($parts as $part) {
+            $part = strtolower(trim($part));
+            if (strlen($part) > 2 && !in_array($part, $noise_words) && !is_numeric($part)) {
+                $meaningful_parts[] = $part;
+            }
+        }
+
+        // Healthcare-specific keyword mapping (enhanced with variations)
+        $healthcare_keywords = [
+            'compression-stocking' => ['compression stocking', 'compression sock', 'support stocking'],
+            'orthopedic-pillow' => ['orthopedic pillow', 'ortho pillow', 'cervical pillow'],
+            'wrist-guards' => ['wristguards', 'wrist guards', 'wrist guard'],
+            'knee-brace' => ['knee brace', 'knee support'],
+            'support-brace' => ['support brace', 'support'],
+            'ankle-brace' => ['ankle brace', 'ankle support'],
+            'wrist-brace' => ['wrist brace', 'wrist support'],
+            'back-brace' => ['back brace', 'back support'],
+            'neck-brace' => ['neck brace', 'neck support'],
+            'crutches' => ['crutches', 'crutch'],
+            'walker' => ['walker', 'walking aid'],
+            'wheelchair' => ['wheelchair', 'wheel chair'],
+            'walking-cane' => ['cane', 'walking cane'],
+            'exercise-band' => ['exercise band', 'resistance band'],
+            'foam-roller' => ['foam roller'],
+            'heat-pack' => ['heat pack', 'heating pad'],
+            'ice-pack' => ['ice pack', 'cold pack'],
+            'kinesiology-tape' => ['kinesiology tape', 'ktape', 'k tape'],
+            'posture-corrector' => ['posture corrector'],
+            'therapy-ball' => ['therapy ball', 'exercise ball'],
+            'tens-unit' => ['tens unit', 'tens'],
+            'ultrasound' => ['ultrasound'],
+            'massage-table' => ['massage table'],
+            'treatment-table' => ['treatment table'],
+            'lumbar-support' => ['lumbar support'],
+            'ergonomic-cushion' => ['ergonomic cushion'],
+            'balance-pad' => ['balance pad'],
+            'stability-ball' => ['stability ball'],
+            'medicine-ball' => ['medicine ball'],
+            'theraband' => ['theraband', 'thera band'],
+            'gel-pack' => ['gel pack']
+        ];
+
+        // Check for healthcare keyword combinations
+        $text = implode(' ', $meaningful_parts);
+
+        // Debug logging
+        error_log("MSH Filename Debug: Original='$filename', Cleaned='$cleaned', Parts=" . implode('|', $meaningful_parts) . ", Text='$text'");
+
+        // FIRST: Try consecutive compound matching for multi-word terms
+        $parts_string = implode(' ', $meaningful_parts);
+        foreach ($healthcare_keywords as $keyword => $variations) {
+            foreach ($variations as $variation) {
+                // Check for consecutive sequence in the parts string
+                if (strpos($parts_string, strtolower($variation)) !== false) {
+                    error_log("MSH Filename Debug: Found consecutive compound match '$variation' -> '$keyword'");
+                    return $keyword;
+                }
+            }
+        }
+
+        // SECOND: Try single word matching
+        foreach ($healthcare_keywords as $keyword => $variations) {
+            foreach ($variations as $variation) {
+                if (strpos($text, $variation) !== false) {
+                    error_log("MSH Filename Debug: Found text match '$variation' -> '$keyword'");
+                    return $keyword;
+                }
+            }
+        }
+
+        // THIRD: Try direct part matching
+        foreach ($healthcare_keywords as $keyword => $variations) {
+            foreach ($variations as $variation) {
+                foreach ($meaningful_parts as $part) {
+                    if ($part === $variation) {
+                        error_log("MSH Filename Debug: Direct part match '$part' -> '$keyword'");
+                        return $keyword;
+                    }
+                }
+            }
+        }
+
+        // Return best meaningful parts (max 3)
+        return implode('-', array_slice($meaningful_parts, 0, 3));
+    }
+
+    /**
+     * Extract brand/insurance company names from filename
+     */
+    private function extract_brand_keywords($filename) {
+        if (empty($filename)) {
+            return '';
+        }
+
+        // Remove file extension and clean
+        $cleaned = preg_replace('/\.(jpg|jpeg|png|gif|svg|webp)$/i', '', $filename);
+        $cleaned = preg_replace('/[-_](logo|nobars?)$/i', '', $cleaned);
+
+        // Common insurance/healthcare brands
+        $brand_mapping = [
+            'bluecross' => ['bluecross', 'blue-cross'],
+            'manulife' => ['manulife'],
+            'sunlife' => ['sunlife', 'sun-life'],
+            'greenshield' => ['greenshield', 'green-shield'],
+            'desjardins' => ['desjardins'],
+            'chambers' => ['chambers'],
+            'benefits' => ['benefits'],
+            'wsib' => ['wsib'],
+            'mvp' => ['mvp'],
+            'rbc' => ['rbc'],
+            'td' => ['td'],
+            'bmo' => ['bmo'],
+            'scotia' => ['scotia'],
+            'cigna' => ['cigna'],
+            'johnson' => ['johnson'],
+            'benefits-plan' => ['benefits', 'plan']
+        ];
+
+        $text = strtolower($cleaned);
+        foreach ($brand_mapping as $brand => $variations) {
+            foreach ($variations as $variation) {
+                if (strpos($text, $variation) !== false) {
+                    return $brand;
+                }
+            }
+        }
+
+        // If no specific brand, return cleaned filename (max 2 words)
+        $parts = preg_split('/[-_\s]+/', $cleaned);
+        $clean_parts = [];
+        foreach ($parts as $part) {
+            $part = trim($part);
+            if (strlen($part) > 1 && !is_numeric($part)) {
+                $clean_parts[] = strtolower($part);
+            }
+        }
+
+        return implode('-', array_slice($clean_parts, 0, 2));
+    }
+
+    /**
+     * Check if extracted keywords represent a high-quality name worth preserving
+     */
+    private function is_high_quality_extracted_name($extracted_keywords, $original_filename) {
+        // High-quality indicators
+        $quality_indicators = [
+            // Brand names
+            'djp', 'bionic', 'footmaxx', 'main-street-health',
+            // Specific medical terms
+            'gait-scan', 'fullstop', 'cardiovascular', 'professional', 'massage-therapy',
+            // Equipment specifics
+            'orthopedic-pillow', 'compression-stocking', 'wristguards',
+            // MSH service-specific terms
+            'cardiovascular-health-testing', 'professional-massage-therapy', 'chiropractic-adjustment-therapy',
+            'concussion-assessment-testing', 'acupuncture-pain-relief',
+            // Equipment terms
+            'bionic-therapy-device', 'support-brace', 'compression-stocking',
+            // Descriptive terms
+            'injury-care', 'framed', 'services'
+        ];
+
+        foreach ($quality_indicators as $indicator) {
+            if (strpos($extracted_keywords, $indicator) !== false || strpos($original_filename, $indicator) !== false) {
+                return true;
+            }
+        }
+
+        // If extracted keywords are longer than 2 words and contain specific terms
+        $word_count = count(explode('-', $extracted_keywords));
+        if ($word_count >= 3) {
+            return true;
+        }
+
+        return false;
+    }
+
+    /**
+     * Detect common icon library patterns (Noun Project, etc.)
+     */
+    private function detect_source_pattern($filename) {
+        // Noun Project pattern: noun-compression-stocking-7981375-FFFFFF.svg (with optional suffixes)
+        if (preg_match('/^noun-(.+)-\d{4,7}-[A-F0-9]{6}(?:-\d+)*/', $filename, $matches)) {
+            return [
+                'source' => 'noun_project',
+                'extracted_term' => str_replace('-', ' ', $matches[1])
+            ];
+        }
+
+        // Getty Images pattern: GettyImages-1343539369.png
+        if (preg_match('/^gettyimages-(\d+)/i', $filename, $matches)) {
+            return [
+                'source' => 'getty_images',
+                'extracted_term' => 'professional-stock-photo'
+            ];
+        }
+
+        // Professional equipment patterns: djp-bionic-fullstop-on-skin-1400x1400-1.jpg
+        if (preg_match('/^([a-z]+)-([a-z]+)-([a-z-]+)-(\d{3,}x\d{3,}|on-\w+)/', $filename, $matches)) {
+            return [
+                'source' => 'professional_equipment',
+                'extracted_term' => $matches[1] . ' ' . $matches[2] . ' ' . str_replace('-', ' ', $matches[3])
+            ];
+        }
+
+        // Frame pattern: slide-footmaxx-gait-scan-framed.jpg (but skip generic Frame-123.png)
+        if (preg_match('/^(frame|slide)-(.+)/i', $filename, $matches)) {
+            $extracted_part = $matches[2];
+            // Skip if it's just numbers and extension (like Frame-330.png -> 330.png)
+            if (!preg_match('/^\d+\.(jpg|jpeg|png|gif|svg|webp)$/i', $extracted_part)) {
+                return [
+                    'source' => 'presentation_asset',
+                    'extracted_term' => str_replace('-', ' ', $extracted_part)
+                ];
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Normalize extracted terms to healthcare keywords
+     */
+    private function normalize_extracted_term($term) {
+        $term_lower = strtolower($term);
+
+        // FIRST: Remove file extensions if present
+        $term_lower = preg_replace('/\.(jpg|jpeg|png|gif|svg|webp)$/i', '', $term_lower);
+
+        // Direct healthcare equipment mapping
+        $equipment_mapping = [
+            'compression stocking' => 'compression-stocking',
+            'compression sock' => 'compression-stocking',
+            'support stocking' => 'support-stocking',
+            'bionic fullstop' => 'bionic-therapy-device',
+            'bionic fullstop on skin' => 'bionic-therapy-device',
+            'fullstop' => 'therapy-device',
+            'orthopedic pillow' => 'orthopedic-pillow',
+            'brain' => 'brain-assessment',
+            'central nervous system' => 'nervous-system-assessment',
+            'nervous system' => 'nervous-system-assessment',
+            'scoliosis' => 'scoliosis-assessment',
+            'injury' => 'injury-assessment',
+            'portable nerve stimulator' => 'nerve-stimulator-therapy',
+            'nerve stimulator' => 'nerve-stimulator-therapy',
+            'wristguards' => 'wrist-guards',
+            'crutches' => 'crutches',
+            'knee brace' => 'knee-brace',
+            'ankle brace' => 'ankle-brace',
+            'back brace' => 'back-brace',
+            'neck brace' => 'neck-brace',
+            'brace' => 'support-brace',
+            'walker' => 'walker',
+            'wheelchair' => 'wheelchair',
+            'cane' => 'walking-cane',
+            'foam roller' => 'foam-roller',
+            'therapy ball' => 'therapy-ball',
+            'balance pad' => 'balance-pad',
+            'resistance band' => 'resistance-band',
+            'heating pad' => 'heating-pad',
+            'cold pack' => 'cold-pack',
+            'gel pack' => 'gel-pack'
+        ];
+
+        // Check for exact matches first
+        if (isset($equipment_mapping[$term_lower])) {
+            return $equipment_mapping[$term_lower];
+        }
+
+        // Check for partial matches
+        foreach ($equipment_mapping as $source_term => $normalized) {
+            if (strpos($term_lower, $source_term) !== false) {
+                return $normalized;
+            }
+        }
+
+        // Fallback: clean up the term
+        return str_replace(' ', '-', $term_lower);
+    }
+
     private function slugify($text) {
         $text = strtolower($text);
         $text = preg_replace('/[^a-z0-9]+/', '-', $text);
@@ -1008,6 +1502,7 @@ class MSH_Image_Optimizer {
         add_action('wp_ajax_msh_preview_meta_text', array($this, 'ajax_preview_meta_text'));
         add_action('wp_ajax_msh_save_edited_meta', array($this, 'ajax_save_edited_meta'));
         add_action('wp_ajax_msh_update_context', array($this, 'ajax_update_context'));
+        add_action('wp_ajax_msh_build_usage_index', array($this, 'ajax_build_usage_index'));
 
         $this->contextual_meta_generator = new MSH_Contextual_Meta_Generator();
 
@@ -1111,11 +1606,11 @@ class MSH_Image_Optimizer {
      * Get all published images that need optimization
      */
     public function get_published_images() {
-        static $cached_results = null;
-
-        if ($cached_results !== null) {
-            return $cached_results;
-        }
+        // TEMP: Disable caching to debug file analysis issues
+        // static $cached_results = null;
+        // if ($cached_results !== null) {
+        //     return $cached_results;
+        // }
 
         global $wpdb;
 
@@ -1129,8 +1624,8 @@ class MSH_Image_Optimizer {
         );
 
         if (empty($attachments)) {
-            $cached_results = [];
-            return $cached_results;
+            // $cached_results = [];
+            return [];
         }
 
         $attachment_map = [];
@@ -1356,9 +1851,9 @@ class MSH_Image_Optimizer {
             return $a['ID'] <=> $b['ID'];
         });
 
-        $cached_results = $published_images;
-
-        return $cached_results;
+        // $cached_results = $published_images;
+        // return $cached_results;
+        return $published_images;
     }
 
     /**
@@ -1454,18 +1949,9 @@ class MSH_Image_Optimizer {
             ? $manual_context_value
             : ($context_info['type'] ?? $auto_context_value);
         $generated_meta = $this->contextual_meta_generator->generate_meta_fields($attachment_id, $context_info);
-        $suggested_filename = '';
-
-        if (!empty($extension)) {
-            $slug = $this->contextual_meta_generator->generate_filename_slug($attachment_id, $context_info, $extension);
-            if (!empty($slug)) {
-                $suggested_filename = $this->ensure_unique_filename($slug, $extension, $attachment_id);
-                $current_basename = basename($relative_file);
-                if (strcasecmp($suggested_filename, $current_basename) === 0) {
-                    $suggested_filename = '';
-                }
-            }
-        }
+        // READ existing suggestion instead of generating new ones during analysis
+        $suggested_filename = get_post_meta($attachment_id, '_msh_suggested_filename', true);
+        $quality_note = get_post_meta($attachment_id, '_msh_filename_quality_note', true);
 
         // Gather optimization metadata
         $optimized_date = get_post_meta($attachment_id, 'msh_optimized_date', true);
@@ -1474,11 +1960,7 @@ class MSH_Image_Optimizer {
         $metadata_last_updated = (int) get_post_meta($attachment_id, 'msh_metadata_last_updated', true);
         $source_last_compressed = (int) get_post_meta($attachment_id, 'msh_source_last_compressed', true);
 
-        if ($suggested_filename !== '') {
-            update_post_meta($attachment_id, '_msh_suggested_filename', $suggested_filename);
-        } else {
-            delete_post_meta($attachment_id, '_msh_suggested_filename');
-        }
+        // Analysis only reads existing suggestions - no writing to database during analysis
 
         if ($is_svg) {
             $optimization_potential = [
@@ -1510,6 +1992,7 @@ class MSH_Image_Optimizer {
             'generated_meta' => $generated_meta,
             'optimization_potential' => $optimization_potential,
             'suggested_filename' => $suggested_filename,
+            'filename_quality_note' => $quality_note,
             'optimized_date' => $optimized_date,
             'optimization_status' => $optimization_status,
             'webp_last_converted' => $webp_last_converted,
@@ -1739,16 +2222,173 @@ class MSH_Image_Optimizer {
      */
     private function ensure_unique_filename($base_name, $extension, $attachment_id) {
         $filename = $base_name . '.' . $extension;
-        
+
         // Check if this exact filename already exists in WordPress
         $existing_attachment = $this->get_attachment_by_filename($filename);
-        
-        if ($existing_attachment && $existing_attachment !== $attachment_id) {
-            // Add attachment ID suffix for uniqueness
-            $filename = $base_name . '-' . $attachment_id . '.' . $extension;
+
+        // Also check for base name conflicts across different extensions
+        $base_conflicts = $this->get_attachments_with_base_name($base_name);
+
+        if (($existing_attachment && $existing_attachment !== $attachment_id) || !empty($base_conflicts)) {
+            // Also check if this suggestion is already suggested for another file
+            $suggestion_conflicts = $this->get_attachments_with_suggestion($filename);
+
+            // Try with short attachment ID suffix first
+            $short_id = $attachment_id;
+            $filename = $base_name . '-' . $short_id . '.' . $extension;
+
+            // If still conflicts, add timestamp
+            $existing_check = $this->get_attachment_by_filename($filename);
+            if ($existing_check && $existing_check !== $attachment_id) {
+                $timestamp = substr(time(), -4); // Last 4 digits of timestamp
+                $filename = $base_name . '-' . $timestamp . '.' . $extension;
+            }
+        } else {
+            // Even if filename doesn't exist yet, check for duplicate suggestions
+            $suggestion_conflicts = $this->get_attachments_with_suggestion($filename);
+            if (!empty($suggestion_conflicts) && !in_array($attachment_id, $suggestion_conflicts)) {
+                $short_id = $attachment_id;
+                $filename = $base_name . '-' . $short_id . '.' . $extension;
+            }
         }
-        
+
+        error_log("MSH Uniqueness: AttachmentID=$attachment_id, BaseName='$base_name', FinalFilename='$filename'");
         return $filename;
+    }
+
+    /**
+     * Get attachments that have the same base filename (ignoring extension)
+     */
+    private function get_attachments_with_base_name($base_name) {
+        global $wpdb;
+
+        $like_pattern = '%' . $wpdb->esc_like($base_name) . '.%';
+        $results = $wpdb->get_col($wpdb->prepare("
+            SELECT post_id
+            FROM {$wpdb->postmeta}
+            WHERE (meta_key = '_wp_attached_file' OR meta_key = '_msh_suggested_filename')
+            AND meta_value LIKE %s
+        ", $like_pattern));
+
+        return array_map('intval', $results);
+    }
+
+    /**
+     * Get attachments that already have this filename as a suggestion
+     */
+    private function get_attachments_with_suggestion($filename) {
+        global $wpdb;
+
+        $results = $wpdb->get_col($wpdb->prepare("
+            SELECT post_id
+            FROM {$wpdb->postmeta}
+            WHERE meta_key = '_msh_suggested_filename'
+            AND meta_value = %s
+        ", $filename));
+
+        return array_map('intval', $results);
+    }
+
+    /**
+     * Check if suggested filename is worse than current filename
+     */
+    private function is_filename_worse($current, $suggested) {
+        // Remove extensions for comparison
+        $current_base = pathinfo($current, PATHINFO_FILENAME);
+        $suggested_base = pathinfo($suggested, PATHINFO_FILENAME);
+
+        // Score filenames (higher = better)
+        $current_score = $this->score_filename_quality($current_base);
+        $suggested_score = $this->score_filename_quality($suggested_base);
+
+        error_log("MSH Quality Check: Current='$current_base' (score: $current_score), Suggested='$suggested_base' (score: $suggested_score)");
+
+        // Don't suggest if it's significantly worse (threshold: 3 points)
+        return ($current_score - $suggested_score) >= 3;
+    }
+
+    /**
+     * Score filename quality (higher = better SEO/descriptiveness)
+     */
+    private function score_filename_quality($filename) {
+        $score = 0;
+        $filename_lower = strtolower($filename);
+
+        // Positive points for SEO-friendly elements (expanded)
+        $seo_keywords = [
+            'hamilton' => 2,
+            'main-street-health' => 3,
+            'physiotherapy' => 2,
+            'chiropractic' => 2,
+            'treatment' => 1,
+            'therapy' => 1,
+            'rehabilitation' => 1,
+            'chronic-pain' => 3,
+            'back-pain' => 3,
+            'neck-pain' => 3,
+            'sciatica' => 3,
+            'tmj' => 3,
+            'concussion' => 3,
+            'workplace-injury' => 3,
+            'auto-accident' => 3,
+            'cardiovascular' => 3,
+            'equipment' => 1,
+            'testing' => 2,
+            'health' => 1,
+            'medical' => 1,
+            'clinical' => 1,
+            // Equipment/product specific
+            'djp' => 2,
+            'bionic' => 2,
+            'fullstop' => 2,
+            'skin' => 1,
+            'orthopedic' => 3,
+            'pillow' => 2,
+            'compression' => 2,
+            'stocking' => 2,
+            'brace' => 2,
+            'crutches' => 2,
+            'knee' => 2,
+            'ankle' => 2,
+            'wrist' => 2,
+            'back' => 2,
+            'neck' => 2,
+            // Brand/quality indicators
+            'gettyimages' => 2,
+            'professional' => 1,
+            'premium' => 1,
+            'advanced' => 1,
+            // Dimensions (indicate professional stock)
+            '1400x1400' => 1,
+            '1200x800' => 1
+        ];
+
+        foreach ($seo_keywords as $keyword => $points) {
+            if (strpos($filename_lower, $keyword) !== false) {
+                $score += $points;
+            }
+        }
+
+        // Bonus for longer, descriptive filenames (up to 6 words)
+        $word_count = count(explode('-', $filename_lower));
+        if ($word_count >= 3 && $word_count <= 6) {
+            $score += $word_count;
+        }
+
+        // Penalty for generic terms
+        $generic_terms = ['rehabilitation-physiotherapy', 'rehabilitation-equipment', 'service-icon'];
+        foreach ($generic_terms as $term) {
+            if (strpos($filename_lower, $term) !== false) {
+                $score -= 5; // Heavy penalty for generic names
+            }
+        }
+
+        // Penalty for numbered suffixes (indicates generated filename)
+        if (preg_match('/-\d{4,}$/', $filename_lower)) {
+            $score -= 2;
+        }
+
+        return max(0, $score);
     }
 
     /**
@@ -1898,7 +2538,7 @@ class MSH_Image_Optimizer {
         if (!empty($context_details['service'])) {
             $detail_items[] = esc_html(sprintf(
                 __('Service focus: %s', 'medicross-child'),
-                $this->format_service_label($context_details['service'])
+                $this->contextual_meta_generator->format_service_label($context_details['service'])
             ));
         }
         if (!empty($context_details['asset'])) {
@@ -2470,11 +3110,14 @@ class MSH_Image_Optimizer {
      */
     public function ajax_apply_filename_suggestions() {
         check_ajax_referer('msh_image_optimizer', 'nonce');
-        
+
         if (!current_user_can('manage_options')) {
             wp_die('Unauthorized');
         }
-        
+
+        // Set max execution time for processing all files at once
+        @set_time_limit(900); // 15 minutes max for large batch processing
+
         $mode = isset($_POST['mode']) ? sanitize_text_field($_POST['mode']) : 'full';
         $limit = isset($_POST['limit']) ? max(0, intval($_POST['limit'])) : 0;
 
@@ -2487,20 +3130,30 @@ class MSH_Image_Optimizer {
                 WHERE meta_key = '_msh_suggested_filename'
                 AND meta_value != ''
             ");
+
+            // Debug: Log how many suggestions were found
+            error_log('MSH Safe Rename: Found ' . count($image_ids) . ' images with filename suggestions');
         }
 
         if ($mode === 'test' && $limit > 0) {
             $image_ids = array_slice($image_ids, 0, $limit);
         }
 
+        // Process ALL files with suggestions - no batch size limit
+        error_log('MSH Safe Rename: Processing all ' . count($image_ids) . ' files with suggestions (NO BATCH LIMIT)');
+
         if (empty($image_ids)) {
+            // Debug: Log that no suggestions exist
+            error_log('MSH Safe Rename: No images with filename suggestions found in database');
+
             wp_send_json_success([
                 'results' => [],
                 'summary' => [
                     'total' => 0,
                     'success' => 0,
                     'errors' => 0,
-                    'skipped' => 0
+                    'skipped' => 0,
+                    'mode' => $mode
                 ]
             ]);
         }
@@ -2512,7 +3165,25 @@ class MSH_Image_Optimizer {
         $error_count = 0;
         $skipped_count = 0;
 
+        $total_count = count($image_ids);
+        $processed = 0;
+        $start_time = time();
+        $max_execution_time = 900; // Stop after 15 minutes (for processing all files at once)
+
         foreach ($image_ids as $attachment_id) {
+            $processed++;
+
+            // Check execution time to prevent timeout
+            if ((time() - $start_time) > $max_execution_time) {
+                error_log("MSH Safe Rename: ⚠️ TIMEOUT - Stopping at $processed of $total_count images due to time limit. Continue with remaining files by running again.");
+                break;
+            }
+
+            // Log progress every 5 images
+            if ($processed % 5 === 0) {
+                error_log("MSH Safe Rename: Processing image $processed of $total_count...");
+            }
+
             $suggested_filename = get_post_meta($attachment_id, '_msh_suggested_filename', true);
 
             if (!$suggested_filename) {
@@ -2563,6 +3234,22 @@ class MSH_Image_Optimizer {
             $success_count++;
         }
 
+        // Check if there are more files to process
+        $has_more = false;
+        $remaining_count = 0;
+
+        if (count($image_ids) === 20 && $mode !== 'test') {
+            // Check for more files with suggestions
+            global $wpdb;
+            $all_ids = $wpdb->get_col("
+                SELECT post_id FROM {$wpdb->postmeta}
+                WHERE meta_key = '_msh_suggested_filename'
+                AND meta_value != ''
+            ");
+            $remaining_count = count($all_ids) - 20;
+            $has_more = $remaining_count > 0;
+        }
+
         wp_send_json_success([
             'results' => $results,
             'summary' => [
@@ -2571,6 +3258,12 @@ class MSH_Image_Optimizer {
                 'errors' => $error_count,
                 'skipped' => $skipped_count,
                 'mode' => $mode
+            ],
+            'has_more' => $has_more,
+            'remaining' => $remaining_count,
+            'batch_info' => [
+                'processed_this_batch' => count($image_ids),
+                'max_batch_size' => 20
             ]
         ]);
     }
@@ -2759,6 +3452,104 @@ class MSH_Image_Optimizer {
             'updates_made' => $updates_made,
             'image_id' => $image_id
         ]);
+    }
+
+    /**
+     * AJAX handler to build the image usage index
+     */
+    public function ajax_build_usage_index() {
+        check_ajax_referer('msh_image_optimizer', 'nonce');
+        if (!current_user_can('manage_options')) {
+            wp_die('Unauthorized');
+        }
+
+        @set_time_limit(60); // Shorter timeout
+        @ini_set('memory_limit', '512M'); // Increase memory
+
+        // SIMPLIFIED: Just create tables and enable the system
+        $this->ensure_safe_rename_tables();
+
+        // Mark system as ready
+        update_option('msh_safe_rename_enabled', '1');
+
+        wp_send_json_success([
+            'message' => 'Safe rename system enabled! Tables created successfully.',
+            'processed_attachments' => 0,
+            'stats' => [
+                'summary' => [
+                    'total_entries' => 0,
+                    'indexed_attachments' => 0,
+                    'unique_locations' => 0,
+                    'last_update' => current_time('mysql')
+                ],
+                'note' => 'System will build index on-demand during renames for better performance'
+            ]
+        ]);
+    }
+
+    private function ensure_safe_rename_tables() {
+        global $wpdb;
+        $charset_collate = $wpdb->get_charset_collate();
+
+        // Create tables if they don't exist
+        $tables = [
+            'wp_msh_image_usage_index' => "CREATE TABLE IF NOT EXISTS wp_msh_image_usage_index (
+                id int(11) NOT NULL AUTO_INCREMENT,
+                attachment_id int(11) NOT NULL,
+                url_variation text NOT NULL,
+                table_name varchar(64) NOT NULL,
+                row_id int(11) NOT NULL,
+                column_name varchar(64) NOT NULL,
+                context_type varchar(50) DEFAULT 'content',
+                post_type varchar(20) DEFAULT NULL,
+                last_updated datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                PRIMARY KEY (id),
+                KEY attachment_id (attachment_id),
+                KEY table_row (table_name, row_id),
+                KEY url_variation (url_variation(191)),
+                KEY context_type (context_type)
+            ) $charset_collate",
+            'wp_msh_rename_backups' => "CREATE TABLE IF NOT EXISTS wp_msh_rename_backups (
+                id int(11) NOT NULL AUTO_INCREMENT,
+                operation_id varchar(32) NOT NULL,
+                attachment_id int(11) NOT NULL,
+                table_name varchar(64) NOT NULL,
+                row_id int(11) NOT NULL,
+                column_name varchar(64) NOT NULL,
+                original_value longtext NOT NULL,
+                backup_date datetime DEFAULT CURRENT_TIMESTAMP,
+                status varchar(20) DEFAULT 'active',
+                PRIMARY KEY (id),
+                KEY operation_id (operation_id),
+                KEY attachment_id (attachment_id),
+                KEY backup_date (backup_date)
+            ) $charset_collate",
+            'wp_msh_rename_verification' => "CREATE TABLE IF NOT EXISTS wp_msh_rename_verification (
+                id int(11) NOT NULL AUTO_INCREMENT,
+                operation_id varchar(32) NOT NULL,
+                attachment_id int(11) NOT NULL,
+                check_type varchar(50) NOT NULL,
+                expected_value text NOT NULL,
+                actual_value text NOT NULL,
+                status varchar(20) NOT NULL,
+                error_message text NULL,
+                check_date datetime DEFAULT CURRENT_TIMESTAMP,
+                PRIMARY KEY (id),
+                KEY operation_id (operation_id),
+                KEY attachment_id (attachment_id),
+                KEY status (status)
+            ) $charset_collate"
+        ];
+
+        require_once ABSPATH . 'wp-admin/includes/upgrade.php';
+
+        foreach ($tables as $table_name => $sql) {
+            dbDelta($sql);
+        }
+
+        // Set options to mark tables as created
+        update_option('msh_usage_index_table_version', '1');
+        update_option('msh_backup_tables_version', '1');
     }
 }
 

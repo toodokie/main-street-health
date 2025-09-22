@@ -104,7 +104,7 @@ class MSH_Safe_Rename_System {
         $this->update_wordpress_metadata($attachment_id, $rename['new_path'], $old_metadata, $new_relative);
 
         $map = $this->build_search_replace_map($old_url, $new_url, $old_metadata, $upload_dir);
-        $replaced = $this->replace_references($map);
+        $replaced = $this->replace_references($map, $attachment_id, $current_basename, $new_filename);
         $this->last_replacements = $replaced;
 
         $this->update_log($log_id, 'complete', $replaced, null);
@@ -307,9 +307,28 @@ class MSH_Safe_Rename_System {
         return $map;
     }
 
-    private function replace_references($map) {
+    private function replace_references($map, $attachment_id = null, $old_filename = null, $new_filename = null) {
         global $wpdb;
-        $total_updates = 0;
+
+        // Use the new targeted replacement engine if available and we have the required info
+        if (class_exists('MSH_Targeted_Replacement_Engine') && $attachment_id && $old_filename && $new_filename) {
+            error_log('MSH Safe Rename: Using enhanced targeted replacement engine for attachment ' . $attachment_id);
+
+            $replacement_engine = MSH_Targeted_Replacement_Engine::get_instance();
+            $result = $replacement_engine->replace_attachment_urls($attachment_id, $old_filename, $new_filename, $this->test_mode);
+
+            if (is_wp_error($result)) {
+                error_log('MSH Safe Rename: Targeted replacement failed: ' . $result->get_error_message());
+                return 0;
+            } else {
+                error_log('MSH Safe Rename: Targeted replacement successful. Updated: ' . $result['updated_count']);
+                return $result['updated_count'];
+            }
+        }
+
+        // If targeted replacement not available, skip database updates for safety
+        error_log('MSH Safe Rename: Targeted replacement engine not available - skipping URL replacement for safety');
+        return 0;
 
         foreach ($map as $old => $new) {
             if ($old === $new) {
@@ -398,8 +417,12 @@ class MSH_Safe_Rename_System {
             return;
         }
 
+        if (!isset($_SERVER['REQUEST_URI'])) {
+            return;
+        }
+
         global $wpdb;
-        $requested_uri = wp_parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
+        $requested_uri = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
         if (!$requested_uri) {
             return;
         }

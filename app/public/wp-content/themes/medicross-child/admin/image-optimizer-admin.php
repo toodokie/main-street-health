@@ -43,6 +43,26 @@ class MSH_Image_Optimizer_Admin {
             '1.0.0',
             true
         );
+
+        // TEMPORARILY DISABLED: Enhanced UI files have syntax errors
+        // Will fix after testing core functionality
+        /*
+        wp_enqueue_script(
+            'msh-image-optimizer-rename-ui',
+            get_stylesheet_directory_uri() . '/assets/js/image-optimizer-rename-ui.js',
+            array('jquery'),
+            '1.0.0',
+            true
+        );
+
+        wp_enqueue_script(
+            'msh-image-optimizer-enhanced',
+            get_stylesheet_directory_uri() . '/assets/js/image-optimizer-enhanced.js',
+            array('jquery', 'msh-image-optimizer-admin', 'msh-image-optimizer-rename-ui'),
+            '1.0.0',
+            true
+        );
+        */
         
         wp_localize_script('msh-image-optimizer-admin', 'mshImageOptimizer', array(
             'ajaxurl' => admin_url('admin-ajax.php'),
@@ -132,6 +152,9 @@ class MSH_Image_Optimizer_Admin {
                         <strong>RECOMMENDED FIRST:</strong> Optimize your published images with WebP conversion, proper ALT text, and SEO improvements before cleaning duplicates.
                     </p>
                     <div class="action-buttons">
+                        <button id="build-usage-index" class="button" style="background: #5CB3CC; color: #ffffff; border: 1px solid #5CB3CC; margin-right: 10px;">
+                            <?php _e('🚀 Build Usage Index', 'medicross-child'); ?>
+                        </button>
                         <button id="analyze-images" class="button" style="background: #35332f; color: #ffffff; border: 1px solid #35332f;">
                             <?php _e('Analyze Published Images', 'medicross-child'); ?>
                         </button>

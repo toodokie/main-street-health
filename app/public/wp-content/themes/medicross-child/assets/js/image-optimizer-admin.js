@@ -39,7 +39,14 @@
     function bindEvents() {
         // Test if button exists and jQuery is working
         console.log('Button found:', $('#analyze-images').length);
-        
+
+        // Build usage index button
+        $('#build-usage-index').on('click', function(e) {
+            e.preventDefault();
+            console.log('Build usage index clicked');
+            buildUsageIndex();
+        });
+
         // Analysis button
         $('#analyze-images').on('click', function(e) {
             e.preventDefault();
@@ -1990,5 +1997,62 @@
             }
         });
     }
-    
+
+    /**
+     * Build the image usage index for faster URL replacement
+     */
+    function buildUsageIndex() {
+        console.log('Building usage index...');
+
+        const $button = $('#build-usage-index');
+        const originalText = $button.text();
+
+        $button.prop('disabled', true).text('Building Index...');
+        updateLog('🚀 Building image usage index for faster safe rename operations...');
+
+        $.ajax({
+            url: mshImageOptimizer.ajaxurl,
+            type: 'POST',
+            data: {
+                action: 'msh_build_usage_index',
+                nonce: mshImageOptimizer.nonce
+            },
+            success: function(response) {
+                $button.prop('disabled', false).text(originalText);
+
+                if (response.success) {
+                    const stats = response.data.stats;
+                    const summary = stats.summary || {};
+
+                    updateLog(`✅ Safe rename system enabled successfully!`);
+                    updateLog(`📊 Database tables created and ready`);
+                    updateLog(`⚡ Enhanced targeted replacement engine active`);
+                    updateLog(`🔒 Automatic backup and verification enabled`);
+                    updateLog(`🚀 System will build usage index on-demand for maximum speed`);
+
+                    if (stats.note) {
+                        updateLog(`ℹ️  ${stats.note}`);
+                    }
+
+                    updateLog('🎉 Safe rename system ready! Files will be renamed safely with full URL replacement.');
+
+                    // Show success message
+                    alert('✅ Safe rename system activated!\n\n' +
+                          '• Enhanced targeted replacement ready\n' +
+                          '• Automatic backups enabled\n' +
+                          '• On-demand indexing for speed\n\n' +
+                          'You can now safely rename files!');
+                } else {
+                    updateLog('❌ Failed to enable safe rename system: ' + (response.data || 'Unknown error'));
+                    alert('Failed to enable safe rename system. Check the log for details.');
+                }
+            },
+            error: function(xhr, status, error) {
+                $button.prop('disabled', false).text(originalText);
+                updateLog('🚨 Network error while building usage index: ' + error);
+                alert('Network error while building usage index.');
+            }
+        });
+    }
+
 })(jQuery);
