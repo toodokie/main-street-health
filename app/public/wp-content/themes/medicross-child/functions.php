@@ -70,7 +70,7 @@ require_once get_stylesheet_directory() . '/inc/class-msh-targeted-replacement-e
 require_once get_stylesheet_directory() . '/inc/msh-navigation-functions.php';
 
 MSH_Safe_Rename_System::get_instance();
-MSH_Image_Usage_Index::get_instance(); // Instantiate to register hooks and create table
+// TEMPORARILY DISABLED to fix site loading: MSH_Image_Usage_Index::get_instance();
 
 // Debug navigation menu URLs
 require_once get_stylesheet_directory() . '/debug-nav-menu-urls.php';

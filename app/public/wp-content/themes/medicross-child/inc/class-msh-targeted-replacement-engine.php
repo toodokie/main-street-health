@@ -15,9 +15,17 @@ class MSH_Targeted_Replacement_Engine {
     private $url_detector;
 
     private function __construct() {
-        $this->usage_index = MSH_Image_Usage_Index::get_instance();
+        // Lazy load these to avoid instantiation issues
+        $this->usage_index = null;
         $this->backup_system = MSH_Backup_Verification_System::get_instance();
         $this->url_detector = MSH_URL_Variation_Detector::get_instance();
+    }
+
+    private function get_usage_index() {
+        if ($this->usage_index === null) {
+            $this->usage_index = MSH_Image_Usage_Index::get_instance();
+        }
+        return $this->usage_index;
     }
 
     public static function get_instance() {
@@ -68,7 +76,7 @@ class MSH_Targeted_Replacement_Engine {
             }
 
             // Get targeted updates using fast index lookup (with fallback)
-            $targeted_updates = $this->usage_index->get_targeted_updates($attachment_id, $replacement_map);
+            $targeted_updates = $this->get_usage_index()->get_targeted_updates($attachment_id, $replacement_map);
 
             // Fallback to direct scanning if index is empty/missing
             if (empty($targeted_updates)) {
