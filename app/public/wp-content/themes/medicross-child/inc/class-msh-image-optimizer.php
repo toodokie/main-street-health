@@ -1954,33 +1954,30 @@ class MSH_Image_Optimizer {
             : ($context_info['type'] ?? $auto_context_value);
         $generated_meta = $this->contextual_meta_generator->generate_meta_fields($attachment_id, $context_info);
 
-        // Get existing suggestion or generate new one if needed
-        $suggested_filename = get_post_meta($attachment_id, '_msh_suggested_filename', true);
+        // Check if file already has SEO-optimized name FIRST
+        $path_info = pathinfo($current_file);
+        $extension = isset($path_info['extension']) ? strtolower($path_info['extension']) : '';
+        $current_basename = strtolower($path_info['basename']);
 
-        // Generate suggestion if it doesn't exist yet
-        if (empty($suggested_filename)) {
-            $path_info = pathinfo($current_file);
-            $extension = isset($path_info['extension']) ? strtolower($path_info['extension']) : '';
-            $current_basename = strtolower($path_info['basename']);
+        // If file already has good name, clear any existing suggestion and don't generate new one
+        $has_good_name = (strpos($current_basename, 'msh') !== false ||
+                         strpos($current_basename, 'hamilton') !== false ||
+                         strpos($current_basename, 'main-street-health') !== false);
 
-            error_log("MSH DEBUG: Analyzing file: $current_file");
-            error_log("MSH DEBUG: Extension detected: '$extension'");
-            error_log("MSH DEBUG: Basename: $current_basename");
+        if ($has_good_name) {
+            // Remove any existing suggestion for this already-optimized file
+            delete_post_meta($attachment_id, '_msh_suggested_filename');
+            $suggested_filename = ''; // No suggestion needed
+        } else {
+            // Get or generate suggestion for files that need renaming
+            $suggested_filename = get_post_meta($attachment_id, '_msh_suggested_filename', true);
 
-            // Skip if already has SEO-optimized name (contains 'msh' or 'hamilton')
-            $skip_suggestion = (strpos($current_basename, 'msh') !== false ||
-                               strpos($current_basename, 'hamilton') !== false ||
-                               strpos($current_basename, 'main-street-health') !== false);
-
-            error_log("MSH DEBUG: Skip suggestion? " . ($skip_suggestion ? 'YES' : 'NO'));
-
-            if (!$skip_suggestion && !empty($extension)) {
+            // Generate suggestion if it doesn't exist yet
+            if (empty($suggested_filename) && !empty($extension)) {
                 $slug = $this->contextual_meta_generator->generate_filename_slug($attachment_id, $context_info, $extension);
-                error_log("MSH DEBUG: Generated slug: '$slug'");
 
                 if (!empty($slug)) {
                     $suggested_filename = $this->ensure_unique_filename($slug, $extension, $attachment_id);
-                    error_log("MSH DEBUG: Final suggestion: '$suggested_filename'");
                     update_post_meta($attachment_id, '_msh_suggested_filename', $suggested_filename);
                     update_post_meta($attachment_id, 'msh_filename_last_suggested', time());
                 }
@@ -3522,12 +3519,6 @@ class MSH_Image_Optimizer {
             return;
         }
 
-        // Skip if already has a suggestion
-        $existing_suggestion = get_post_meta($attachment_id, '_msh_suggested_filename', true);
-        if (!empty($existing_suggestion)) {
-            return;
-        }
-
         // Get current filename and extension
         $current_file = get_attached_file($attachment_id);
         if (!$current_file) {
@@ -3535,12 +3526,21 @@ class MSH_Image_Optimizer {
         }
 
         $path_info = pathinfo($current_file);
-        $extension = strtolower($path_info['extension']);
-        $current_basename = $path_info['basename'];
+        $extension = isset($path_info['extension']) ? strtolower($path_info['extension']) : '';
+        $current_basename = strtolower($path_info['basename']);
 
         // Skip if already has an SEO-optimized name (contains 'msh' or 'hamilton')
-        if (strpos(strtolower($current_basename), 'msh') !== false ||
-            strpos(strtolower($current_basename), 'hamilton') !== false) {
+        $has_good_name = (strpos($current_basename, 'msh') !== false ||
+                         strpos($current_basename, 'hamilton') !== false ||
+                         strpos($current_basename, 'main-street-health') !== false);
+
+        if ($has_good_name || empty($extension)) {
+            return; // Don't generate suggestions for good files or files without extensions
+        }
+
+        // Skip if already has a suggestion
+        $existing_suggestion = get_post_meta($attachment_id, '_msh_suggested_filename', true);
+        if (!empty($existing_suggestion)) {
             return;
         }
 
