@@ -1955,6 +1955,7 @@ class MSH_Image_Optimizer {
         $generated_meta = $this->contextual_meta_generator->generate_meta_fields($attachment_id, $context_info);
 
         // Check if file already has SEO-optimized name FIRST
+        $current_file = $file_path; // Use the correct variable name
         $path_info = pathinfo($current_file);
         $extension = isset($path_info['extension']) ? strtolower($path_info['extension']) : '';
         $current_basename = strtolower($path_info['basename']);
