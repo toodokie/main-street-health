@@ -3463,27 +3463,45 @@ class MSH_Image_Optimizer {
             wp_die('Unauthorized');
         }
 
-        @set_time_limit(60); // Shorter timeout
-        @ini_set('memory_limit', '512M'); // Increase memory
+        @set_time_limit(300); // 5 minutes
+        @ini_set('memory_limit', '512M');
 
-        // SIMPLIFIED: Just create tables and enable the system
+        // Create tables first
         $this->ensure_safe_rename_tables();
+
+        // Get usage index instance
+        $usage_index = MSH_Image_Usage_Index::get_instance();
+
+        // Check current index status first
+        $stats = $usage_index->get_index_stats();
+        $current_entries = $stats['summary']->total_entries ?? 0;
+
+        if ($current_entries > 0) {
+            // Index already has data, return current stats
+            wp_send_json_success([
+                'message' => 'Usage index already exists with ' . $current_entries . ' entries.',
+                'processed_attachments' => $stats['summary']->indexed_attachments ?? 0,
+                'stats' => $stats,
+                'status' => 'already_built'
+            ]);
+            return;
+        }
+
+        // Build the index with small batch size for better performance
+        error_log('MSH Index Build: Starting index build process');
+        $processed = $usage_index->build_complete_index(25); // Small batches
+
+        // Get final stats
+        $final_stats = $usage_index->get_index_stats();
 
         // Mark system as ready
         update_option('msh_safe_rename_enabled', '1');
 
         wp_send_json_success([
-            'message' => 'Safe rename system enabled! Tables created successfully.',
-            'processed_attachments' => 0,
-            'stats' => [
-                'summary' => [
-                    'total_entries' => 0,
-                    'indexed_attachments' => 0,
-                    'unique_locations' => 0,
-                    'last_update' => current_time('mysql')
-                ],
-                'note' => 'System will build index on-demand during renames for better performance'
-            ]
+            'message' => 'Usage index built successfully! Processed ' . $processed . ' attachments.',
+            'processed_attachments' => $processed,
+            'stats' => $final_stats,
+            'status' => 'newly_built'
         ]);
     }
 

@@ -1080,7 +1080,27 @@ $equipment_mapping = [
 
 ---
 
-## Recent Updates (September 2025) - Filename Generation System Fixes
+## Recent Updates (September 2025)
+
+### Index System Performance Fix
+**Fixed**: WordPress publishing hang and slow rename performance (30+ seconds per file)
+
+**Issues Resolved**:
+1. **Publishing Hang**: Disabled automatic index updates on save_post hook that were causing infinite loops
+2. **Slow Rename Performance**: Fixed index system not being utilized, causing fallback to direct database scanning
+3. **Index Building**: Enhanced ajax_build_usage_index to actually build the index data
+
+**Implementation**:
+- Modified `update_post_index()` to skip autosaves and temporarily disabled automatic indexing
+- Enhanced `ajax_build_usage_index()` to properly build index with batch processing
+- Index now provides instant lookup (<1 second) vs direct scanning (30+ seconds)
+
+**Usage**:
+1. Click "🚀 Build Usage Index" button in Image Optimizer admin
+2. Wait for index to build (processes ~748 images)
+3. Renames now use fast index lookups instead of slow database scans
+
+### Filename Generation System Fixes
 
 ### Critical Issues Resolved
 

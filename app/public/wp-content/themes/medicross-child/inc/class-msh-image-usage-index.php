@@ -449,6 +449,28 @@ class MSH_Image_Usage_Index {
      * Update post index when a post is saved
      */
     public function update_post_index($post_id) {
+        // Skip for autosaves, revisions, and during imports
+        if (wp_is_post_autosave($post_id) || wp_is_post_revision($post_id)) {
+            return;
+        }
+
+        // Skip if doing autosave
+        if (defined('DOING_AUTOSAVE') && DOING_AUTOSAVE) {
+            return;
+        }
+
+        // Skip if index table doesn't exist yet
+        global $wpdb;
+        $table_exists = $wpdb->get_var("SHOW TABLES LIKE '{$this->index_table}'");
+        if (!$table_exists) {
+            return;
+        }
+
+        // TEMPORARY: Disable automatic indexing to fix publishing hang
+        // The index will be built manually via the admin button instead
+        return;
+
+        // Original code (disabled to prevent hang):
         // Get all attachments used in this post
         $content = get_post_field('post_content', $post_id);
         $excerpt = get_post_field('post_excerpt', $post_id);
