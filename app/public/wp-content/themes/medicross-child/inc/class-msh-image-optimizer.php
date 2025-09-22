@@ -1503,6 +1503,7 @@ class MSH_Image_Optimizer {
         add_action('wp_ajax_msh_save_edited_meta', array($this, 'ajax_save_edited_meta'));
         add_action('wp_ajax_msh_update_context', array($this, 'ajax_update_context'));
         add_action('wp_ajax_msh_build_usage_index', array($this, 'ajax_build_usage_index'));
+        add_action('wp_ajax_msh_clear_bad_suggestions', array($this, 'ajax_clear_bad_suggestions'));
 
         $this->contextual_meta_generator = new MSH_Contextual_Meta_Generator();
 
@@ -1957,15 +1958,24 @@ class MSH_Image_Optimizer {
         $suggested_filename = get_post_meta($attachment_id, '_msh_suggested_filename', true);
 
         // Generate suggestion if it doesn't exist yet
-        if (empty($suggested_filename) && !$is_svg) {
+        if (empty($suggested_filename)) {
             $path_info = pathinfo($current_file);
             $extension = strtolower($path_info['extension']);
-            $slug = $this->contextual_meta_generator->generate_filename_slug($attachment_id, $context_info, $extension);
+            $current_basename = strtolower($path_info['basename']);
 
-            if (!empty($slug)) {
-                $suggested_filename = $this->ensure_unique_filename($slug, $extension, $attachment_id);
-                update_post_meta($attachment_id, '_msh_suggested_filename', $suggested_filename);
-                update_post_meta($attachment_id, 'msh_filename_last_suggested', time());
+            // Skip if already has SEO-optimized name (contains 'msh' or 'hamilton')
+            $skip_suggestion = (strpos($current_basename, 'msh') !== false ||
+                               strpos($current_basename, 'hamilton') !== false ||
+                               strpos($current_basename, 'main-street-health') !== false);
+
+            if (!$skip_suggestion) {
+                $slug = $this->contextual_meta_generator->generate_filename_slug($attachment_id, $context_info, $extension);
+
+                if (!empty($slug)) {
+                    $suggested_filename = $this->ensure_unique_filename($slug, $extension, $attachment_id);
+                    update_post_meta($attachment_id, '_msh_suggested_filename', $suggested_filename);
+                    update_post_meta($attachment_id, 'msh_filename_last_suggested', time());
+                }
             }
         }
 
@@ -3469,6 +3479,42 @@ class MSH_Image_Optimizer {
             'message' => 'Meta text updated successfully',
             'updates_made' => $updates_made,
             'image_id' => $image_id
+        ]);
+    }
+
+    /**
+     * Clear bad suggestions (missing extensions or for already-renamed files)
+     */
+    public function ajax_clear_bad_suggestions() {
+        check_ajax_referer('msh_image_optimizer', 'nonce');
+        if (!current_user_can('manage_options')) {
+            wp_die('Unauthorized');
+        }
+
+        global $wpdb;
+
+        // Remove suggestions without extensions
+        $bad_count = $wpdb->query("
+            DELETE pm FROM {$wpdb->postmeta} pm
+            WHERE pm.meta_key = '_msh_suggested_filename'
+            AND pm.meta_value NOT REGEXP '\\.(jpg|png|svg|gif|webp)$'
+        ");
+
+        // Remove suggestions for already SEO-optimized files
+        $optimized_count = $wpdb->query("
+            DELETE pm FROM {$wpdb->postmeta} pm
+            JOIN {$wpdb->postmeta} pm2 ON pm.post_id = pm2.post_id
+            WHERE pm.meta_key = '_msh_suggested_filename'
+            AND pm2.meta_key = '_wp_attached_file'
+            AND (LOWER(pm2.meta_value) LIKE '%hamilton%'
+                 OR LOWER(pm2.meta_value) LIKE '%msh%'
+                 OR LOWER(pm2.meta_value) LIKE '%main-street-health%')
+        ");
+
+        wp_send_json_success([
+            'message' => "Cleared {$bad_count} bad suggestions and {$optimized_count} suggestions for already-optimized files.",
+            'bad_removed' => $bad_count,
+            'optimized_removed' => $optimized_count
         ]);
     }
 
