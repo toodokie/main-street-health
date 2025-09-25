@@ -34,6 +34,10 @@ pxl_add_custom_widget(
                                     'label' => esc_html__('Layout 2', 'medicross' ),
                                     'image' => get_template_directory_uri() . '/elements/widgets/img-layout/pxl_team_carousel/layout2.jpg'
                                 ],
+                                '3' => [
+                                    'label' => esc_html__('Layout 3 (MSH Style)', 'medicross' ),
+                                    'image' => get_template_directory_uri() . '/elements/widgets/img-layout/pxl_team_carousel/layout1.jpg'
+                                ],
                             ],
                         ),
                     ),
@@ -135,6 +139,51 @@ pxl_add_custom_widget(
                                 ),
                             ),
                             'title_field' => '{{{ title2 }}}',
+                        ),
+                    ),
+                ),
+                array(
+                    'name' => 'tab_content3',
+                    'label' => esc_html__('Content', 'medicross'),
+                    'tab' => \Elementor\Controls_Manager::TAB_CONTENT,
+                    'condition' => [
+                        'layout' => '3'
+                    ],
+                    'controls' => array(
+                        array(
+                            'name' => 'team3',
+                            'label' => esc_html__('Team Members', 'medicross'),
+                            'type' => \Elementor\Controls_Manager::REPEATER,
+                            'controls' => array(
+                                array(
+                                    'name' => 'image3',
+                                    'label' => esc_html__('Image', 'medicross' ),
+                                    'type' => \Elementor\Controls_Manager::MEDIA,
+                                ),
+                                array(
+                                    'name' => 'title3',
+                                    'label' => esc_html__('Name', 'medicross'),
+                                    'type' => \Elementor\Controls_Manager::TEXT,
+                                    'label_block' => true,
+                                ),
+                                array(
+                                    'name' => 'position3',
+                                    'label' => esc_html__('Position', 'medicross'),
+                                    'type' => \Elementor\Controls_Manager::TEXT,
+                                ),
+                                array(
+                                    'name' => 'desc3',
+                                    'label' => esc_html__('Description', 'medicross'),
+                                    'type' => \Elementor\Controls_Manager::TEXTAREA,
+                                ),
+                                array(
+                                    'name' => 'item_link3',
+                                    'label' => esc_html__('Link', 'medicross'),
+                                    'type' => \Elementor\Controls_Manager::URL,
+                                    'label_block' => true,
+                                ),
+                            ),
+                            'title_field' => '{{{ title3 }}}',
                         ),
                     ),
                 ),

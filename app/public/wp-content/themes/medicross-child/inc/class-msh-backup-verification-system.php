@@ -191,12 +191,27 @@ class MSH_Backup_Verification_System {
     /**
      * Verify that replacement was successful
      */
-    public function verify_replacement($operation_id, $attachment_id, $replacement_map) {
+    public function verify_replacement($operation_id, $attachment_id, $replacement_map, $targeted_updates = null) {
         global $wpdb;
+
+        error_log('MSH VERIFICATION DEBUG: Starting verification for operation ' . $operation_id . ', attachment ' . $attachment_id);
+        error_log('MSH VERIFICATION DEBUG: Replacement map: ' . print_r($replacement_map, true));
+        error_log('MSH VERIFICATION DEBUG: TARGETED UPDATES PARAMETER: ' . ($targeted_updates === null ? 'NULL' : (is_array($targeted_updates) ? count($targeted_updates) . ' items' : 'NOT ARRAY')));
+        if ($targeted_updates && is_array($targeted_updates)) {
+            error_log('MSH VERIFICATION DEBUG: WILL USE TARGETED VERIFICATION');
+        } else {
+            error_log('MSH VERIFICATION DEBUG: WILL USE GLOBAL VERIFICATION - THIS IS THE PROBLEM!');
+        }
+        error_log('MSH VERIFICATION DEBUG: Targeted updates parameter debug: ' . ($targeted_updates === null ? 'NULL' : (is_array($targeted_updates) ? 'ARRAY with ' . count($targeted_updates) . ' items' : 'NOT ARRAY: ' . print_r($targeted_updates, true))));
 
         $verification_results = [];
         $success_count = 0;
         $error_count = 0;
+
+        // If we have targeted updates, verify only those specific rows
+        if ($targeted_updates && is_array($targeted_updates)) {
+            return $this->verify_targeted_updates($operation_id, $attachment_id, $targeted_updates, $replacement_map);
+        }
 
         // Verify posts table
         foreach (array_keys($replacement_map) as $old_url) {
@@ -209,11 +224,15 @@ class MSH_Backup_Verification_System {
                 WHERE post_content LIKE %s OR post_excerpt LIKE %s
             ", $like, $like));
 
+            error_log('MSH VERIFICATION DEBUG: Posts table - Old URL: ' . $old_url . ', Remaining count: ' . $remaining);
+
             $status = $remaining > 0 ? 'failed' : 'success';
             if ($status === 'failed') {
                 $error_count++;
+                error_log('MSH VERIFICATION DEBUG: Posts verification FAILED - ' . $remaining . ' occurrences still found');
             } else {
                 $success_count++;
+                error_log('MSH VERIFICATION DEBUG: Posts verification SUCCESS - no occurrences found');
             }
 
             $wpdb->insert($this->verification_table, [
@@ -257,11 +276,15 @@ class MSH_Backup_Verification_System {
                     WHERE {$value_column} LIKE %s
                 ", $like));
 
+                error_log('MSH VERIFICATION DEBUG: ' . $table_name . ' table - Old URL: ' . $old_url . ', Remaining count: ' . $remaining);
+
                 $status = $remaining > 0 ? 'failed' : 'success';
                 if ($status === 'failed') {
                     $error_count++;
+                    error_log('MSH VERIFICATION DEBUG: ' . $table_name . ' verification FAILED - ' . $remaining . ' occurrences still found');
                 } else {
                     $success_count++;
+                    error_log('MSH VERIFICATION DEBUG: ' . $table_name . ' verification SUCCESS - no occurrences found');
                 }
 
                 $wpdb->insert($this->verification_table, [
@@ -283,8 +306,84 @@ class MSH_Backup_Verification_System {
             }
         }
 
+        $overall_status = $error_count === 0 ? 'success' : 'failed';
+        error_log('MSH VERIFICATION DEBUG: FINAL RESULT - Overall status: ' . $overall_status . ', Success: ' . $success_count . ', Errors: ' . $error_count);
+
         return [
-            'overall_status' => $error_count === 0 ? 'success' : 'failed',
+            'overall_status' => $overall_status,
+            'success_count' => $success_count,
+            'error_count' => $error_count,
+            'details' => $verification_results
+        ];
+    }
+
+    /**
+     * Verify only the targeted database rows that were updated (precise verification)
+     */
+    private function verify_targeted_updates($operation_id, $attachment_id, $targeted_updates, $replacement_map) {
+        global $wpdb;
+
+        error_log('MSH VERIFICATION DEBUG: TARGETED VERIFICATION - Checking only ' . count($targeted_updates) . ' specific rows');
+
+        $verification_results = [];
+        $success_count = 0;
+        $error_count = 0;
+
+        foreach ($targeted_updates as $update) {
+            $table = $update['table'];
+            $id_column = $update['id_column'];
+            $row_id = $update['row_id'];
+            $column = $update['column'];
+            $old_value = $update['old_value'];
+            $new_value = $update['new_value'];
+
+            error_log('MSH VERIFICATION DEBUG: Checking row ' . $row_id . ' in ' . $table . '.' . $column);
+
+            // Check if this specific row still contains the old URL
+            $current_value = $wpdb->get_var($wpdb->prepare("
+                SELECT {$column}
+                FROM {$table}
+                WHERE {$id_column} = %d
+            ", $row_id));
+
+            $still_contains_old = (strpos($current_value, $old_value) !== false);
+
+            if ($still_contains_old) {
+                $error_count++;
+                $status = 'failed';
+                error_log('MSH VERIFICATION DEBUG: FAILED - Row ' . $row_id . ' still contains old URL: ' . $old_value);
+            } else {
+                $success_count++;
+                $status = 'success';
+                error_log('MSH VERIFICATION DEBUG: SUCCESS - Row ' . $row_id . ' was updated correctly');
+            }
+
+            $wpdb->insert($this->verification_table, [
+                'operation_id' => $operation_id,
+                'attachment_id' => $attachment_id,
+                'check_type' => 'targeted_' . $table,
+                'expected_value' => 'Row ' . $row_id . ' updated from ' . $old_value . ' to ' . $new_value,
+                'actual_value' => $still_contains_old ? 'Still contains old URL' : 'Successfully updated',
+                'status' => $status,
+                'error_message' => $status === 'failed' ? 'Targeted update failed for row ' . $row_id : null
+            ]);
+
+            $verification_results[] = [
+                'type' => 'targeted_update',
+                'table' => $table,
+                'row_id' => $row_id,
+                'column' => $column,
+                'old_value' => $old_value,
+                'new_value' => $new_value,
+                'status' => $status
+            ];
+        }
+
+        $overall_status = $error_count === 0 ? 'success' : 'failed';
+        error_log('MSH VERIFICATION DEBUG: TARGETED VERIFICATION RESULT - Overall status: ' . $overall_status . ', Success: ' . $success_count . ', Errors: ' . $error_count);
+
+        return [
+            'overall_status' => $overall_status,
             'success_count' => $success_count,
             'error_count' => $error_count,
             'details' => $verification_results

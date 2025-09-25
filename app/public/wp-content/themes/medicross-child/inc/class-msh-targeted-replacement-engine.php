@@ -75,11 +75,42 @@ class MSH_Targeted_Replacement_Engine {
                 $results['backup_count'] = $this->backup_system->create_backup($operation_id, $attachment_id, $replacement_map);
             }
 
-            // Get targeted updates using fast index lookup (with fallback)
-            $targeted_updates = $this->get_usage_index()->get_targeted_updates($attachment_id, $replacement_map);
+            // Get targeted updates using fast index lookup (with extensive debugging)
+            error_log('MSH INDEX DEBUG: Starting index lookup for attachment ' . $attachment_id);
+
+            $usage_index = $this->get_usage_index();
+            error_log('MSH INDEX DEBUG: Got usage index instance: ' . (is_object($usage_index) ? 'SUCCESS' : 'FAILED'));
+
+            $targeted_updates = $usage_index->get_targeted_updates($attachment_id, $replacement_map);
+            error_log('MSH INDEX DEBUG: get_targeted_updates returned ' . count($targeted_updates) . ' results');
+
+            if (!empty($targeted_updates)) {
+                error_log('MSH INDEX DEBUG: Using index data - found ' . count($targeted_updates) . ' targeted updates');
+                foreach ($targeted_updates as $i => $update) {
+                    error_log('MSH INDEX DEBUG: Update ' . ($i+1) . ': ' . $update['table'] . '.' . $update['column'] . ' row_id=' . $update['row_id']);
+                }
+            }
 
             // Fallback to direct scanning if index is empty/missing
             if (empty($targeted_updates)) {
+                error_log('MSH INDEX DEBUG: ❌ INDEX FAILED - No results from index lookup');
+                error_log('MSH INDEX DEBUG: Checking why index is empty...');
+
+                // Debug the index state
+                global $wpdb;
+                $index_table = $wpdb->prefix . 'msh_image_usage_index';
+                $total_entries = $wpdb->get_var("SELECT COUNT(*) FROM {$index_table}");
+                $attachment_entries = $wpdb->get_var($wpdb->prepare("SELECT COUNT(*) FROM {$index_table} WHERE attachment_id = %d", $attachment_id));
+
+                error_log('MSH INDEX DEBUG: Index table total entries: ' . $total_entries);
+                error_log('MSH INDEX DEBUG: Entries for attachment ' . $attachment_id . ': ' . $attachment_entries);
+
+                if ($attachment_entries > 0) {
+                    $sample_entries = $wpdb->get_results($wpdb->prepare("SELECT * FROM {$index_table} WHERE attachment_id = %d LIMIT 3", $attachment_id));
+                    error_log('MSH INDEX DEBUG: Sample index entries: ' . print_r($sample_entries, true));
+                    error_log('MSH INDEX DEBUG: Replacement map keys: ' . implode(', ', array_keys($replacement_map)));
+                }
+
                 error_log('MSH Safe Rename: Index empty, falling back to direct scanning for attachment ' . $attachment_id);
                 $targeted_updates = $this->get_targeted_updates_direct($attachment_id, $replacement_map);
             }
@@ -97,9 +128,20 @@ class MSH_Targeted_Replacement_Engine {
                 }
             }
 
+            // Debug before verification check
+            error_log('MSH REPLACEMENT DEBUG: Verification check - test_mode: ' . ($test_mode ? 'TRUE' : 'FALSE') . ', error_count: ' . $results['error_count']);
+
             // Perform verification if not in test mode
             if (!$test_mode && $results['error_count'] === 0) {
-                $verification = $this->backup_system->verify_replacement($operation_id, $attachment_id, $replacement_map);
+                error_log('MSH REPLACEMENT DEBUG: ✅ PROCEEDING WITH VERIFICATION');
+                error_log('MSH REPLACEMENT DEBUG: About to call verification with targeted_updates: ' . (empty($targeted_updates) ? 'EMPTY' : count($targeted_updates) . ' items'));
+                if (!empty($targeted_updates)) {
+                    foreach ($targeted_updates as $i => $update) {
+                        error_log('MSH REPLACEMENT DEBUG: Update ' . ($i+1) . ': ' . $update['table'] . '.' . $update['column'] . ' row_id=' . $update['row_id']);
+                    }
+                }
+                // Pass the targeted updates list to verification for precise checking
+                $verification = $this->backup_system->verify_replacement($operation_id, $attachment_id, $replacement_map, $targeted_updates);
                 $results['verification'] = $verification;
 
                 // If verification failed, restore backup
@@ -108,6 +150,8 @@ class MSH_Targeted_Replacement_Engine {
                     $results['backup_restored'] = $restored;
                     return new WP_Error('verification_failed', 'Replacement verification failed, backup restored', $results);
                 }
+            } else {
+                error_log('MSH REPLACEMENT DEBUG: ❌ SKIPPING VERIFICATION - test_mode: ' . ($test_mode ? 'TRUE' : 'FALSE') . ', error_count: ' . $results['error_count']);
             }
 
         } catch (Exception $e) {
@@ -208,6 +252,8 @@ class MSH_Targeted_Replacement_Engine {
     private function perform_targeted_update($update, $test_mode = false) {
         global $wpdb;
 
+        error_log('MSH REPLACEMENT DEBUG: Performing update on ' . $update['table'] . ' row ' . $update['row_id'] . ' (test_mode: ' . ($test_mode ? 'TRUE' : 'FALSE') . ')');
+
         $result = [
             'success' => false,
             'table' => $update['table'],
@@ -228,6 +274,7 @@ class MSH_Targeted_Replacement_Engine {
 
             if ($current_value === null) {
                 $result['error'] = 'Row not found';
+                error_log('MSH REPLACEMENT DEBUG: ❌ ERROR - Row not found: ' . $update['table'] . ' row ' . $update['row_id']);
                 return $result;
             }
 
@@ -252,6 +299,7 @@ class MSH_Targeted_Replacement_Engine {
 
                 if ($updated === false) {
                     $result['error'] = 'Database update failed: ' . $wpdb->last_error;
+                    error_log('MSH REPLACEMENT DEBUG: ❌ ERROR - Database update failed: ' . $wpdb->last_error . ' (table: ' . $update['table'] . ', row: ' . $update['row_id'] . ')');
                     return $result;
                 }
             }
@@ -259,9 +307,11 @@ class MSH_Targeted_Replacement_Engine {
             $result['success'] = true;
             $result['message'] = $test_mode ? 'Would update' : 'Updated successfully';
             $result['changes_made'] = substr_count($current_value, $update['old_value']);
+            error_log('MSH REPLACEMENT DEBUG: ✅ SUCCESS - ' . $result['message'] . ' (changes: ' . $result['changes_made'] . ')');
 
         } catch (Exception $e) {
             $result['error'] = $e->getMessage();
+            error_log('MSH REPLACEMENT DEBUG: ❌ EXCEPTION - ' . $e->getMessage() . ' (table: ' . $update['table'] . ', row: ' . $update['row_id'] . ')');
         }
 
         return $result;

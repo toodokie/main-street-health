@@ -19,10 +19,10 @@ class MSH_WebP_Delivery {
         add_filter('the_content', array($this, 'replace_images_in_content'), 99);
         add_filter('post_thumbnail_html', array($this, 'replace_images_in_html'), 99);
         add_filter('get_header_image', array($this, 'maybe_serve_webp_header'));
-        
+
         // Add WebP support detection script
         add_action('wp_head', array($this, 'add_webp_detection_script'), 1);
-        
+
         // Handle AJAX detection fallback
         add_action('wp_ajax_msh_detect_webp', array($this, 'ajax_detect_webp'));
         add_action('wp_ajax_nopriv_msh_detect_webp', array($this, 'ajax_detect_webp'));
@@ -35,31 +35,31 @@ class MSH_WebP_Delivery {
         if ($this->webp_support !== null) {
             return $this->webp_support;
         }
-        
+
         // Check if already detected via cookie
         if (isset($_COOKIE['webp_support'])) {
             $this->webp_support = ($_COOKIE['webp_support'] === '1');
             return $this->webp_support;
         }
-        
+
         // Check Accept header (fallback)
-        if (isset($_SERVER['HTTP_ACCEPT']) && 
+        if (isset($_SERVER['HTTP_ACCEPT']) &&
             strpos($_SERVER['HTTP_ACCEPT'], 'image/webp') !== false) {
             $this->webp_support = true;
             return $this->webp_support;
         }
-        
+
         // Check User-Agent for known WebP support
         if (isset($_SERVER['HTTP_USER_AGENT'])) {
             $user_agent = $_SERVER['HTTP_USER_AGENT'];
-            
+
             // Chrome, Edge, Firefox, Opera support WebP
             if (preg_match('/(Chrome|Chromium|Edge|Firefox|Opera)/', $user_agent)) {
                 $this->webp_support = true;
                 return $this->webp_support;
             }
         }
-        
+
         // Default to false for safety
         $this->webp_support = false;
         return $this->webp_support;
@@ -90,24 +90,24 @@ class MSH_WebP_Delivery {
         if (!$this->browser_supports_webp()) {
             return $image_path;
         }
-        
+
         // Skip SVG files
         if (preg_match('/\.svg$/i', $image_path)) {
             return $image_path;
         }
-        
+
         // Only convert jpg, jpeg, png
         if (!preg_match('/\.(jpg|jpeg|png)$/i', $image_path)) {
             return $image_path;
         }
-        
+
         $webp_path = preg_replace('/\.(jpg|jpeg|png)$/i', '.webp', $image_path);
-        
+
         // Check if WebP version exists
         if ($this->webp_exists($image_path)) {
             return $webp_path;
         }
-        
+
         return $image_path; // Fallback to original
     }
     
@@ -118,7 +118,7 @@ class MSH_WebP_Delivery {
         if (!$image || !is_array($image)) {
             return $image;
         }
-        
+
         $image[0] = $this->get_webp_path($image[0]);
         return $image;
     }

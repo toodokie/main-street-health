@@ -188,9 +188,9 @@ class MSH_Contextual_Meta_Generator {
             $asset_type = $this->detect_asset_type(strtolower(trim(($context['attachment_title'] ?? '') . ' ' . $file_basename . ' ' . ($context['page_title'] ?? ''))));
 
             // IMPORTANT: Don't override icon context that was already set by detect_icon_context
-            if ($context['type'] === 'icon') {
-                error_log("MSH Context Debug: Preserving icon context for '$file_basename', not applying asset type '$asset_type'");
-                // Don't apply any asset type overrides - keep as icon
+            if ($context['type'] === 'service-icon') {
+                // Debug disabled for performance
+                // Don't apply any asset type overrides - keep as service-icon
             } elseif ($asset_type === 'logo' && $context['type'] === 'clinical') {
                 $context['type'] = 'business';
                 $context['asset'] = 'logo';
@@ -545,7 +545,17 @@ class MSH_Contextual_Meta_Generator {
         $caption = strtolower((string) get_post_field('post_excerpt', $attachment_id));
         $combined = $filename . ' ' . $title . ' ' . $caption . ' ' . $directory;
 
+        // Primary icon detection - be more aggressive with SVGs
         $icon_keyword = preg_match('/icon|\.svg$|\/icons\//', $combined);
+
+        // ENHANCED: Auto-detect all SVG files as potential icons (with size check)
+        if (strpos($filename, '.svg') !== false) {
+            // Most SVGs under 300x300 are likely icons
+            if (($width > 0 && $height > 0 && $width <= 300 && $height <= 300) || ($width == 0 && $height == 0)) {
+                $icon_keyword = 1;
+                error_log("MSH Icon Debug: Auto-detected SVG as icon: '$filename' (size: {$width}x{$height})");
+            }
+        }
         $concept_keyword = preg_match('/(chronic[-_ ]?pain|sport[-_ ]?injur|work[-_ ]?related[-_ ]?injur|workplace[-_ ]?injur|motor[-_ ]?icon|vehicle[-_ ]?icon|accident|wsib|program)/', $combined);
 
         // Force healthcare equipment SVGs to be treated as icons
@@ -564,7 +574,7 @@ class MSH_Contextual_Meta_Generator {
 
         // Debug SVG icon detection
         if (strpos($filename, '.svg') !== false) {
-            error_log("MSH Icon Debug: SVG file '$filename', Combined='$combined', IconKeyword=$icon_keyword, ConceptKeyword=$concept_keyword");
+            // Debug disabled for performance
 
         }
 
@@ -589,7 +599,14 @@ class MSH_Contextual_Meta_Generator {
             $category = 'team';
         }
 
+        // First try to extract clean concept from Noun Project filenames
         $concept_source = $context['attachment_slug'] ?? pathinfo($filename, PATHINFO_FILENAME);
+
+        // Check if this is a Noun Project file and extract the clean term
+        if (preg_match('/^noun-(.+)-\d{4,7}-[A-F0-9]{6}/i', $filename, $matches)) {
+            $concept_source = $matches[1]; // Extract just the concept part (e.g., "foot-bandage")
+            error_log("MSH Icon Debug: Extracted Noun Project concept: '$concept_source' from '$filename'");
+        }
 
         // If still no obvious concept, try inferring from service keywords
         if (!$icon_keyword) {
@@ -605,7 +622,7 @@ class MSH_Contextual_Meta_Generator {
         list($concept_slug, $concept_label) = $this->normalize_icon_concept($concept_source);
 
         return [
-            'type' => 'icon',
+            'type' => 'service-icon',
             'icon_type' => $category,
             'icon_concept' => $concept_slug,
             'icon_concept_label' => $concept_label,
@@ -621,7 +638,7 @@ class MSH_Contextual_Meta_Generator {
 
         $patterns = [
             'logo' => '/\b(logo|brandmark|wordmark|seal|badge)\b/i',
-            'icon' => '/\b(icon|symbol|glyph|badge)\b/i',
+            'icon' => '/\b(icon|symbol|glyph|badge|\.svg)\b/i',  // Enhanced: Include .svg extension
             'frame' => '/\b(frame|border|template|layout|mockup)\b/i',
             'product' => '/\b(pillow|brace|support|sleeve|wrap|tens|biofreeze|orthotic|stocking|pillow|equipment|device|gel|cream)\b/i',
             'equipment' => '/\b(machine|table|apparatus|equipment|device|tool)\b/i',
@@ -674,13 +691,16 @@ class MSH_Contextual_Meta_Generator {
     }
 
     public function generate_meta_fields($attachment_id, array $context) {
+        error_log("MSH Meta Generation: Type='{$context['type']}', attachment_id=$attachment_id, title='{$context['attachment_title']}'");
+
         switch ($context['type']) {
             case 'team':
                 return $this->generate_team_meta($context);
             case 'testimonial':
                 return $this->generate_testimonial_meta($context);
             case 'icon':
-                return $this->generate_icon_meta($context);
+                // Legacy fallback - redirect to service-icon
+                return $this->generate_service_icon_meta($context);
             case 'service-icon':
                 return $this->generate_service_icon_meta($context);
             case 'facility':
@@ -702,7 +722,7 @@ class MSH_Contextual_Meta_Generator {
     }
 
     public function generate_filename_slug($attachment_id, array $context, $extension = null) {
-        error_log("MSH Context Debug: AttachmentID=$attachment_id, Type='{$context['type']}', Extension='$extension', Original='{$context['original_filename']}'");
+        // Debug disabled for performance
 
 
         switch ($context['type']) {
@@ -713,32 +733,15 @@ class MSH_Contextual_Meta_Generator {
                 $subject_slug = !empty($context['attachment_slug']) ? $this->truncate_slug($context['attachment_slug'], 3) : 'patient';
                 return $this->slugify('patient-testimonial-' . $subject_slug . '-' . $this->location_slug);
             case 'icon':
-                // Smart filename extraction from original name
-                $original_filename = $context['original_filename'] ?? '';
-                $extracted_keywords = $this->extract_filename_keywords($original_filename);
-
-                error_log("MSH Debug Icon Case: Original='$original_filename', Extracted='$extracted_keywords'");
-
-                $concept_source = '';
-                if (!empty($extracted_keywords)) {
-                    $concept_source = $extracted_keywords;
-                } else {
-                    $concept_source = $context['icon_concept'] ?? $context['attachment_slug'] ?? 'service';
-                }
-
-                $concept = $this->slugify($concept_source);
-                if ($concept === '') {
-                    $concept = 'service';
-                }
-
-                error_log("MSH Debug Icon Case: Final concept='$concept', Result='" . $concept . '-icon-' . $this->location_slug . "'");
-                return $this->slugify($concept . '-icon-' . $this->location_slug);
+                // Legacy fallback - redirect to service-icon processing
+                $context['type'] = 'service-icon';
+                return $this->generate_filename_slug($context);
             case 'service-icon':
                 // FIRST: Try filename extraction for high-quality names (same as icon case)
                 $original_filename = $context['original_filename'] ?? '';
                 $extracted_keywords = $this->extract_filename_keywords($original_filename);
 
-                error_log("MSH Debug Service-Icon Case: Original='$original_filename', Extracted='$extracted_keywords'");
+                // Debug disabled for performance
 
                 if (!empty($extracted_keywords)) {
                     $concept_source = $extracted_keywords;
@@ -754,7 +757,7 @@ class MSH_Contextual_Meta_Generator {
                     $concept = 'service';
                 }
 
-                error_log("MSH Debug Service-Icon Case: Final concept='$concept', Result='" . $concept . '-icon-' . $this->location_slug . "'");
+                // Debug disabled for performance
                 return $this->slugify($concept . '-icon-' . $this->location_slug);
             case 'facility':
                 return $this->slugify($this->business_name . '-facility-' . $this->location_slug);
@@ -992,43 +995,43 @@ class MSH_Contextual_Meta_Generator {
     }
 
     private function generate_service_icon_meta(array $context) {
-        $service = $context['service'] ?? 'rehabilitation';
-        $service_label = $this->format_service_label($service);
-        $service_lower = strtolower($service_label);
+        // Try to get specific concept from the icon
+        $concept_label = '';
+
+        // First try to extract from original filename (Noun Project files)
+        if (!empty($context['original_filename'])) {
+            if (preg_match('/^noun-(.+)-\d{4,7}-[A-F0-9]{6}/i', $context['original_filename'], $matches)) {
+                $concept_label = $this->format_service_label($matches[1]);
+                error_log("MSH Service Icon Meta: Extracted concept '$concept_label' from filename");
+            }
+        }
+
+        // If no concept found, try icon_concept field
+        if (empty($concept_label) && !empty($context['icon_concept'])) {
+            $concept = $context['icon_concept'];
+            // Clean any Noun Project patterns
+            if (preg_match('/^noun-(.+)-\d{4,}/i', $concept, $matches)) {
+                $concept = $matches[1];
+            }
+            $concept_label = $this->format_service_label($concept);
+        }
+
+        // Fallback to service if no specific concept
+        if (empty($concept_label)) {
+            $service = $context['service'] ?? 'rehabilitation';
+            $concept_label = $this->format_service_label($service);
+        }
+
+        $concept_lower = strtolower($concept_label);
 
         return [
-            'title' => $this->clean_text("{$service_label} Services - {$this->business_name} {$this->location}"),
-            'alt_text' => $this->clean_text("{$service_label} rehabilitation services icon"),
-            'caption' => $this->clean_text("{$service_label} recovery and support programs"),
-            'description' => $this->clean_text("Comprehensive {$service_lower} rehabilitation at {$this->business_name} {$this->location}. Insurance coordination, direct billing, and personalized recovery planning.")
+            'title' => $this->clean_text("{$concept_label} Service Icon - {$this->business_name} {$this->location}"),
+            'alt_text' => $this->clean_text("{$concept_label} icon for {$this->business_name} {$this->location}"),
+            'caption' => $this->clean_text("{$concept_label} service icon for navigation"),
+            'description' => $this->clean_text("{$concept_label} service icon used across {$this->business_name} {$this->location} website. Professional rehabilitation with WSIB approved programs and direct billing.")
         ];
     }
 
-    private function generate_icon_meta(array $context) {
-        $category = $context['icon_type'] ?? 'service';
-        $concept_label = $context['icon_concept_label'] ?? $this->format_service_label($context['icon_concept'] ?? 'service');
-
-        $category_labels = [
-            'condition' => 'Condition Icon',
-            'program' => 'Program Icon',
-            'team' => 'Team Icon',
-            'service' => 'Service Icon'
-        ];
-
-        $icon_category = $category_labels[$category] ?? 'Service Icon';
-
-        $title = $this->ensure_unique_title("{$concept_label} {$icon_category} - {$this->business_name} {$this->location}", $context['attachment_id'] ?? 0);
-        $alt = "{$concept_label} {$icon_category} for {$this->business_name} {$this->location}";
-        $caption = "{$icon_category} for {$concept_label} navigation";
-        $description = "{$concept_label} {$icon_category} used across {$this->business_name} {$this->location} website.";
-
-        return [
-            'title' => $this->clean_text($title),
-            'alt_text' => $this->clean_text($alt),
-            'caption' => $this->clean_text($caption),
-            'description' => $this->clean_text($description)
-        ];
-    }
 
     private function generate_logo_meta(array $context) {
         return [
@@ -1499,11 +1502,16 @@ class MSH_Image_Optimizer {
         add_action('wp_ajax_msh_apply_filename_suggestions', array($this, 'ajax_apply_filename_suggestions'));
         add_action('wp_ajax_msh_save_filename_suggestion', array($this, 'ajax_save_filename_suggestion'));
         add_action('wp_ajax_msh_remove_filename_suggestion', array($this, 'ajax_remove_filename_suggestion'));
+        add_action('wp_ajax_msh_accept_filename_suggestion', array($this, 'ajax_accept_filename_suggestion'));
+        add_action('wp_ajax_msh_reject_filename_suggestion', array($this, 'ajax_reject_filename_suggestion'));
         add_action('wp_ajax_msh_preview_meta_text', array($this, 'ajax_preview_meta_text'));
         add_action('wp_ajax_msh_save_edited_meta', array($this, 'ajax_save_edited_meta'));
         add_action('wp_ajax_msh_update_context', array($this, 'ajax_update_context'));
         add_action('wp_ajax_msh_build_usage_index', array($this, 'ajax_build_usage_index'));
         add_action('wp_ajax_msh_clear_bad_suggestions', array($this, 'ajax_clear_bad_suggestions'));
+        add_action('wp_ajax_msh_optimize_high_priority', array($this, 'ajax_optimize_high_priority'));
+        add_action('wp_ajax_msh_optimize_medium_priority', array($this, 'ajax_optimize_medium_priority'));
+        add_action('wp_ajax_msh_optimize_all_remaining', array($this, 'ajax_optimize_all_remaining'));
 
         $this->contextual_meta_generator = new MSH_Contextual_Meta_Generator();
 
@@ -1548,9 +1556,11 @@ class MSH_Image_Optimizer {
             'ready_for_optimization',
             'optimized',
             'metadata_missing',
-            'needs_recompression', 
+            'needs_recompression',
             'webp_missing',
             'metadata_current',
+            'needs_webp_conversion',
+            'webp_timestamp_missing',
             'needs_attention'
         ];
         
@@ -1568,25 +1578,45 @@ class MSH_Image_Optimizer {
     private function get_optimization_status($attachment_id) {
         $webp_time = (int)get_post_meta($attachment_id, 'msh_webp_last_converted', true);
         $meta_time = (int)get_post_meta($attachment_id, 'msh_metadata_last_updated', true);
+        $optimized_date = get_post_meta($attachment_id, 'msh_optimized_date', true);
         $version = get_post_meta($attachment_id, 'msh_optimization_version', true);
-        
+
         $source_file = get_attached_file($attachment_id);
         if (!$source_file || !file_exists($source_file)) {
+            // Missing files are marked as "needs_attention" and excluded from optimization
             return $this->validate_status('needs_attention');
         }
-        
+
+        // Skip WebP conversion logic for files that don't need it
+        $file_extension = strtolower(pathinfo($source_file, PATHINFO_EXTENSION));
+        $is_webp_convertible = in_array($file_extension, ['jpg', 'jpeg', 'png']);
+
+        // For SVG, WebP, and other non-convertible formats, only check metadata
+        if (!$is_webp_convertible) {
+            if (!$meta_time) {
+                return $this->validate_status('metadata_missing');
+            }
+            return $this->validate_status('optimized'); // These files don't need WebP conversion
+        }
+
         // Check for missing metadata FIRST (before recompression test)
         if (!$meta_time && !$webp_time) {
             return $this->validate_status('ready_for_optimization');
         }
-        
+
         if (!$meta_time) {
             return $this->validate_status('metadata_missing');
         }
-        
+
+        // CHECK: If image has been marked as optimized via msh_optimized_date, consider it optimized
+        // This handles cases where metadata was applied but WebP conversion failed
+        if ($optimized_date && $meta_time) {
+            return $this->validate_status('optimized');
+        }
+
         $webp_path = preg_replace('/\.(jpg|jpeg|png)$/i', '.webp', $source_file);
         $webp_exists = file_exists($webp_path);
-        
+
         // Now check recompression (only for images that have been optimized)
         $recompression_check = $this->needs_recompression($attachment_id);
         if ($recompression_check === 'needs_attention') {
@@ -1594,13 +1624,17 @@ class MSH_Image_Optimizer {
         } elseif ($recompression_check === true) {
             return $this->validate_status('needs_recompression');
         }
-        
+
         if ($webp_time && $meta_time && $webp_exists) {
             return $this->validate_status('optimized');
         } elseif ($webp_time && !$webp_exists) {
             return $this->validate_status('webp_missing');
-        } elseif ($meta_time && !$webp_time) {
-            return $this->validate_status('metadata_current');
+        } elseif ($meta_time && !$webp_time && !$webp_exists) {
+            // Has metadata but missing WebP - needs WebP conversion
+            return $this->validate_status('needs_webp_conversion');
+        } elseif ($meta_time && !$webp_time && $webp_exists) {
+            // Has metadata and WebP file exists but no timestamp - update timestamp
+            return $this->validate_status('webp_timestamp_missing');
         } else {
             return $this->validate_status('ready_for_optimization');
         }
@@ -1619,13 +1653,22 @@ class MSH_Image_Optimizer {
         global $wpdb;
 
         $attachments = $wpdb->get_results(
-            "SELECT ID, post_title, post_name
+            "SELECT ID, post_title, post_name, post_mime_type
              FROM {$wpdb->posts}
              WHERE post_type = 'attachment'
              AND post_mime_type LIKE 'image/%'
              ORDER BY ID",
             ARRAY_A
         );
+
+        // Debug: Count SVG attachments found (reduced logging for performance)
+        $svg_count = 0;
+        foreach ($attachments as $attachment) {
+            if (strpos($attachment['post_mime_type'], 'svg') !== false) {
+                $svg_count++;
+            }
+        }
+        error_log("MSH DEBUG: Total SVG attachments found in DB: {$svg_count}");
 
         if (empty($attachments)) {
             // $cached_results = [];
@@ -1673,7 +1716,17 @@ class MSH_Image_Optimizer {
             }
 
             if ($meta_row['meta_key'] === '_wp_attached_file') {
-                $attachment_map[$post_id]['file_path'] = ltrim((string) $meta_row['meta_value'], '/');
+                $file_path = ltrim((string) $meta_row['meta_value'], '/');
+                $uploads_dir = wp_upload_dir();
+                $full_path = $uploads_dir['basedir'] . '/' . $file_path;
+
+                // Only set file_path if file actually exists on disk
+                if (file_exists($full_path)) {
+                    $attachment_map[$post_id]['file_path'] = $file_path;
+                } else {
+                    error_log("MSH DEBUG: Skipping attachment {$post_id} - file missing: {$full_path}");
+                    // Leave file_path empty so it gets filtered out later
+                }
             }
 
             if ($meta_row['meta_key'] === '_wp_attachment_image_alt') {
@@ -1841,15 +1894,48 @@ class MSH_Image_Optimizer {
         }
 
         $published_images = [];
+        $svg_excluded_count = 0;
+        $svg_included_count = 0;
 
         foreach ($attachment_map as $attachment) {
-            if (empty($attachment['used_in'])) {
+            $is_svg = isset($attachment['post_mime_type']) && strpos($attachment['post_mime_type'], 'svg') !== false;
+
+            // TEMPORARY: Limit SVG auto-include to prevent performance issues
+            // Only auto-include SVGs with IDs > 14500 (newer condition icons) to focus on relevant ones
+            $should_auto_include_svg = $is_svg && (int)$attachment['ID'] > 14500;
+
+            // Include SVGs regardless of usage detection (limited to newer ones for performance)
+            if (empty($attachment['used_in']) && !$should_auto_include_svg) {
+                if ($is_svg && (int)$attachment['ID'] <= 14500) {
+                    // Skip older duplicate SVGs for performance
+                    continue;
+                }
+                continue; // Exclude non-SVG unused images, but keep newer SVGs
+            }
+
+            if (empty($attachment['used_in']) && $should_auto_include_svg) {
+                // SVGs without detected usage - add them with a default usage note
+                $attachment['used_in'] = ['SVG Icon (auto-included)' => true];
+                $svg_excluded_count++; // Count as "rescued" SVGs
+                error_log("MSH DEBUG: SVG rescued (no usage detected but included) - ID {$attachment['ID']}: {$attachment['post_title']}");
+            }
+
+            if ($is_svg) {
+                $svg_included_count++;
+                error_log("MSH DEBUG: SVG included - ID {$attachment['ID']}: {$attachment['post_title']} used in: " . implode(', ', array_keys($attachment['used_in'])));
+            }
+
+            // Skip images with missing files (empty file_path)
+            if (empty($attachment['file_path'])) {
+                error_log("MSH DEBUG: Skipping image with missing file - ID {$attachment['ID']}: {$attachment['post_title']}");
                 continue;
             }
 
             $attachment['used_in'] = implode(', ', array_keys($attachment['used_in']));
             $published_images[] = $attachment;
         }
+
+        error_log("MSH DEBUG: SVG summary - Total included: {$svg_included_count}, Rescued without usage: {$svg_excluded_count}");
 
         usort($published_images, static function ($a, $b) {
             return $a['ID'] <=> $b['ID'];
@@ -1966,8 +2052,14 @@ class MSH_Image_Optimizer {
                          strpos($current_basename, 'main-street-health') !== false ||
                          // Also detect common SEO patterns our system generates
                          preg_match('/^(rehabilitation|physiotherapy|chiropractic|acupuncture|massage|orthotics|chronic-pain|work-related|sport-injuries|motor-vehicle|patient-testimonial|bluecross|canada-life|manulife)-/', $current_basename) ||
-                         // Or files that end with attachment ID pattern (our system's signature)
-                         preg_match('/-\d{4,5}\.(jpg|jpeg|png|gif|svg|webp)$/', $current_basename));
+                         // Or files that end with OUR attachment ID pattern (more specific to avoid false matches)
+                         preg_match('/-' . $attachment_id . '\.(jpg|jpeg|png|gif|svg|webp)$/', $current_basename));
+
+        // Debug filename suggestion logic for SVGs
+        $is_svg = (strtolower(pathinfo($current_file, PATHINFO_EXTENSION)) === 'svg');
+        if ($is_svg && (int)$attachment_id > 14500) {
+            // Debug disabled for performance
+        }
 
         if ($has_good_name) {
             // Remove any existing suggestion for this already-optimized file
@@ -1977,14 +2069,24 @@ class MSH_Image_Optimizer {
             // Get or generate suggestion for files that need renaming
             $suggested_filename = get_post_meta($attachment_id, '_msh_suggested_filename', true);
 
+            // Debug disabled for performance
+
             // Generate suggestion if it doesn't exist yet
             if (empty($suggested_filename) && !empty($extension)) {
+                // Debug disabled for performance
+
                 $slug = $this->contextual_meta_generator->generate_filename_slug($attachment_id, $context_info, $extension);
+
+                // Debug disabled for performance
 
                 if (!empty($slug)) {
                     $suggested_filename = $this->ensure_unique_filename($slug, $extension, $attachment_id);
                     update_post_meta($attachment_id, '_msh_suggested_filename', $suggested_filename);
                     update_post_meta($attachment_id, 'msh_filename_last_suggested', time());
+
+                    // Debug disabled for performance
+                } else {
+                    // Debug disabled for performance
                 }
             }
         }
@@ -2812,12 +2914,37 @@ class MSH_Image_Optimizer {
      */
     public function ajax_analyze_images() {
         check_ajax_referer('msh_image_optimizer', 'nonce');
-        
+
         if (!current_user_can('manage_options')) {
             wp_die('Unauthorized');
         }
-        
+
+        // Check for force refresh parameter
+        $force_refresh = isset($_POST['force_refresh']) && $_POST['force_refresh'] === 'true';
+
+        // URGENT: Quick cache to stop analysis time waste
+        $cache_key = 'msh_analysis_cache_' . md5('latest_analysis');
+
+        if ($force_refresh) {
+            delete_transient($cache_key);
+            error_log("MSH: Cache cleared - performing fresh analysis");
+        }
+
+        $cached_result = get_transient($cache_key);
+
+        if ($cached_result !== false && !$force_refresh) {
+            $cache_age = time() - $cached_result['timestamp'];
+            error_log("MSH: Using cached analysis from " . human_time_diff($cached_result['timestamp']) . " ago");
+
+            // Use cache if less than 30 minutes old
+            if ($cache_age < 1800) {
+                wp_send_json_success($cached_result['data']);
+                return;
+            }
+        }
+
         $start_time = microtime(true);
+        error_log('MSH: Starting fresh analysis (no valid cache found)');
         
         // Debug: First check total images
         global $wpdb;
@@ -2827,9 +2954,27 @@ class MSH_Image_Optimizer {
         $analysis_results = [];
         
         foreach ($images as $image) {
+            // Fix missing file_path for images that don't have _wp_attached_file meta
+            if (empty($image['file_path'])) {
+                $attached_file = get_attached_file($image['ID']);
+                if ($attached_file) {
+                    $upload_dir = wp_get_upload_dir();
+                    $uploads_basedir = $upload_dir['basedir'];
+                    if (strpos($attached_file, $uploads_basedir) === 0) {
+                        $image['file_path'] = str_replace($uploads_basedir . '/', '', $attached_file);
+                        error_log("MSH File Path Fix: ID {$image['ID']} - recovered file_path: {$image['file_path']}");
+                    }
+                }
+            }
+
             $analysis = $this->analyze_single_image($image['ID']);
             $priority = $this->calculate_healthcare_priority($image);
-            
+
+            // Map current_size_bytes to file_size for frontend compatibility
+            if (isset($analysis['current_size_bytes'])) {
+                $analysis['file_size'] = $analysis['current_size_bytes'];
+            }
+
             $analysis_results[] = array_merge($image, $analysis, ['priority' => $priority]);
         }
         
@@ -2840,15 +2985,25 @@ class MSH_Image_Optimizer {
         
         // Include minimal debug info in response
         $duration_ms = round((microtime(true) - $start_time) * 1000, 2);
-        
-        wp_send_json_success([
+
+        $response_data = [
             'images' => $analysis_results,
             'debug' => [
                 'total_images_in_db' => intval($total_images),
                 'published_images_found' => count($images),
                 'analysis_duration_ms' => $duration_ms
             ]
-        ]);
+        ];
+
+        // URGENT: Cache the results to prevent time waste
+        set_transient($cache_key, [
+            'data' => $response_data,
+            'timestamp' => time()
+        ], 1800); // Cache for 30 minutes
+
+        error_log("MSH: Analysis complete in {$duration_ms}ms, cached for 30 minutes");
+
+        wp_send_json_success($response_data);
     }
 
     /**
@@ -2873,6 +3028,121 @@ class MSH_Image_Optimizer {
         }
         
         wp_send_json_success($results);
+    }
+
+    /**
+     * AJAX handler for High Priority optimization (15+)
+     */
+    public function ajax_optimize_high_priority() {
+        check_ajax_referer('msh_image_optimizer', 'nonce');
+
+        if (!current_user_can('manage_options')) {
+            wp_die('Unauthorized');
+        }
+
+        // Get all published images with priority 15+
+        $images = $this->get_published_images();
+        $high_priority_images = array_filter($images, function($image) {
+            return $image['priority_score'] >= 15;
+        });
+
+        $image_ids = array_column($high_priority_images, 'ID');
+        $results = [];
+
+        foreach ($image_ids as $attachment_id) {
+            $result = $this->optimize_single_image(intval($attachment_id));
+            $results[] = [
+                'id' => $attachment_id,
+                'result' => $result
+            ];
+        }
+
+        // Clear analysis cache after optimization
+        $cache_key = 'msh_analysis_cache_' . md5('latest_analysis');
+        delete_transient($cache_key);
+
+        wp_send_json_success([
+            'results' => $results,
+            'total_processed' => count($image_ids),
+            'message' => sprintf(__('Optimized %d high priority images (15+)', 'medicross-child'), count($image_ids))
+        ]);
+    }
+
+    /**
+     * AJAX handler for Medium Priority optimization (10-14)
+     */
+    public function ajax_optimize_medium_priority() {
+        check_ajax_referer('msh_image_optimizer', 'nonce');
+
+        if (!current_user_can('manage_options')) {
+            wp_die('Unauthorized');
+        }
+
+        // Get all published images with priority 10-14
+        $images = $this->get_published_images();
+        $medium_priority_images = array_filter($images, function($image) {
+            return $image['priority_score'] >= 10 && $image['priority_score'] < 15;
+        });
+
+        $image_ids = array_column($medium_priority_images, 'ID');
+        $results = [];
+
+        foreach ($image_ids as $attachment_id) {
+            $result = $this->optimize_single_image(intval($attachment_id));
+            $results[] = [
+                'id' => $attachment_id,
+                'result' => $result
+            ];
+        }
+
+        // Clear analysis cache after optimization
+        $cache_key = 'msh_analysis_cache_' . md5('latest_analysis');
+        delete_transient($cache_key);
+
+        wp_send_json_success([
+            'results' => $results,
+            'total_processed' => count($image_ids),
+            'message' => sprintf(__('Optimized %d medium priority images (10-14)', 'medicross-child'), count($image_ids))
+        ]);
+    }
+
+    /**
+     * AJAX handler for All Remaining optimization
+     */
+    public function ajax_optimize_all_remaining() {
+        check_ajax_referer('msh_image_optimizer', 'nonce');
+
+        if (!current_user_can('manage_options')) {
+            wp_die('Unauthorized');
+        }
+
+        // Get all published images that need optimization (excluding needs_attention)
+        $images = $this->get_published_images();
+        $unoptimized_images = array_filter($images, function($image) {
+            return $image['optimization_status'] !== 'optimized' &&
+                   $image['optimization_status'] !== 'needs_attention';
+        });
+
+        $image_ids = array_column($unoptimized_images, 'ID');
+        $results = [];
+
+        foreach ($image_ids as $attachment_id) {
+            $result = $this->optimize_single_image(intval($attachment_id));
+            $results[] = [
+                'id' => $attachment_id,
+                'result' => $result
+            ];
+        }
+
+        // Clear analysis cache after optimization
+        $cache_key = 'msh_analysis_cache_' . md5('latest_analysis');
+        delete_transient($cache_key);
+
+        wp_send_json_success([
+            'results' => $results,
+            'total_processed' => count($image_ids),
+            'message' => sprintf(__('Optimized %d remaining images', 'medicross-child'), count($image_ids))
+        ]);
     }
 
     /**
@@ -2987,9 +3257,42 @@ class MSH_Image_Optimizer {
             }
         }
 
-        if (!empty($meta_applied)) {
-            update_post_meta($attachment_id, 'msh_metadata_last_updated', (int) $timestamp);
-            delete_post_meta($attachment_id, 'msh_metadata_source');
+        // Convert to WebP if applicable
+        $webp_converted = false;
+        $webp_timestamp_updated = false;
+        $image_info = wp_get_image_editor($file_path);
+        if (!is_wp_error($image_info)) {
+            $mime_type = get_post_mime_type($attachment_id);
+            if (in_array($mime_type, ['image/jpeg', 'image/png'])) {
+                $webp_path = preg_replace('/\.(jpg|jpeg|png)$/i', '.webp', $file_path);
+
+                // Convert if WebP doesn't exist or source is newer
+                if (!file_exists($webp_path) || filemtime($file_path) > filemtime($webp_path)) {
+                    $webp_result = $this->convert_to_webp($file_path, $webp_path);
+                    if ($webp_result) {
+                        update_post_meta($attachment_id, 'msh_webp_last_converted', $timestamp);
+                        $result['actions'][] = 'WebP version created';
+                        $webp_converted = true;
+                    } else {
+                        $result['actions'][] = 'WebP conversion failed';
+                    }
+                } elseif (file_exists($webp_path) && !get_post_meta($attachment_id, 'msh_webp_last_converted', true)) {
+                    // WebP exists but timestamp missing - update timestamp
+                    update_post_meta($attachment_id, 'msh_webp_last_converted', $timestamp);
+                    $result['actions'][] = 'WebP timestamp updated';
+                    $webp_timestamp_updated = true;
+                }
+            }
+        }
+
+        if (!empty($meta_applied) || $webp_converted || $webp_timestamp_updated) {
+            // Only update metadata timestamp if metadata was actually changed
+            if (!empty($meta_applied)) {
+                update_post_meta($attachment_id, 'msh_metadata_last_updated', (int) $timestamp);
+                delete_post_meta($attachment_id, 'msh_metadata_source');
+            }
+            // Mark image as optimization complete
+            update_post_meta($attachment_id, 'msh_optimized_date', date('Y-m-d H:i:s', $timestamp));
         }
 
         foreach ($meta_skipped as $field) {
@@ -3045,6 +3348,13 @@ class MSH_Image_Optimizer {
         $raw_context = isset($_POST['context']) ? wp_unslash($_POST['context']) : '';
         $new_context = sanitize_text_field($raw_context);
 
+        // Handle legacy underscore format by converting to hyphen
+        if ($new_context === 'service_icon') {
+            $new_context = 'service-icon';
+        }
+
+        error_log('MSH DEBUG: ajax_update_context - attachment_id: ' . $attachment_id . ', new_context: ' . $new_context);
+
         $choices = $this->get_context_choices();
         if ($new_context !== '' && !array_key_exists($new_context, $choices)) {
             wp_send_json_error(__('Invalid context selection.', 'medicross-child'));
@@ -3061,24 +3371,34 @@ class MSH_Image_Optimizer {
         delete_post_meta($attachment_id, 'msh_context_last_manual_update');
 
         // Refresh auto-detected context for comparison badges.
-        $auto_context = $this->contextual_meta_generator->detect_context($attachment_id, true);
-        if (!empty($auto_context['type'])) {
-            update_post_meta($attachment_id, '_msh_auto_context', $auto_context['type']);
-        } else {
-            delete_post_meta($attachment_id, '_msh_auto_context');
+        try {
+            $auto_context = $this->contextual_meta_generator->detect_context($attachment_id, true);
+            if (!empty($auto_context['type'])) {
+                update_post_meta($attachment_id, '_msh_auto_context', $auto_context['type']);
+            } else {
+                delete_post_meta($attachment_id, '_msh_auto_context');
+            }
+        } catch (Exception $e) {
+            error_log('MSH DEBUG: Error detecting context - ' . $e->getMessage());
         }
 
-        $image_data = $this->analyze_single_image($attachment_id);
-        if (!is_array($image_data) || isset($image_data['error'])) {
-            $error_message = is_array($image_data) && isset($image_data['error'])
-                ? $image_data['error']
-                : __('Unable to refresh analyzer data.', 'medicross-child');
-            wp_send_json_error($error_message);
-        }
+        try {
+            $image_data = $this->analyze_single_image($attachment_id);
+            if (!is_array($image_data) || isset($image_data['error'])) {
+                $error_message = is_array($image_data) && isset($image_data['error'])
+                    ? $image_data['error']
+                    : __('Unable to refresh analyzer data.', 'medicross-child');
+                error_log('MSH DEBUG: analyze_single_image error - ' . $error_message);
+                wp_send_json_error($error_message);
+            }
 
-        wp_send_json_success([
-            'image' => $image_data,
-        ]);
+            wp_send_json_success([
+                'image' => $image_data,
+            ]);
+        } catch (Exception $e) {
+            error_log('MSH DEBUG: Exception in ajax_update_context - ' . $e->getMessage());
+            wp_send_json_error('Error updating context: ' . $e->getMessage());
+        }
     }
 
     /**
@@ -3144,22 +3464,26 @@ class MSH_Image_Optimizer {
     }
     
     /**
-     * Apply filename suggestions in batch
+     * Apply filename suggestions in batch with automatic batch processing
      */
     public function ajax_apply_filename_suggestions() {
+        error_log('MSH Safe Rename: Batch apply function called');
         check_ajax_referer('msh_image_optimizer', 'nonce');
 
         if (!current_user_can('manage_options')) {
             wp_die('Unauthorized');
         }
 
-        // Set max execution time for processing all files at once
-        @set_time_limit(900); // 15 minutes max for large batch processing
+        // Production-ready batch processing
+        $batch_size = 25; // Safe batch size to prevent timeouts
+        $batch_number = isset($_POST['batch_number']) ? intval($_POST['batch_number']) : 1;
+        $total_files = isset($_POST['total_files']) ? intval($_POST['total_files']) : 0;
 
         $mode = isset($_POST['mode']) ? sanitize_text_field($_POST['mode']) : 'full';
         $limit = isset($_POST['limit']) ? max(0, intval($_POST['limit'])) : 0;
 
         $image_ids = isset($_POST['image_ids']) ? array_map('intval', $_POST['image_ids']) : [];
+        error_log('MSH Safe Rename: Received image_ids from JavaScript: ' . print_r($image_ids, true));
 
         if (empty($image_ids)) {
             global $wpdb;
@@ -3177,54 +3501,129 @@ class MSH_Image_Optimizer {
             $image_ids = array_slice($image_ids, 0, $limit);
         }
 
-        // Process ALL files with suggestions - no batch size limit
-        error_log('MSH Safe Rename: Processing all ' . count($image_ids) . ' files with suggestions (NO BATCH LIMIT)');
+        // Calculate batch boundaries
+        $total_count = count($image_ids);
+        $start_index = ($batch_number - 1) * $batch_size;
+        $current_batch = array_slice($image_ids, $start_index, $batch_size);
+        $total_batches = ceil($total_count / $batch_size);
 
-        if (empty($image_ids)) {
-            // Debug: Log that no suggestions exist
-            error_log('MSH Safe Rename: No images with filename suggestions found in database');
+        error_log("MSH Safe Rename: Processing batch {$batch_number}/{$total_batches} - " . count($current_batch) . " files (of {$total_count} total)");
 
+        if (empty($current_batch)) {
+            // All batches processed or no files to process
             wp_send_json_success([
                 'results' => [],
                 'summary' => [
-                    'total' => 0,
+                    'total' => $total_count,
                     'success' => 0,
                     'errors' => 0,
                     'skipped' => 0,
-                    'mode' => $mode
+                    'mode' => $mode,
+                    'batch_complete' => true,
+                    'all_batches_complete' => true
                 ]
             ]);
         }
 
+        // SMART APPROACH: Index ONLY the files in current batch
+        error_log("MSH Safe Rename: Smart indexing batch {$batch_number}/{$total_batches} - indexing " . count($current_batch) . " files");
+        $usage_index = MSH_Image_Usage_Index::get_instance();
+
+        // Quick index for just current batch files
+        $indexed_count = 0;
+        $skipped_count = 0;
+        foreach ($current_batch as $attachment_id) {
+            try {
+                // Check if index already exists - don't rebuild existing indexes!
+                global $wpdb;
+                $index_table = $wpdb->prefix . 'msh_image_usage_index';
+                $existing_count = $wpdb->get_var($wpdb->prepare(
+                    "SELECT COUNT(*) FROM {$index_table} WHERE attachment_id = %d",
+                    $attachment_id
+                ));
+
+                if ($existing_count > 0) {
+                    $skipped_count++;
+                    error_log("MSH Safe Rename: ✅ SKIPPING $attachment_id - already indexed ($existing_count entries)");
+                    continue;
+                }
+
+                $usage_index->index_attachment_usage($attachment_id);
+                $indexed_count++;
+                if ($indexed_count % 5 === 0) {
+                    error_log("MSH Safe Rename: Just-in-time indexed $indexed_count files in batch {$batch_number}...");
+                }
+            } catch (Exception $e) {
+                error_log("MSH Safe Rename: Failed to index $attachment_id: " . $e->getMessage());
+            }
+        }
+        error_log("MSH Safe Rename: Batch {$batch_number} indexing complete - indexed $indexed_count files, skipped $skipped_count files");
+
+        error_log('MSH Safe Rename: About to get instance of MSH_Safe_Rename_System');
         $renamer = MSH_Safe_Rename_System::get_instance();
+        error_log('MSH Safe Rename: Successfully got instance of MSH_Safe_Rename_System');
+
+        // Record start time for performance tracking
+        $batch_start_time = microtime(true);
+
+        error_log("MSH Safe Rename: ===============================================");
+        error_log("MSH Safe Rename: 🚀 STARTING BATCH {$batch_number}/{$total_batches} FILENAME APPLICATION");
+        error_log("MSH Safe Rename: ===============================================");
+        error_log("MSH Safe Rename: 📊 BATCH OVERVIEW:");
+        error_log("MSH Safe Rename: 📊   Batch: {$batch_number} of {$total_batches}");
+        error_log("MSH Safe Rename: 📊   Files in this batch: " . count($current_batch));
+        error_log("MSH Safe Rename: 📊   Total files overall: {$total_count}");
+        error_log("MSH Safe Rename: 📊   Processing mode: " . ($mode === 'test' ? 'TEST MODE' : 'LIVE MODE'));
+        error_log("MSH Safe Rename: 📊   Start time: " . date('Y-m-d H:i:s'));
+        error_log("MSH Safe Rename: ===============================================");
 
         $results = [];
         $success_count = 0;
         $error_count = 0;
         $skipped_count = 0;
 
-        $total_count = count($image_ids);
+        $batch_file_count = count($current_batch);
         $processed = 0;
         $start_time = time();
-        $max_execution_time = 900; // Stop after 15 minutes (for processing all files at once)
+        $max_execution_time = 600; // 10 minutes max per batch
 
-        foreach ($image_ids as $attachment_id) {
+        foreach ($current_batch as $attachment_id) {
             $processed++;
+
+            // Enhanced progress logging for batch
+            $batch_percentage = round(($processed / $batch_file_count) * 100, 1);
+            error_log("MSH Safe Rename: 📊 BATCH {$batch_number} PROGRESS: File {$processed}/{$batch_file_count} ({$batch_percentage}%)");
 
             // Check execution time to prevent timeout
             if ((time() - $start_time) > $max_execution_time) {
-                error_log("MSH Safe Rename: ⚠️ TIMEOUT - Stopping at $processed of $total_count images due to time limit. Continue with remaining files by running again.");
+                error_log("MSH Safe Rename: ⚠️ BATCH TIMEOUT - Stopping batch {$batch_number} at {$processed} of {$batch_file_count} files");
                 break;
             }
 
-            // Log progress every 5 images
-            if ($processed % 5 === 0) {
-                error_log("MSH Safe Rename: Processing image $processed of $total_count...");
+            // Enhanced logging for every file with comprehensive debugging
+            error_log("MSH Safe Rename: ===============================================");
+            error_log("MSH Safe Rename: [Stage 1/4] 🔍 BATCH PROCESSING FILE $processed/$total_count");
+            error_log("MSH Safe Rename: [Stage 1/4] 📎 Attachment ID: $attachment_id");
+
+            // Get current attachment data with detailed logging
+            $attachment = get_post($attachment_id);
+            if (!$attachment || $attachment->post_type !== 'attachment') {
+                error_log("MSH Safe Rename: [Stage 1/4] ❌ Invalid attachment ID: $attachment_id");
+                error_log("MSH Safe Rename: [Stage 1/4] ❌ Attachment type: " . ($attachment ? $attachment->post_type : 'null'));
+                continue;
             }
 
+            // Log current attachment details
+            $current_file = get_attached_file($attachment_id);
+            error_log("MSH Safe Rename: [Stage 1/4] 📁 Current file: $current_file");
+            error_log("MSH Safe Rename: [Stage 1/4] 📋 Attachment title: '{$attachment->post_title}'");
+
+            // Get the suggested filename with validation
             $suggested_filename = get_post_meta($attachment_id, '_msh_suggested_filename', true);
 
             if (!$suggested_filename) {
+                error_log("MSH Safe Rename: [Stage 1/4] ⚠️ No suggested filename for attachment: $attachment_id");
+                error_log("MSH Safe Rename: [Stage 1/4] ⚠️ Skipping this file - no rename suggestion available");
                 $results[] = [
                     'id' => $attachment_id,
                     'status' => 'skipped',
@@ -3234,10 +3633,26 @@ class MSH_Image_Optimizer {
                 continue;
             }
 
+            error_log("MSH Safe Rename: [Stage 1/4] ✅ Found suggested filename: '$suggested_filename'");
+            error_log("MSH Safe Rename: [Stage 1/4] 🚀 Initiating safe rename process...");
+
             $suggested_filename = sanitize_file_name($suggested_filename);
+            error_log("MSH Safe Rename: [Stage 1/4] 🧹 Sanitized filename: '$suggested_filename'");
+
+            // Record timing for performance analysis
+            $start_time = microtime(true);
+            error_log("MSH Safe Rename: [Stage 2/4] 🚀 Calling rename_attachment() with mode: " . ($mode === 'test' ? 'TEST' : 'LIVE'));
+
             $result = $renamer->rename_attachment($attachment_id, basename($suggested_filename), $mode === 'test');
 
+            $end_time = microtime(true);
+            $duration = round(($end_time - $start_time), 2);
+            error_log("MSH Safe Rename: [Stage 4/4] 🎉 Rename operation completed in {$duration}s");
+
             if (is_wp_error($result)) {
+                error_log("MSH Safe Rename: [Stage 4/4] ❌ Rename failed with WP_Error: " . $result->get_error_message());
+                error_log("MSH Safe Rename: [Stage 4/4] ❌ Error code: " . $result->get_error_code());
+                error_log("MSH Safe Rename: [Stage 4/4] ❌ File processing COMPLETE - error!");
                 $results[] = [
                     'id' => $attachment_id,
                     'status' => 'error',
@@ -3248,7 +3663,10 @@ class MSH_Image_Optimizer {
             }
 
             if (!empty($result['skipped'])) {
+                error_log("MSH Safe Rename: [Stage 4/4] ⚠️ File skipped - filename already optimized");
                 delete_post_meta($attachment_id, '_msh_suggested_filename');
+                error_log("MSH Safe Rename: [Stage 4/4] 🗑️ Cleared suggested filename meta for skipped file: $attachment_id");
+                error_log("MSH Safe Rename: [Stage 4/4] ⚠️ File processing COMPLETE - skipped!");
 
                 $results[] = [
                     'id' => $attachment_id,
@@ -3259,7 +3677,14 @@ class MSH_Image_Optimizer {
                 continue;
             }
 
+            error_log("MSH Safe Rename: [Stage 4/4] ✅ Successfully renamed attachment $attachment_id to '$suggested_filename' in {$duration}s");
+            error_log("MSH Safe Rename: [Stage 4/4] 🔄 Database references updated: " . $result['replaced']);
+            error_log("MSH Safe Rename: [Stage 4/4] 🔗 Old URL: " . $result['old_url']);
+            error_log("MSH Safe Rename: [Stage 4/4] 🔗 New URL: " . $result['new_url']);
+
             delete_post_meta($attachment_id, '_msh_suggested_filename');
+            error_log("MSH Safe Rename: [Stage 4/4] 🗑️ Cleared suggested filename meta for attachment: $attachment_id");
+            error_log("MSH Safe Rename: [Stage 4/4] 🎉 File processing COMPLETE - success!");
 
             $results[] = [
                 'id' => $attachment_id,
@@ -3288,20 +3713,56 @@ class MSH_Image_Optimizer {
             $has_more = $remaining_count > 0;
         }
 
+        // Calculate final statistics
+        $success_rate = $processed > 0 ? round(($success_count / $processed) * 100, 1) : 0;
+        $end_time = microtime(true);
+        $total_duration = round(($end_time - $batch_start_time), 2);
+        $avg_per_file = $processed > 0 ? round($total_duration / $processed, 2) : 0;
+
+        error_log("MSH Safe Rename: ===============================================");
+        error_log("MSH Safe Rename: 🎉 BATCH RENAME PROCESS COMPLETE!");
+        error_log("MSH Safe Rename: ===============================================");
+        error_log("MSH Safe Rename: 📊 FINAL STATISTICS:");
+        error_log("MSH Safe Rename: 📊   Total files processed: $processed");
+        error_log("MSH Safe Rename: 📊   ✅ Successful renames: $success_count");
+        error_log("MSH Safe Rename: 📊   ❌ Failed renames: $error_count");
+        error_log("MSH Safe Rename: 📊   ⚠️ Skipped files: $skipped_count");
+        error_log("MSH Safe Rename: 📊   🎯 Success rate: {$success_rate}%");
+        error_log("MSH Safe Rename: 📊   ⏱️ Total duration: {$total_duration}s");
+        error_log("MSH Safe Rename: 📊   ⚡ Average per file: {$avg_per_file}s");
+        error_log("MSH Safe Rename: 📊   🚀 Has more files: " . ($has_more ? 'YES' : 'NO'));
+        if ($has_more) {
+            error_log("MSH Safe Rename: 📊   📝 Remaining files: $remaining_count");
+        }
+        error_log("MSH Safe Rename: ===============================================");
+
+        // Calculate if there are more batches to process
+        $has_more_batches = $batch_number < $total_batches;
+        $next_batch_number = $has_more_batches ? $batch_number + 1 : 0;
+
         wp_send_json_success([
             'results' => $results,
             'summary' => [
-                'total' => count($image_ids),
+                'total' => $batch_file_count,
                 'success' => $success_count,
                 'errors' => $error_count,
                 'skipped' => $skipped_count,
-                'mode' => $mode
+                'mode' => $mode,
+                'batch_complete' => true
             ],
-            'has_more' => $has_more,
-            'remaining' => $remaining_count,
             'batch_info' => [
-                'processed_this_batch' => count($image_ids),
-                'max_batch_size' => 20
+                'current_batch' => $batch_number,
+                'total_batches' => $total_batches,
+                'has_more_batches' => $has_more_batches,
+                'next_batch_number' => $next_batch_number,
+                'batch_size' => $batch_size,
+                'total_files' => $total_count,
+                'files_processed_so_far' => (($batch_number - 1) * $batch_size) + $processed,
+                'overall_progress' => round(((($batch_number - 1) * $batch_size) + $processed) / $total_count * 100, 1)
+            ],
+            'performance' => [
+                'duration' => $total_duration,
+                'avg_per_file' => $avg_per_file
             ]
         ]);
     }
@@ -3554,7 +4015,7 @@ class MSH_Image_Optimizer {
         }
 
         // Auto-detect context from filename and path
-        $context_details = $this->detect_image_context($attachment_id);
+        $context_details = $this->contextual_meta_generator->detect_context($attachment_id);
 
         // Generate suggestion using the contextual generator
         $slug = $this->contextual_meta_generator->generate_filename_slug($attachment_id, $context_details, $extension);
@@ -3578,7 +4039,7 @@ class MSH_Image_Optimizer {
             wp_die('Unauthorized');
         }
 
-        @set_time_limit(300); // 5 minutes
+        @set_time_limit(900); // 15 minutes for complete rebuild
         @ini_set('memory_limit', '512M');
 
         // Create tables first
@@ -3587,12 +4048,15 @@ class MSH_Image_Optimizer {
         // Get usage index instance
         $usage_index = MSH_Image_Usage_Index::get_instance();
 
+        // Check if force rebuild is requested (disabled for performance)
+        $force_rebuild = false; // isset($_POST['force_rebuild']) && $_POST['force_rebuild'] === 'true';
+
         // Check current index status first
         $stats = $usage_index->get_index_stats();
         $current_entries = $stats['summary']->total_entries ?? 0;
 
-        if ($current_entries > 0) {
-            // Index already has data, return current stats
+        if ($current_entries > 0 && !$force_rebuild) {
+            // Index already has data, return current stats (unless force rebuild)
             wp_send_json_success([
                 'message' => 'Usage index already exists with ' . $current_entries . ' entries.',
                 'processed_attachments' => $stats['summary']->indexed_attachments ?? 0,
@@ -3600,6 +4064,15 @@ class MSH_Image_Optimizer {
                 'status' => 'already_built'
             ]);
             return;
+        }
+
+        if ($force_rebuild) {
+            error_log('MSH Index Build: Force rebuild requested - clearing existing index');
+            // Clear the existing index for complete rebuild
+            global $wpdb;
+            $table_name = $wpdb->prefix . 'msh_image_usage_index';
+            $wpdb->query("TRUNCATE TABLE $table_name");
+            error_log('MSH Index Build: Existing index cleared');
         }
 
         // Build the index with small batch size for better performance
@@ -3683,6 +4156,175 @@ class MSH_Image_Optimizer {
         // Set options to mark tables as created
         update_option('msh_usage_index_table_version', '1');
         update_option('msh_backup_tables_version', '1');
+    }
+
+    /**
+     * Convert image to WebP format
+     */
+    private function convert_to_webp($source_path, $webp_path) {
+        if (!function_exists('imagewebp')) {
+            return false; // WebP not supported
+        }
+
+        // Get image info
+        $image_info = getimagesize($source_path);
+        if (!$image_info) {
+            return false;
+        }
+
+        $mime_type = $image_info['mime'];
+        $image = null;
+
+        // Create image resource based on type
+        switch ($mime_type) {
+            case 'image/jpeg':
+                $image = imagecreatefromjpeg($source_path);
+                break;
+            case 'image/png':
+                $image = imagecreatefrompng($source_path);
+                // Preserve transparency
+                imagealphablending($image, false);
+                imagesavealpha($image, true);
+                break;
+            default:
+                return false;
+        }
+
+        if (!$image) {
+            return false;
+        }
+
+        // Convert to WebP with 85% quality (good balance of quality/size)
+        $result = imagewebp($image, $webp_path, 85);
+
+        // Clean up memory
+        imagedestroy($image);
+
+        return $result;
+    }
+
+    /**
+     * AJAX handler to accept and apply a filename suggestion for a single image
+     */
+    public function ajax_accept_filename_suggestion() {
+        error_log("MSH Accept Debug: Starting ajax_accept_filename_suggestion");
+
+        check_ajax_referer('msh_image_optimizer', 'nonce');
+
+        if (!current_user_can('manage_options')) {
+            wp_die('Unauthorized');
+        }
+
+        $image_id = intval($_POST['image_id'] ?? 0);
+        error_log("MSH Accept Debug: Image ID = $image_id");
+
+        if (!$image_id) {
+            wp_send_json_error('Missing image ID');
+            return;
+        }
+
+        // Validate the attachment exists
+        if (!get_post($image_id) || get_post_type($image_id) !== 'attachment') {
+            wp_send_json_error('Invalid attachment ID');
+            return;
+        }
+
+        // Get the suggested filename
+        $suggested_filename = get_post_meta($image_id, '_msh_suggested_filename', true);
+
+        if (!$suggested_filename) {
+            wp_send_json_error('No filename suggestion found for this image');
+            return;
+        }
+
+        error_log("MSH Accept Debug: Using Safe Rename System for individual apply");
+
+        // Use the same Safe Rename System as the batch process
+        try {
+            if (!class_exists('MSH_Safe_Rename_System')) {
+                wp_send_json_error('Safe Rename System not available');
+                return;
+            }
+
+            $renamer = MSH_Safe_Rename_System::get_instance();
+            if (!$renamer) {
+                wp_send_json_error('Failed to get Safe Rename System instance');
+                return;
+            }
+
+            // Build a simple array with just this image for processing
+            $image_data = [];
+            $attachment_post = get_post($image_id);
+            if ($attachment_post) {
+                $current_file = get_attached_file($image_id);
+                $filename = $current_file ? basename($current_file) : '';
+
+                $image_data[] = [
+                    'ID' => $image_id,
+                    'filename' => $filename,
+                    'suggested_filename' => $suggested_filename
+                ];
+            }
+
+            if (empty($image_data)) {
+                wp_send_json_error('Failed to prepare image data for renaming');
+                return;
+            }
+
+            // Use the same processing logic as batch apply
+            $results = $renamer->process_batch_renames($image_data);
+
+            if (!empty($results['success'])) {
+                $success = $results['success'][0]; // Get first (and only) success result
+                wp_send_json_success([
+                    'message' => 'Filename updated successfully using Safe Rename System',
+                    'new_filename' => $success['new_filename'] ?? $suggested_filename,
+                    'image_id' => $image_id,
+                    'database_updates' => $success['database_updates'] ?? 0
+                ]);
+            } elseif (!empty($results['errors'])) {
+                $error = $results['errors'][0]; // Get first error
+                wp_send_json_error('Safe Rename failed: ' . ($error['message'] ?? 'Unknown error'));
+            } else {
+                wp_send_json_error('Safe Rename System returned no results');
+            }
+
+        } catch (Exception $e) {
+            error_log("MSH Accept Debug: Exception in Safe Rename System: " . $e->getMessage());
+            wp_send_json_error('Safe Rename System error: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * AJAX handler to reject/dismiss a filename suggestion for a single image
+     */
+    public function ajax_reject_filename_suggestion() {
+        check_ajax_referer('msh_image_optimizer', 'nonce');
+
+        if (!current_user_can('manage_options')) {
+            wp_die('Unauthorized');
+        }
+
+        $image_id = intval($_POST['image_id'] ?? 0);
+
+        if (!$image_id) {
+            wp_send_json_error('Missing image ID');
+            return;
+        }
+
+        // Validate the attachment exists
+        if (!get_post($image_id) || get_post_type($image_id) !== 'attachment') {
+            wp_send_json_error('Invalid attachment ID');
+            return;
+        }
+
+        // Remove the suggestion (same as existing ajax_remove_filename_suggestion)
+        delete_post_meta($image_id, '_msh_suggested_filename');
+
+        wp_send_json_success([
+            'message' => 'Filename suggestion dismissed - current name will be kept',
+            'image_id' => $image_id
+        ]);
     }
 }
 

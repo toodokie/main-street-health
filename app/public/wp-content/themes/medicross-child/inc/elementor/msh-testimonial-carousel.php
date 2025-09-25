@@ -49,6 +49,70 @@ class MSH_Testimonial_Carousel_Widget extends Widget_Base {
             ]
         );
 
+        $this->add_control(
+            'data_source',
+            [
+                'label' => __('Data Source', 'medicross-child'),
+                'type' => Controls_Manager::SELECT,
+                'default' => 'manual',
+                'options' => [
+                    'manual' => __('Manual Entry (Current)', 'medicross-child'),
+                    'database' => __('Reviews Database', 'medicross-child'),
+                ],
+                'description' => __('Choose whether to enter testimonials manually or pull from the Reviews database.', 'medicross-child'),
+            ]
+        );
+
+        // Database source controls
+        $this->add_control(
+            'posts_per_page',
+            [
+                'label' => __('Number of Reviews', 'medicross-child'),
+                'type' => Controls_Manager::NUMBER,
+                'default' => 5,
+                'min' => 1,
+                'max' => 20,
+                'condition' => [
+                    'data_source' => 'database',
+                ],
+            ]
+        );
+
+        $this->add_control(
+            'orderby',
+            [
+                'label' => __('Order By', 'medicross-child'),
+                'type' => Controls_Manager::SELECT,
+                'default' => 'date',
+                'options' => [
+                    'date' => __('Date', 'medicross-child'),
+                    'title' => __('Client Name', 'medicross-child'),
+                    'menu_order' => __('Menu Order', 'medicross-child'),
+                    'rand' => __('Random', 'medicross-child'),
+                ],
+                'condition' => [
+                    'data_source' => 'database',
+                ],
+            ]
+        );
+
+        $this->add_control(
+            'order',
+            [
+                'label' => __('Order', 'medicross-child'),
+                'type' => Controls_Manager::SELECT,
+                'default' => 'DESC',
+                'options' => [
+                    'ASC' => __('Ascending', 'medicross-child'),
+                    'DESC' => __('Descending', 'medicross-child'),
+                ],
+                'condition' => [
+                    'data_source' => 'database',
+                ],
+            ]
+        );
+
+        // Manual entry controls
         $repeater = new Repeater();
 
         $repeater->add_control(
@@ -121,6 +185,9 @@ class MSH_Testimonial_Carousel_Widget extends Widget_Base {
                     ],
                 ],
                 'title_field' => '{{{ client_name }}}',
+                'condition' => [
+                    'data_source' => 'manual',
+                ],
             ]
         );
 
@@ -1140,16 +1207,67 @@ class MSH_Testimonial_Carousel_Widget extends Widget_Base {
         $this->end_controls_section();
     }
 
+    private function get_testimonials_data($settings) {
+        $data_source = $settings['data_source'] ?? 'manual';
+
+        if ($data_source === 'database') {
+            return $this->get_reviews_from_database($settings);
+        } else {
+            return $settings['testimonials_list'] ?? [];
+        }
+    }
+
+    private function get_reviews_from_database($settings) {
+        $posts_per_page = $settings['posts_per_page'] ?? 5;
+        $orderby = $settings['orderby'] ?? 'date';
+        $order = $settings['order'] ?? 'DESC';
+
+        $args = [
+            'post_type' => 'msh_review',
+            'post_status' => 'publish',
+            'posts_per_page' => intval($posts_per_page),
+            'orderby' => $orderby,
+            'order' => $order,
+        ];
+
+        $reviews_query = new \WP_Query($args);
+        $testimonials = [];
+
+        if ($reviews_query->have_posts()) {
+            while ($reviews_query->have_posts()) {
+                $reviews_query->the_post();
+
+                $testimonials[] = [
+                    'testimonial_content' => get_the_content(),
+                    'client_name' => get_the_title(),
+                    'client_position' => '', // Not using position for simplified reviews
+                    'client_image' => [
+                        'url' => get_the_post_thumbnail_url(get_the_ID(), 'thumbnail'),
+                        'id' => get_post_thumbnail_id(get_the_ID()),
+                    ],
+                    'show_quote_icon' => 'yes', // Default to yes for database reviews
+                ];
+            }
+            wp_reset_postdata();
+        }
+
+        return $testimonials;
+    }
+
     protected function render() {
         $settings = $this->get_settings_for_display();
         $widget_id = $this->get_id();
 
-        if (empty($settings['testimonials_list'])) {
+        // Get testimonials based on data source
+        $testimonials_data = $this->get_testimonials_data($settings);
+
+        if (empty($testimonials_data)) {
+            echo '<p>' . __('No testimonials found.', 'medicross-child') . '</p>';
             return;
         }
 
         // Calculate initial slide (middle of the carousel)
-        $total_slides = count($settings['testimonials_list']);
+        $total_slides = count($testimonials_data);
         $initial_slide = floor($total_slides / 2);
 
         // Carousel configuration
@@ -1197,7 +1315,7 @@ class MSH_Testimonial_Carousel_Widget extends Widget_Base {
                  data-initial-slide="<?php echo esc_attr($initial_slide); ?>">
                 
                 <div class="swiper-wrapper">
-                    <?php foreach ($settings['testimonials_list'] as $index => $item) : ?>
+                    <?php foreach ($testimonials_data as $index => $item) : ?>
                         <div class="swiper-slide">
                             <div class="msh-testimonial-card">
                                 <?php if ($item['show_quote_icon'] === 'yes') : ?>

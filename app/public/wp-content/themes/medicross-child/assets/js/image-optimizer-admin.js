@@ -72,12 +72,13 @@
             optimizeByPriority(1, 100);
         });
         
-        // Apply filename suggestions
-        $('#apply-filename-suggestions').on('click', function() {
-            if (confirm('This will rename files to their suggested SEO-friendly names. This action cannot be undone. Continue?')) {
-                applyFilenameSuggestions();
-            }
-        });
+        // Apply filename suggestions - DISABLED: Now handled by image-optimizer-modern.js with selection logic
+        // $('#apply-filename-suggestions').on('click', function() {
+        //     if (confirm('This will rename files to their suggested SEO-friendly names. This action cannot be undone. Continue?')) {
+        //         applyFilenameSuggestions();
+        //     }
+        // });
+        console.log('MSH: Old batch handler disabled, using modern selection-aware handler');
         
         // Save individual filename suggestions (delegated event for dynamic content)
         $(document).on('click', '.save-filename', function() {
@@ -107,7 +108,7 @@
         });
         
         // Filter checkboxes
-        $('.results-filters input[type="checkbox"]').on('change', filterResults);
+        $('.filters-section input[type="checkbox"]').on('change', filterResults);
         
         // Log controls
         $('#clear-log').on('click', function() {
@@ -802,7 +803,8 @@
             mediumPriority: $('#filter-medium-priority').is(':checked'),
             lowPriority: $('#filter-low-priority').is(':checked'),
             missingAlt: $('#filter-missing-alt').is(':checked'),
-            noWebp: $('#filter-no-webp').is(':checked')
+            noWebp: $('#filter-no-webp').is(':checked'),
+            unoptimizedOnly: $('#filter-unoptimized-only').is(':checked')
         };
         
         $('.result-row').each(function() {
@@ -820,9 +822,23 @@
             // Issue filters
             if (filters.missingAlt && issues.includes('alt')) show = true;
             if (filters.noWebp && issues.includes('webp')) show = true;
-            
+
+            // Hide optimized images filter
+            if (filters.unoptimizedOnly) {
+                const isOptimized = $row.data('optimized') === true || $row.data('optimized') === 'true' || $row.data('status') === 'optimized';
+
+                // Debug logging (remove later)
+                if ($row.data('attachment-id') && parseInt($row.data('attachment-id')) < 220) {
+                    console.log('Filter Debug - ID:', $row.data('attachment-id'), 'optimized:', $row.data('optimized'), 'status:', $row.data('status'), 'isOptimized:', isOptimized);
+                }
+
+                if (isOptimized) {
+                    show = false;
+                }
+            }
+
             // If no filters are checked, show all
-            if (!filters.highPriority && !filters.mediumPriority && !filters.lowPriority && 
+            if (!filters.highPriority && !filters.mediumPriority && !filters.lowPriority &&
                 !filters.missingAlt && !filters.noWebp) {
                 show = true;
             }
@@ -881,8 +897,9 @@
             updateLog('Batch optimization complete!');
             loadProgress(); // Refresh progress stats
             
-            // Refresh the analysis to show updated status
-            setTimeout(analyzeImages, 1000);
+            // DISABLED: Auto-refresh causing analysis loop
+            // setTimeout(analyzeImages, 1000);
+            console.log('MSH: Auto-analysis disabled to prevent loop');
             return;
         }
         
@@ -1345,8 +1362,9 @@
                         updateLog(`${status} Image ${result.id}: ${result.reason}`);
                     });
                     
-                    // Refresh analysis
-                    setTimeout(analyzeDuplicates, 1000);
+                    // DISABLED: Auto-refresh causing analysis loop
+                    // setTimeout(analyzeDuplicates, 1000);
+                    console.log('MSH: Auto-duplicate analysis disabled to prevent loop');
                 } else {
                     updateLog('Error during cleanup.');
                 }

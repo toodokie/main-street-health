@@ -25,6 +25,11 @@ function medicross_child_enqueue_styles(){
     wp_enqueue_style('scroll-top-override', get_stylesheet_directory_uri() . '/assets/css/scroll-top-override.css', array(
         'pxl-style-child'
     ), '1.0.0');
+
+    // Add team carousel fixes
+    wp_enqueue_style('team-carousel-fixes', get_stylesheet_directory_uri() . '/assets/css/team-carousel-fixes.css', array(
+        'pxl-style-child'
+    ), '1.0.0');
 }
 add_action( 'wp_enqueue_scripts', 'medicross_child_enqueue_styles', 99);
 
@@ -69,8 +74,11 @@ require_once get_stylesheet_directory() . '/inc/class-msh-targeted-replacement-e
 
 require_once get_stylesheet_directory() . '/inc/msh-navigation-functions.php';
 
+// Register Reviews custom post type
+require_once get_stylesheet_directory() . '/inc/register-reviews-post-type.php';
+
 MSH_Safe_Rename_System::get_instance();
-// TEMPORARILY DISABLED to fix site loading: MSH_Image_Usage_Index::get_instance();
+MSH_Image_Usage_Index::get_instance();
 
 // Debug navigation menu URLs
 require_once get_stylesheet_directory() . '/debug-nav-menu-urls.php';
@@ -359,6 +367,13 @@ function msh_include_elementor_widgets() {
         if (file_exists($post_widget_file)) {
             include_once $post_widget_file;
         }
+
+                // Include MSH Team Carousel widget
+        $team_widget_file = get_stylesheet_directory() . '/elements/widgets/msh_team_carousel.php';
+        if (file_exists($team_widget_file)) {
+            include_once $team_widget_file;
+        }
+
         
         // Include MSH Injuries Grid widget - Final version
         $injuries_grid_final_file = get_stylesheet_directory() . '/inc/elementor/msh-injuries-grid-final.php';
@@ -437,6 +452,10 @@ function msh_register_elementor_widgets() {
         // Single Post Display Widget
         if (class_exists('MSH_Single_Post_Display')) {
             \Elementor\Plugin::instance()->widgets_manager->register_widget_type(new \MSH_Single_Post_Display());
+        }
+        // Team Carousel Widget
+        if (class_exists('MSH_Team_Carousel')) {
+            \Elementor\Plugin::instance()->widgets_manager->register_widget_type(new \MSH_Team_Carousel());
         }
         // Injury Cards Widget - ensure it's loaded
         $injury_cards_file = get_stylesheet_directory() . '/inc/elementor/msh-injury-cards.php';
@@ -1257,3 +1276,70 @@ function msh_optimize_links() {
     });
 }
 add_action('init', 'msh_optimize_links');
+
+/**
+ * Enable SVG uploads with security checks
+ * Added for The Dot Creative Agency icon uploads
+ */
+function enable_svg_uploads($mimes) {
+    $mimes['svg'] = 'image/svg+xml';
+    return $mimes;
+}
+add_filter('upload_mimes', 'enable_svg_uploads');
+
+/**
+ * Security check for SVG uploads - sanitize content
+ */
+function sanitize_svg_upload($file) {
+    // Only process SVG files
+    if ($file['type'] !== 'image/svg+xml') {
+        return $file;
+    }
+
+    // Basic security check - ensure it's actually an SVG
+    $svg_content = file_get_contents($file['tmp_name']);
+
+    // Check for malicious content patterns
+    $malicious_patterns = [
+        '/<script[^>]*>.*?<\/script>/is',
+        '/javascript:/i',
+        '/data:.*base64/i',
+        '/<iframe/i',
+        '/<object/i',
+        '/<embed/i',
+        '/onload=/i',
+        '/onclick=/i',
+        '/onerror=/i'
+    ];
+
+    foreach ($malicious_patterns as $pattern) {
+        if (preg_match($pattern, $svg_content)) {
+            $file['error'] = 'SVG file contains potentially malicious content and cannot be uploaded.';
+            return $file;
+        }
+    }
+
+    // Ensure it starts with SVG declaration
+    if (!preg_match('/^\s*<\?xml.*?\?>\s*<svg/i', $svg_content) && !preg_match('/^\s*<svg/i', $svg_content)) {
+        $file['error'] = 'Invalid SVG file format.';
+        return $file;
+    }
+
+    return $file;
+}
+add_filter('wp_handle_upload_prefilter', 'sanitize_svg_upload');
+
+/**
+ * Fix SVG display in media library
+ */
+function fix_svg_display($response, $attachment, $meta) {
+    if ($response['mime'] === 'image/svg+xml') {
+        $response['image'] = [
+            'src' => $response['url'],
+            'width' => 150,
+            'height' => 150
+        ];
+    }
+    return $response;
+}
+add_filter('wp_prepare_attachment_for_js', 'fix_svg_display', 10, 3);

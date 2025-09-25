@@ -45,8 +45,93 @@ $widget->add_render_attribute( 'carousel', [
     'data-settings' => wp_json_encode($opts)
 ]);
 ?>
-<?php if(isset($settings['team']) && !empty($settings['team']) && count($settings['team'])): 
+<?php if(isset($settings['team']) && !empty($settings['team']) && count($settings['team'])):
 $image_size = !empty($settings['img_size']) ? $settings['img_size'] : 'full'; ?>
+
+<style>
+/* Team Carousel Layout 1 - Complete Navigation Redesign */
+.pxl-team-carousel1 .pxl-item--desc {
+    word-wrap: break-word !important;
+    word-break: normal !important;
+    white-space: normal !important;
+    overflow-wrap: break-word !important;
+    hyphens: none !important;
+    line-height: 1.6 !important;
+    text-align: center !important;
+}
+
+/* Hide the original arrow wrap */
+.pxl-team-carousel1 .pxl-swiper-arrow-wrap {
+    display: none !important;
+}
+
+/* Create new combined navigation container */
+.pxl-team-carousel1 .pxl-navigation-combined {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    gap: 20px !important;
+    margin: 30px 0 0 0 !important;
+    position: relative !important;
+}
+
+/* Style arrows for inline layout */
+.pxl-team-carousel1 .pxl-nav-arrow {
+    width: 40px !important;
+    height: 40px !important;
+    border-radius: 50% !important;
+    background: #A8C8A3 !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    cursor: pointer !important;
+    transition: all 0.3s ease !important;
+    border: none !important;
+    outline: none !important;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1) !important;
+}
+
+.pxl-team-carousel1 .pxl-nav-arrow:hover {
+    background: #5CB3CC !important;
+    transform: scale(1.05) !important;
+}
+
+.pxl-team-carousel1 .pxl-nav-arrow i {
+    color: #fff !important;
+    font-size: 16px !important;
+}
+
+/* Only modify pagination position when inside combined navigation */
+.pxl-team-carousel1 .pxl-navigation-combined .pxl-swiper-dots {
+    position: relative !important;
+    bottom: auto !important;
+    margin: 0 !important;
+}
+
+/* Center all text content */
+.pxl-team-carousel1 .pxl-item--meta {
+    text-align: center !important;
+}
+
+.pxl-team-carousel1 .pxl-item--title {
+    text-align: center !important;
+}
+
+.pxl-team-carousel1 .pxl-item--position {
+    text-align: center !important;
+}
+
+/* Hide the share icon that appears on hover */
+.pxl-team-carousel1 .pxl-social--wrap .fa-share-alt {
+    display: none !important;
+}
+
+/* Optional: Hide the entire social wrap if you want to remove all social icons */
+/* .pxl-team-carousel1 .pxl-social--wrap {
+    display: none !important;
+} */
+</style>
+
 <div class="pxl-swiper-slider pxl-team pxl-team-carousel1 " <?php if($drap !== false) : ?>data-cursor-drap="<?php echo esc_html('DRAG', 'medicross'); ?>"<?php endif; ?>>
     <div class="pxl-carousel-inner">
         <div <?php pxl_print_html($widget->get_render_attribute_string( 'carousel' )); ?>>
@@ -92,7 +177,8 @@ $image_size = !empty($settings['img_size']) ? $settings['img_size'] : 'full'; ?>
                                                     <?php foreach ($team_social as $value): ?>
                                                         <a href="<?php echo esc_url($value['url']); ?>" target="_blank"><i class="<?php echo esc_attr($value['icon']); ?>"></i></a>
                                                     <?php endforeach; ?>
-                                                    <a ><i class="fas fa-share-alt"></i></a>
+                                                    <?php /* Share icon removed - uncomment line below to restore */ ?>
+                                                    <?php /* <a ><i class="fas fa-share-alt"></i></a> */ ?>
                                                 </div>
                                             </div>
                                         <?php endif; ?>
@@ -115,20 +201,40 @@ $image_size = !empty($settings['img_size']) ? $settings['img_size'] : 'full'; ?>
             </div>
         </div>
 
-        <?php if($pagination !== false): ?>
+        <?php if($arrows !== false && $pagination !== false): ?>
+            <!-- Combined Navigation: Left Arrow - Dots - Right Arrow -->
+            <div class="pxl-navigation-combined">
+                <button class="pxl-nav-arrow pxl-nav-prev" onclick="this.closest('.pxl-team-carousel1').querySelector('.pxl-swiper-arrow-prev').click()">
+                    <i class="flaticon flaticon-next" style="transform:scaleX(-1);"></i>
+                </button>
+
+                <div class="pxl-swiper-dots style-1"></div>
+
+                <button class="pxl-nav-arrow pxl-nav-next" onclick="this.closest('.pxl-team-carousel1').querySelector('.pxl-swiper-arrow-next').click()">
+                    <i class="flaticon flaticon-next"></i>
+                </button>
+            </div>
+        <?php elseif($arrows !== false): ?>
+            <!-- Arrows Only - Centered Style -->
+            <div class="pxl-navigation-combined">
+                <button class="pxl-nav-arrow pxl-nav-prev" onclick="this.closest('.pxl-team-carousel1').querySelector('.pxl-swiper-arrow-prev').click()">
+                    <i class="flaticon flaticon-next" style="transform:scaleX(-1);"></i>
+                </button>
+
+                <button class="pxl-nav-arrow pxl-nav-next" onclick="this.closest('.pxl-team-carousel1').querySelector('.pxl-swiper-arrow-next').click()">
+                    <i class="flaticon flaticon-next"></i>
+                </button>
+            </div>
+        <?php elseif($pagination !== false): ?>
+            <!-- Pagination Only -->
             <div class="pxl-swiper-dots style-1"></div>
         <?php endif; ?>
 
-        <?php if($arrows !== false): ?>
-            <div class="pxl-swiper-arrow-wrap style-1">
-                <div class="pxl-swiper-arrow pxl-swiper-arrow-prev" tabindex="0" role="button" aria-label="previous slide" aria-controls="swiper-wrapper-5f10c24cfcd53105d">
-                    <i class="flaticon flaticon-next"></i>
-                </div>
-                <div class="pxl-swiper-arrow pxl-swiper-arrow-next" tabindex="0" role="button" aria-label="next slide" aria-controls="swiper-wrapper-5f10c24cfcd53105d">
-                    <i class="flaticon flaticon-next" style="transform:scaleX(-1);"></i>
-                </div>
-            </div>
-        <?php endif; ?>
+        <!-- Hidden original arrows for functionality -->
+        <div style="display: none;">
+            <div class="pxl-swiper-arrow pxl-swiper-arrow-prev"></div>
+            <div class="pxl-swiper-arrow pxl-swiper-arrow-next"></div>
+        </div>
     </div>
 </div>
 <?php endif; ?>

@@ -37,34 +37,14 @@ class MSH_Image_Optimizer_Admin {
         }
         
         wp_enqueue_script(
-            'msh-image-optimizer-admin',
-            get_stylesheet_directory_uri() . '/assets/js/image-optimizer-admin.js',
+            'msh-image-optimizer-modern',
+            get_stylesheet_directory_uri() . '/assets/js/image-optimizer-modern.js',
             array('jquery'),
-            '1.0.0',
+            '2.0.1-' . time(),
             true
         );
-
-        // TEMPORARILY DISABLED: Enhanced UI files have syntax errors
-        // Will fix after testing core functionality
-        /*
-        wp_enqueue_script(
-            'msh-image-optimizer-rename-ui',
-            get_stylesheet_directory_uri() . '/assets/js/image-optimizer-rename-ui.js',
-            array('jquery'),
-            '1.0.0',
-            true
-        );
-
-        wp_enqueue_script(
-            'msh-image-optimizer-enhanced',
-            get_stylesheet_directory_uri() . '/assets/js/image-optimizer-enhanced.js',
-            array('jquery', 'msh-image-optimizer-admin', 'msh-image-optimizer-rename-ui'),
-            '1.0.0',
-            true
-        );
-        */
         
-        wp_localize_script('msh-image-optimizer-admin', 'mshImageOptimizer', array(
+        wp_localize_script('msh-image-optimizer-modern', 'mshImageOptimizer', array(
             'ajaxurl' => admin_url('admin-ajax.php'),
             'nonce' => wp_create_nonce('msh_image_optimizer'),
             'cleanup_nonce' => wp_create_nonce('msh_media_cleanup'),
@@ -80,7 +60,7 @@ class MSH_Image_Optimizer_Admin {
             'msh-image-optimizer-admin',
             get_stylesheet_directory_uri() . '/assets/css/image-optimizer-admin.css',
             array(),
-            '1.0.0'
+            '1.0.1-' . time()
         );
     }
     
@@ -152,9 +132,9 @@ class MSH_Image_Optimizer_Admin {
                         <strong>RECOMMENDED FIRST:</strong> Optimize your published images with WebP conversion, proper ALT text, and SEO improvements before cleaning duplicates.
                     </p>
                     <div class="action-buttons">
-                        <button id="build-usage-index" class="button" style="background: #5CB3CC; color: #ffffff; border: 1px solid #5CB3CC; margin-right: 10px;">
-                            <?php _e('🚀 Build Usage Index', 'medicross-child'); ?>
-                        </button>
+                        <div style="display: inline-block; background: #d4edda; padding: 8px 12px; border-radius: 4px; margin-left: 10px; font-size: 13px; color: #155724;">
+                            <strong>Smart Indexing:</strong> Files are indexed automatically when renamed for optimal performance
+                        </div>
                         <button id="analyze-images" class="button" style="background: #35332f; color: #ffffff; border: 1px solid #35332f;">
                             <?php _e('Analyze Published Images', 'medicross-child'); ?>
                         </button>
@@ -176,40 +156,92 @@ class MSH_Image_Optimizer_Admin {
                     </div>
                 </div>
 
+                <!-- Optimization Log -->
+                <div class="msh-log-section" style="display: none;">
+                    <h3><?php _e('Optimization Activity', 'medicross-child'); ?></h3>
+                    <div class="log-container">
+                        <textarea id="optimization-log" readonly placeholder="<?php _e('Activity log will appear here...', 'medicross-child'); ?>"></textarea>
+                    </div>
+                </div>
+
                 <!-- Results Display -->
                 <div class="msh-results-section" style="display: none;">
                     <h2><?php _e('Analysis Results', 'medicross-child'); ?></h2>
-                    <div class="filters-section">
-                        <h3><?php _e('Filter Results:', 'medicross-child'); ?></h3>
-                        <label><input type="checkbox" id="filter-high-priority" checked> <?php _e('High Priority (15+)', 'medicross-child'); ?></label>
-                        <label><input type="checkbox" id="filter-medium-priority" checked> <?php _e('Medium Priority (10-14)', 'medicross-child'); ?></label>
-                        <label><input type="checkbox" id="filter-low-priority" checked> <?php _e('Low Priority (0-9)', 'medicross-child'); ?></label>
-                        <label><input type="checkbox" id="filter-missing-alt"> <?php _e('Missing ALT Text', 'medicross-child'); ?></label>
-                        <label><input type="checkbox" id="filter-no-webp"> <?php _e('No WebP', 'medicross-child'); ?></label>
+
+                    <!-- Modern Filters -->
+                    <div class="filter-controls">
+                        <div class="filter-group">
+                            <label class="filter-label"><?php _e('Status:', 'medicross-child'); ?></label>
+                            <select class="filter-control filter-select" data-filter-type="status">
+                                <option value="all"><?php _e('All Images', 'medicross-child'); ?></option>
+                                <option value="needs_optimization" selected><?php _e('Needs Optimization', 'medicross-child'); ?></option>
+                                <option value="optimized"><?php _e('Optimized', 'medicross-child'); ?></option>
+                            </select>
+                        </div>
+                        <div class="filter-group">
+                            <label class="filter-label"><?php _e('Priority:', 'medicross-child'); ?></label>
+                            <select class="filter-control filter-select" data-filter-type="priority">
+                                <option value="all"><?php _e('All Priorities', 'medicross-child'); ?></option>
+                                <option value="high"><?php _e('High (15+)', 'medicross-child'); ?></option>
+                                <option value="medium"><?php _e('Medium (10-14)', 'medicross-child'); ?></option>
+                                <option value="low"><?php _e('Low (0-9)', 'medicross-child'); ?></option>
+                            </select>
+                        </div>
+                        <div class="filter-group">
+                            <label class="filter-label"><?php _e('Filename:', 'medicross-child'); ?></label>
+                            <select class="filter-control filter-select" data-filter-type="filename">
+                                <option value="all"><?php _e('All Files', 'medicross-child'); ?></option>
+                                <option value="has_suggestion"><?php _e('Has Filename Suggestion', 'medicross-child'); ?></option>
+                                <option value="no_suggestion"><?php _e('No Filename Suggestion', 'medicross-child'); ?></option>
+                            </select>
+                        </div>
+                        <div class="filter-group">
+                            <label class="filter-label"><?php _e('Issues:', 'medicross-child'); ?></label>
+                            <select class="filter-control filter-select" data-filter-type="issues">
+                                <option value="all"><?php _e('All Issues', 'medicross-child'); ?></option>
+                                <option value="missing_alt"><?php _e('Missing ALT Text', 'medicross-child'); ?></option>
+                                <option value="no_webp"><?php _e('No WebP', 'medicross-child'); ?></option>
+                                <option value="large_size"><?php _e('Large File Size', 'medicross-child'); ?></option>
+                            </select>
+                        </div>
+                        <div class="filter-actions">
+                            <span class="results-count" id="results-count">0 images</span>
+                            <button id="clear-filters" class="button button-secondary"><?php _e('Clear', 'medicross-child'); ?></button>
+                        </div>
                     </div>
-                    
+
+                    <!-- Bulk Actions -->
                     <div class="bulk-actions">
-                        <label><input type="checkbox" id="select-all"> <?php _e('Select All', 'medicross-child'); ?></label>
+                        <label class="select-all-label">
+                            <input type="checkbox" id="select-all" class="select-all-checkbox">
+                            <?php _e('Select All', 'medicross-child'); ?>
+                        </label>
                         <button id="optimize-selected" class="button" disabled><?php _e('Optimize Selected', 'medicross-child'); ?></button>
+                        <span class="selected-count" id="selected-count">0 selected</span>
                     </div>
-                    
-                    <table class="results-table" id="results-table">
-                        <thead>
-                            <tr>
-                                <th><input type="checkbox" id="select-all-header"></th>
-                                <th><?php _e('Image', 'medicross-child'); ?></th>
-                                <th><?php _e('Filename', 'medicross-child'); ?></th>
-                                <th><?php _e('Priority', 'medicross-child'); ?></th>
-                                <th><?php _e('Issues', 'medicross-child'); ?></th>
-                                <th><?php _e('Size', 'medicross-child'); ?></th>
-                                <th><?php _e('Used In', 'medicross-child'); ?></th>
-                                <th><?php _e('Actions', 'medicross-child'); ?></th>
-                            </tr>
-                        </thead>
-                        <tbody id="results-tbody">
-                            <tr><td colspan="8" class="no-results"><?php _e('Click "Analyze Published Images" to begin analysis.', 'medicross-child'); ?></td></tr>
-                        </tbody>
-                    </table>
+
+                    <!-- Results Table -->
+                    <div class="results-container">
+                        <table class="results-table" id="results-table">
+                            <thead>
+                                <tr>
+                                    <th class="select-column"><input type="checkbox" id="select-all-header"></th>
+                                    <th class="image-column"><?php _e('Image', 'medicross-child'); ?></th>
+                                    <th class="filename-column"><?php _e('Filename', 'medicross-child'); ?></th>
+                                    <th class="context-column"><?php _e('Content Category', 'medicross-child'); ?></th>
+                                    <th class="status-column"><?php _e('Status', 'medicross-child'); ?></th>
+                                    <th class="priority-column"><?php _e('Priority', 'medicross-child'); ?></th>
+                                    <th class="size-column"><?php _e('Size', 'medicross-child'); ?></th>
+                                    <th class="actions-column"><?php _e('Actions', 'medicross-child'); ?></th>
+                                </tr>
+                            </thead>
+                            <tbody id="results-tbody">
+                                <tr class="no-results-row">
+                                    <td colspan="8" class="no-results"><?php _e('Click "Analyze Published Images" to begin analysis.', 'medicross-child'); ?></td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
 
                 <!-- Step 2: Duplicate Management -->
@@ -248,16 +280,32 @@ class MSH_Image_Optimizer_Admin {
                 
             </div>
             
-            <!-- Optimization Log -->
-            <div class="msh-log-section">
-                <h2><?php _e('Optimization Log', 'medicross-child'); ?></h2>
-                <div class="log-container">
-                    <textarea id="optimization-log" readonly placeholder="<?php _e('Activity log will appear here...', 'medicross-child'); ?>"></textarea>
-                </div>
-            </div>
-            
         </div>
         <?php
+    }
+
+    /**
+     * Get usage index statistics for display
+     */
+    private function get_usage_index_stats() {
+        try {
+            if (class_exists('MSH_Image_Usage_Index')) {
+                $usage_index = MSH_Image_Usage_Index::get_instance();
+                $stats = $usage_index->get_index_stats();
+
+                if ($stats && $stats['summary'] && $stats['summary']->total_entries > 0) {
+                    return [
+                        'total_entries' => $stats['summary']->total_entries,
+                        'unique_attachments' => $stats['summary']->indexed_attachments,
+                        'last_update' => $stats['summary']->last_update
+                    ];
+                }
+            }
+        } catch (Exception $e) {
+            error_log('MSH DEBUG: Error getting usage index stats: ' . $e->getMessage());
+        }
+
+        return false;
     }
 }
 
