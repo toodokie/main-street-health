@@ -85,40 +85,52 @@ class MSH_Backup_Verification_System {
 
         $backup_count = 0;
 
-        // Backup posts content
-        $posts = $wpdb->get_results($wpdb->prepare("
-            SELECT ID, post_content, post_excerpt
-            FROM {$wpdb->posts}
-            WHERE post_content LIKE %s OR post_excerpt LIKE %s
-        ", '%' . $wpdb->esc_like(key($replacement_map)) . '%', '%' . $wpdb->esc_like(key($replacement_map)) . '%'));
+        $urls = array_keys($replacement_map);
 
-        foreach ($posts as $post) {
-            // Backup post_content
-            if ($this->contains_any_urls($post->post_content, array_keys($replacement_map))) {
-                $wpdb->insert($this->backup_table, [
-                    'operation_id' => $operation_id,
-                    'attachment_id' => $attachment_id,
-                    'table_name' => 'posts',
-                    'row_id' => $post->ID,
-                    'column_name' => 'post_content',
-                    'original_value' => $post->post_content,
-                    'status' => 'active'
-                ]);
-                $backup_count++;
+        // Backup posts content
+        $processed_post_columns = [];
+        foreach ($urls as $old_url) {
+            if ($old_url === '') {
+                continue;
             }
 
-            // Backup post_excerpt
-            if ($this->contains_any_urls($post->post_excerpt, array_keys($replacement_map))) {
-                $wpdb->insert($this->backup_table, [
-                    'operation_id' => $operation_id,
-                    'attachment_id' => $attachment_id,
-                    'table_name' => 'posts',
-                    'row_id' => $post->ID,
-                    'column_name' => 'post_excerpt',
-                    'original_value' => $post->post_excerpt,
-                    'status' => 'active'
-                ]);
-                $backup_count++;
+            $like = '%' . $wpdb->esc_like($old_url) . '%';
+            $posts = $wpdb->get_results($wpdb->prepare("
+                SELECT ID, post_content, post_excerpt
+                FROM {$wpdb->posts}
+                WHERE post_content LIKE %s OR post_excerpt LIKE %s
+            ", $like, $like));
+
+            foreach ($posts as $post) {
+                $content_key = $post->ID . ':post_content';
+                if (!isset($processed_post_columns[$content_key]) && $this->contains_any_urls($post->post_content, $urls)) {
+                    $wpdb->insert($this->backup_table, [
+                        'operation_id' => $operation_id,
+                        'attachment_id' => $attachment_id,
+                        'table_name' => 'posts',
+                        'row_id' => $post->ID,
+                        'column_name' => 'post_content',
+                        'original_value' => $post->post_content,
+                        'status' => 'active'
+                    ]);
+                    $backup_count++;
+                    $processed_post_columns[$content_key] = true;
+                }
+
+                $excerpt_key = $post->ID . ':post_excerpt';
+                if (!isset($processed_post_columns[$excerpt_key]) && $this->contains_any_urls($post->post_excerpt, $urls)) {
+                    $wpdb->insert($this->backup_table, [
+                        'operation_id' => $operation_id,
+                        'attachment_id' => $attachment_id,
+                        'table_name' => 'posts',
+                        'row_id' => $post->ID,
+                        'column_name' => 'post_excerpt',
+                        'original_value' => $post->post_excerpt,
+                        'status' => 'active'
+                    ]);
+                    $backup_count++;
+                    $processed_post_columns[$excerpt_key] = true;
+                }
             }
         }
 
@@ -146,7 +158,14 @@ class MSH_Backup_Verification_System {
         global $wpdb;
         $backup_count = 0;
 
-        foreach (array_keys($replacement_map) as $old_url) {
+        $processed_rows = [];
+        $urls = array_keys($replacement_map);
+
+        foreach ($urls as $old_url) {
+            if ($old_url === '') {
+                continue;
+            }
+
             $like = '%' . $wpdb->esc_like($old_url) . '%';
             $rows = $wpdb->get_results($wpdb->prepare("
                 SELECT {$id_column} as id, {$value_column} as value
@@ -155,6 +174,14 @@ class MSH_Backup_Verification_System {
             ", $like));
 
             foreach ($rows as $row) {
+                if (isset($processed_rows[$row->id])) {
+                    continue;
+                }
+
+                if (!$this->contains_any_urls($row->value, $urls)) {
+                    continue;
+                }
+
                 $wpdb->insert($this->backup_table, [
                     'operation_id' => $operation_id,
                     'attachment_id' => $attachment_id,
@@ -165,6 +192,7 @@ class MSH_Backup_Verification_System {
                     'status' => 'active'
                 ]);
                 $backup_count++;
+                $processed_rows[$row->id] = true;
             }
         }
 
@@ -194,15 +222,6 @@ class MSH_Backup_Verification_System {
     public function verify_replacement($operation_id, $attachment_id, $replacement_map, $targeted_updates = null) {
         global $wpdb;
 
-        error_log('MSH VERIFICATION DEBUG: Starting verification for operation ' . $operation_id . ', attachment ' . $attachment_id);
-        error_log('MSH VERIFICATION DEBUG: Replacement map: ' . print_r($replacement_map, true));
-        error_log('MSH VERIFICATION DEBUG: TARGETED UPDATES PARAMETER: ' . ($targeted_updates === null ? 'NULL' : (is_array($targeted_updates) ? count($targeted_updates) . ' items' : 'NOT ARRAY')));
-        if ($targeted_updates && is_array($targeted_updates)) {
-            error_log('MSH VERIFICATION DEBUG: WILL USE TARGETED VERIFICATION');
-        } else {
-            error_log('MSH VERIFICATION DEBUG: WILL USE GLOBAL VERIFICATION - THIS IS THE PROBLEM!');
-        }
-        error_log('MSH VERIFICATION DEBUG: Targeted updates parameter debug: ' . ($targeted_updates === null ? 'NULL' : (is_array($targeted_updates) ? 'ARRAY with ' . count($targeted_updates) . ' items' : 'NOT ARRAY: ' . print_r($targeted_updates, true))));
 
         $verification_results = [];
         $success_count = 0;
@@ -224,15 +243,12 @@ class MSH_Backup_Verification_System {
                 WHERE post_content LIKE %s OR post_excerpt LIKE %s
             ", $like, $like));
 
-            error_log('MSH VERIFICATION DEBUG: Posts table - Old URL: ' . $old_url . ', Remaining count: ' . $remaining);
 
             $status = $remaining > 0 ? 'failed' : 'success';
             if ($status === 'failed') {
                 $error_count++;
-                error_log('MSH VERIFICATION DEBUG: Posts verification FAILED - ' . $remaining . ' occurrences still found');
             } else {
                 $success_count++;
-                error_log('MSH VERIFICATION DEBUG: Posts verification SUCCESS - no occurrences found');
             }
 
             $wpdb->insert($this->verification_table, [
@@ -276,15 +292,12 @@ class MSH_Backup_Verification_System {
                     WHERE {$value_column} LIKE %s
                 ", $like));
 
-                error_log('MSH VERIFICATION DEBUG: ' . $table_name . ' table - Old URL: ' . $old_url . ', Remaining count: ' . $remaining);
 
                 $status = $remaining > 0 ? 'failed' : 'success';
                 if ($status === 'failed') {
                     $error_count++;
-                    error_log('MSH VERIFICATION DEBUG: ' . $table_name . ' verification FAILED - ' . $remaining . ' occurrences still found');
                 } else {
                     $success_count++;
-                    error_log('MSH VERIFICATION DEBUG: ' . $table_name . ' verification SUCCESS - no occurrences found');
                 }
 
                 $wpdb->insert($this->verification_table, [
@@ -307,7 +320,6 @@ class MSH_Backup_Verification_System {
         }
 
         $overall_status = $error_count === 0 ? 'success' : 'failed';
-        error_log('MSH VERIFICATION DEBUG: FINAL RESULT - Overall status: ' . $overall_status . ', Success: ' . $success_count . ', Errors: ' . $error_count);
 
         return [
             'overall_status' => $overall_status,
@@ -323,7 +335,6 @@ class MSH_Backup_Verification_System {
     private function verify_targeted_updates($operation_id, $attachment_id, $targeted_updates, $replacement_map) {
         global $wpdb;
 
-        error_log('MSH VERIFICATION DEBUG: TARGETED VERIFICATION - Checking only ' . count($targeted_updates) . ' specific rows');
 
         $verification_results = [];
         $success_count = 0;
@@ -337,7 +348,6 @@ class MSH_Backup_Verification_System {
             $old_value = $update['old_value'];
             $new_value = $update['new_value'];
 
-            error_log('MSH VERIFICATION DEBUG: Checking row ' . $row_id . ' in ' . $table . '.' . $column);
 
             // Check if this specific row still contains the old URL
             $current_value = $wpdb->get_var($wpdb->prepare("
@@ -351,11 +361,9 @@ class MSH_Backup_Verification_System {
             if ($still_contains_old) {
                 $error_count++;
                 $status = 'failed';
-                error_log('MSH VERIFICATION DEBUG: FAILED - Row ' . $row_id . ' still contains old URL: ' . $old_value);
             } else {
                 $success_count++;
                 $status = 'success';
-                error_log('MSH VERIFICATION DEBUG: SUCCESS - Row ' . $row_id . ' was updated correctly');
             }
 
             $wpdb->insert($this->verification_table, [
@@ -380,7 +388,6 @@ class MSH_Backup_Verification_System {
         }
 
         $overall_status = $error_count === 0 ? 'success' : 'failed';
-        error_log('MSH VERIFICATION DEBUG: TARGETED VERIFICATION RESULT - Overall status: ' . $overall_status . ', Success: ' . $success_count . ', Errors: ' . $error_count);
 
         return [
             'overall_status' => $overall_status,

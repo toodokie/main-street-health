@@ -20,7 +20,7 @@ class MSH_Image_Optimizer_Admin {
      */
     public function add_admin_menu() {
         add_media_page(
-            'MSH Image Optimizer',
+            'The Dot Image Optimizer',
             'Image Optimizer',
             'manage_options',
             'msh-image-optimizer',
@@ -36,6 +36,33 @@ class MSH_Image_Optimizer_Admin {
             return;
         }
         
+        wp_enqueue_style(
+            'msh-image-optimizer-fonts',
+            'https://use.typekit.net/gac6jnd.css',
+            array(),
+            null
+        );
+
+        if (!class_exists('MSH_Image_Usage_Index')) {
+            require_once get_stylesheet_directory() . '/inc/class-msh-image-usage-index.php';
+        }
+
+        $index_summary = null;
+        if (class_exists('MSH_Image_Usage_Index')) {
+            $usage_index = MSH_Image_Usage_Index::get_instance();
+            $stats = $usage_index->get_index_stats();
+            if (!empty($stats['summary'])) {
+                $summary = $stats['summary'];
+                $index_summary = array(
+                    'total_entries' => isset($summary->total_entries) ? (int) $summary->total_entries : 0,
+                    'indexed_attachments' => isset($summary->indexed_attachments) ? (int) $summary->indexed_attachments : 0,
+                    'unique_locations' => isset($summary->unique_locations) ? (int) $summary->unique_locations : 0,
+                    'last_update_raw' => $summary->last_update,
+                    'last_update_display' => $summary->last_update ? mysql2date(get_option('date_format') . ' ' . get_option('time_format'), $summary->last_update, false) : null,
+                );
+            }
+        }
+
         wp_enqueue_script(
             'msh-image-optimizer-modern',
             get_stylesheet_directory_uri() . '/assets/js/image-optimizer-modern.js',
@@ -48,6 +75,7 @@ class MSH_Image_Optimizer_Admin {
             'ajaxurl' => admin_url('admin-ajax.php'),
             'nonce' => wp_create_nonce('msh_image_optimizer'),
             'cleanup_nonce' => wp_create_nonce('msh_media_cleanup'),
+            'indexStats' => $index_summary,
             'strings' => array(
                 'analyzing' => __('Analyzing images...', 'medicross-child'),
                 'optimizing' => __('Optimizing images...', 'medicross-child'),
@@ -59,7 +87,7 @@ class MSH_Image_Optimizer_Admin {
         wp_enqueue_style(
             'msh-image-optimizer-admin',
             get_stylesheet_directory_uri() . '/assets/css/image-optimizer-admin.css',
-            array(),
+            array('msh-image-optimizer-fonts'),
             '1.0.1-' . time()
         );
     }
@@ -70,7 +98,7 @@ class MSH_Image_Optimizer_Admin {
     public function admin_page() {
         ?>
         <div class="wrap">
-            <h1><?php _e('MSH Image Optimizer', 'medicross-child'); ?></h1>
+            <h1><?php _e('The Dot Image Optimizer', 'medicross-child'); ?></h1>
             
             <div class="msh-optimizer-dashboard">
                 
@@ -92,7 +120,43 @@ class MSH_Image_Optimizer_Admin {
                         </div>
                     </div>
                 </div>
-                
+
+                <!-- Rename Settings -->
+                <div class="msh-rename-settings-section">
+                    <h2><?php _e('File Rename Settings', 'medicross-child'); ?></h2>
+                    <div class="rename-setting-card">
+                        <div class="rename-setting-content">
+                            <label class="rename-toggle-wrapper">
+                                <input type="checkbox" id="enable-file-rename" class="rename-toggle-checkbox"
+                                       <?php checked(get_option('msh_enable_file_rename', '0'), '1'); ?>>
+                                <span class="rename-toggle-slider"></span>
+                                <div class="rename-toggle-text">
+                                    <strong><?php _e('Enable File Renaming', 'medicross-child'); ?></strong>
+                                    <span class="rename-toggle-description">
+                                        <?php _e('Allow the optimizer to rename files for better SEO. Requires usage index to prevent broken links.', 'medicross-child'); ?>
+                                    </span>
+                                </div>
+                            </label>
+                            <div id="rename-status-indicator" class="rename-status">
+                                <span class="rename-status-text">
+                                    <?php
+                                    $rename_enabled = get_option('msh_enable_file_rename', '0') === '1';
+                                    $index_built = get_option('msh_usage_index_last_build') !== false;
+
+                                    if ($rename_enabled && $index_built) {
+                                        echo '<span class="status-ready">' . __('✓ Ready for renaming', 'medicross-child') . '</span>';
+                                    } elseif ($rename_enabled && !$index_built) {
+                                        echo '<span class="status-pending">' . __('⚠ Index required', 'medicross-child') . '</span>';
+                                    } else {
+                                        echo '<span class="status-disabled">' . __('Renaming disabled', 'medicross-child') . '</span>';
+                                    }
+                                    ?>
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- Progress Overview -->
                 <div class="msh-progress-section">
                     <h2><?php _e('Image Optimization Progress', 'medicross-child'); ?></h2>
@@ -123,6 +187,27 @@ class MSH_Image_Optimizer_Admin {
                         <span class="progress-percent" id="progress-percent">0%</span>
                     </div>
                     <div class="progress-status" id="progress-status">Waiting for analysis…</div>
+                    <div class="index-status-card">
+                        <div class="index-status-info">
+                            <div>
+                                <span class="index-status-label"><?php _e('Usage Index:', 'medicross-child'); ?></span>
+                                <span id="index-status-summary" class="index-status-value">&mdash;</span>
+                            </div>
+                            <div id="index-last-updated" class="index-status-timestamp"></div>
+                        </div>
+                        <div class="index-status-actions">
+                            <button id="rebuild-usage-index" class="button button-secondary">
+                                <?php _e('Smart Build Index', 'medicross-child'); ?>
+                            </button>
+                            <button id="force-rebuild-usage-index" class="button button-primary" style="margin-left: 10px;">
+                                <?php _e('Force Rebuild', 'medicross-child'); ?>
+                            </button>
+                            <div class="index-button-help" style="margin-top: 8px; font-size: 12px; color: #666;">
+                                <div><strong>Smart Build:</strong> Only processes new/changed attachments (fast, incremental)</div>
+                                <div><strong>Force Rebuild:</strong> Clears everything and rebuilds from scratch (slow, complete)</div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
                 
                 <!-- Step 1: Image Optimization -->
@@ -131,11 +216,9 @@ class MSH_Image_Optimizer_Admin {
                     <p style="margin-bottom: 15px; color: #35332f; font-size: 14px; background: #faf9f6; padding: 10px; border-radius: 4px;">
                         <strong>RECOMMENDED FIRST:</strong> Optimize your published images with WebP conversion, proper ALT text, and SEO improvements before cleaning duplicates.
                     </p>
-                    <div class="action-buttons">
-                        <div style="display: inline-block; background: #d4edda; padding: 8px 12px; border-radius: 4px; margin-left: 10px; font-size: 13px; color: #155724;">
-                            <strong>Smart Indexing:</strong> Files are indexed automatically when renamed for optimal performance
-                        </div>
-                        <button id="analyze-images" class="button" style="background: #35332f; color: #ffffff; border: 1px solid #35332f;">
+                    <p class="msh-inline-note"><em><?php _e('Smart Indexing: Files are indexed automatically when renamed for optimal performance', 'medicross-child'); ?></em></p>
+                    <div class="action-buttons" style="flex-wrap: wrap;">
+                        <button id="analyze-images" class="button" style="background: #daff00; color: #35332f; border: 1px solid #35332f;">
                             <?php _e('Analyze Published Images', 'medicross-child'); ?>
                         </button>
                         <button id="optimize-high-priority" class="button" style="background: #daff00; color: #35332f; border: 1px solid #35332f;" disabled>
@@ -150,17 +233,22 @@ class MSH_Image_Optimizer_Admin {
                         <button id="apply-filename-suggestions" class="button" style="background: #daff00; color: #35332f; border: 1px solid #35332f;" disabled>
                             <?php _e('Apply Filename Suggestions', 'medicross-child'); ?>
                         </button>
+                        <span class="action-button-pair">
+                        <button id="verify-webp-status" class="button" style="background: #faf9f6; color: #35332f; border: 1px solid #35332f;">
+                            <?php _e('Verify WebP Status', 'medicross-child'); ?>
+                        </button>
                         <button id="reset-optimization" class="button button-secondary" style="background: #faf9f6; color: #35332f; border: 1px solid #35332f;">
                             <?php _e('Reset Optimization Flags', 'medicross-child'); ?>
                         </button>
+                        </span>
                     </div>
                 </div>
 
-                <!-- Optimization Log -->
-                <div class="msh-log-section" style="display: none;">
+                <!-- Step 1: Optimization Activity Log -->
+                <div class="msh-log-section step1-log" style="display: none;">
                     <h3><?php _e('Optimization Activity', 'medicross-child'); ?></h3>
                     <div class="log-container">
-                        <textarea id="optimization-log" readonly placeholder="<?php _e('Activity log will appear here...', 'medicross-child'); ?>"></textarea>
+                        <textarea id="optimization-log" readonly placeholder="<?php _e('Optimization activity will appear here...', 'medicross-child'); ?>"></textarea>
                     </div>
                 </div>
 
@@ -254,7 +342,7 @@ class MSH_Image_Optimizer_Admin {
                         <button id="quick-duplicate-scan" class="button" style="background: #35332f; color: #ffffff; border: 1px solid #35332f;">
                             <?php _e('Quick Duplicate Scan', 'medicross-child'); ?>
                         </button>
-                        <button id="full-library-scan" class="button" style="background: #daff00; color: #35332f; border: 1px solid #35332f; font-weight: 600;">
+                        <button id="full-library-scan" class="button" style="background: #daff00; color: #35332f; border: 1px solid #35332f;">
                             <?php _e('Deep Library Scan', 'medicross-child'); ?>
                         </button>
                         <button id="test-cleanup" class="button button-secondary" style="background: #faf9f6; color: #35332f; border: 1px solid #35332f; margin-left: 20px;">
@@ -262,7 +350,15 @@ class MSH_Image_Optimizer_Admin {
                         </button>
                     </div>
                 </div>
-                
+
+                <!-- Step 2: Duplicate Cleanup Activity Log -->
+                <div class="msh-log-section step2-log" style="display: none;">
+                    <h3><?php _e('Duplicate Cleanup Activity', 'medicross-child'); ?></h3>
+                    <div class="log-container">
+                        <textarea id="duplicate-log" readonly placeholder="<?php _e('Duplicate cleanup activity will appear here...', 'medicross-child'); ?>"></textarea>
+                    </div>
+                </div>
+
                 <!-- Processing Modal -->
                 <div id="processing-modal" class="processing-modal" style="display: none;">
                     <div class="modal-content">
@@ -302,7 +398,7 @@ class MSH_Image_Optimizer_Admin {
                 }
             }
         } catch (Exception $e) {
-            error_log('MSH DEBUG: Error getting usage index stats: ' . $e->getMessage());
+            // Debug logging removed for production
         }
 
         return false;

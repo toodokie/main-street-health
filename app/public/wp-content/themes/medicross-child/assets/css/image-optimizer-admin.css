@@ -1,5 +1,166 @@
 /* MSH Image Optimizer Admin Styles - The Dot Creative Agency Brand */
 
+.msh-optimizer-dashboard,
+.msh-optimizer-dashboard * {
+    font-family: 'ff-real-text-pro', sans-serif;
+}
+
+.msh-optimizer-dashboard {
+    --msh-font-xl: clamp(1.25rem, 3vw, 1.5rem);      /* ~20px – 24px */
+    --msh-font-lg: clamp(1.0625rem, 2.6vw, 1.35rem); /* ~17px – 21.6px */
+    --msh-font-md: clamp(0.9375rem, 2.2vw, 1.1rem);  /* ~15px – 17.6px */
+    --msh-font-sm: clamp(0.8125rem, 1.8vw, 0.95rem); /* ~13px – 15.2px */
+    --msh-font-xs: clamp(0.75rem, 1.6vw, 0.875rem);  /* ~12px – 14px */
+    --msh-font-xxs: clamp(0.6875rem, 1.4vw, 0.8125rem); /* ~11px – 13px */
+    --msh-font-min: clamp(0.625rem, 1.1vw, 0.75rem); /* ~10px – 12px */
+}
+
+.msh-optimizer-dashboard h1,
+.msh-optimizer-dashboard h2,
+.msh-optimizer-dashboard h3,
+.msh-optimizer-dashboard h4,
+.msh-optimizer-dashboard h5 {
+    font-family: 'futura-pt', sans-serif;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+}
+
+.msh-optimizer-dashboard .msh-progress-section h2,
+.msh-optimizer-dashboard .msh-actions-section h2,
+.msh-optimizer-dashboard .msh-results-section h2 {
+    font-size: clamp(1.25rem, 3vw, 1.75rem);
+    letter-spacing: 0.04em;
+    font-weight: 300;
+}
+
+.msh-optimizer-dashboard .msh-inline-note {
+    margin: 0 0 15px;
+    font-size: var(--msh-font-sm);
+    color: #35332f;
+}
+
+.msh-optimizer-dashboard .button,
+.msh-optimizer-dashboard button,
+.msh-optimizer-dashboard .button-primary {
+    font-family: 'futura-pt', sans-serif;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    font-weight: 400;
+}
+
+/* Rename Settings Section */
+.msh-rename-settings-section {
+    background: #faf9f6;
+    border: 1px solid #e1ddd7;
+    border-radius: 8px;
+    padding: 20px;
+    margin-bottom: 20px;
+}
+
+.msh-rename-settings-section h2 {
+    font-size: var(--msh-font-lg);
+    color: #35332f;
+    margin-bottom: 15px;
+}
+
+.rename-setting-card {
+    background: white;
+    border-radius: 6px;
+    padding: 20px;
+    border: 1px solid #e8e4de;
+}
+
+.rename-setting-content {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 20px;
+}
+
+.rename-toggle-wrapper {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    cursor: pointer;
+    flex: 1;
+}
+
+.rename-toggle-checkbox {
+    position: absolute;
+    opacity: 0;
+    cursor: pointer;
+}
+
+.rename-toggle-slider {
+    position: relative;
+    display: inline-block;
+    width: 50px;
+    height: 24px;
+    background-color: #ccc;
+    border-radius: 24px;
+    transition: background-color 0.3s;
+}
+
+.rename-toggle-slider:before {
+    position: absolute;
+    content: "";
+    height: 18px;
+    width: 18px;
+    left: 3px;
+    top: 3px;
+    background-color: white;
+    border-radius: 50%;
+    transition: transform 0.3s;
+}
+
+.rename-toggle-checkbox:checked + .rename-toggle-slider {
+    background-color: #daff00;
+}
+
+.rename-toggle-checkbox:checked + .rename-toggle-slider:before {
+    transform: translateX(26px);
+}
+
+.rename-toggle-text strong {
+    display: block;
+    font-size: var(--msh-font-md);
+    color: #35332f;
+    margin-bottom: 4px;
+}
+
+.rename-toggle-description {
+    font-size: var(--msh-font-sm);
+    color: #666;
+    line-height: 1.4;
+}
+
+.rename-status {
+    flex-shrink: 0;
+}
+
+.rename-status-text .status-ready {
+    color: #22c55e;
+    font-weight: 600;
+}
+
+.rename-status-text .status-pending {
+    color: #f59e0b;
+    font-weight: 600;
+}
+
+.rename-status-text .status-disabled {
+    color: #6b7280;
+    font-weight: 600;
+}
+
+.msh-optimizer-dashboard .stat-number,
+.msh-optimizer-dashboard .filter-label,
+.msh-optimizer-dashboard .status-label,
+.msh-optimizer-dashboard .stat-label {
+    font-family: 'futura-pt', sans-serif;
+    letter-spacing: 0.06em;
+}
+
 .msh-image-optimizer {
     max-width: 1200px;
     margin: 20px 0;
@@ -43,14 +204,14 @@
 
 .stat-number {
     display: block;
-    font-size: 24px;
+    font-size: var(--msh-font-xl);
     font-weight: bold;
     color: #35332f;
 }
 
 .stat-label {
     display: block;
-    font-size: 12px;
+    font-size: var(--msh-font-xs);
     color: #35332f;
     margin-top: 5px;
 }
@@ -85,7 +246,7 @@
     top: 50%;
     left: 50%;
     transform: translate(-50%, -50%);
-    font-size: 12px;
+    font-size: var(--msh-font-xs);
     font-weight: 600;
     color: #35332f;
     pointer-events: none;
@@ -93,8 +254,76 @@
 
 .progress-status {
     margin-top: 8px;
-    font-size: 13px;
+    font-size: var(--msh-font-sm);
     color: #35332f;
+}
+
+.index-status-card {
+    margin-top: 16px;
+    background: #faf9f6;
+    border: 1px solid #dce2ec;
+    border-radius: 6px;
+    padding: 12px 16px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.index-status-info {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    color: #35332f;
+    font-size: 14px;
+}
+
+.index-status-label {
+    font-weight: 600;
+    margin-right: 6px;
+}
+
+.index-status-value {
+    font-weight: 600;
+}
+
+.index-status-timestamp {
+    font-size: 12px;
+    color: #666666;
+}
+
+.index-status-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    align-items: flex-end;
+}
+
+.index-status-actions .button {
+    border: 1px solid #35332f;
+    color: #35332f;
+    background: #faf9f6;
+}
+
+.index-status-actions .button:hover {
+    background: #f1f4f8;
+}
+
+.index-status-hint {
+    font-size: 12px;
+    color: #666666;
+}
+
+@media (max-width: 768px) {
+    .index-status-card {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .index-status-actions {
+        align-items: flex-start;
+    }
 }
 
 .msh-actions-section {
@@ -110,6 +339,11 @@
     gap: 10px;
     flex-wrap: wrap;
     margin-top: 15px;
+}
+
+.action-buttons .action-button-pair {
+    display: inline-flex;
+    gap: 10px;
 }
 
 .action-buttons .button {
@@ -169,7 +403,7 @@
 
 .context-meta-details {
     margin-top: 8px;
-    font-size: 11px;
+    font-size: var(--msh-font-xxs);
     color: #35332f;
 }
 
@@ -208,7 +442,7 @@
     margin: 0 6px 6px 0;
     padding: 2px 8px;
     border-radius: 999px;
-    font-size: 11px;
+    font-size: var(--msh-font-xxs);
     font-weight: 600;
     border: 1px solid #c3c4c7;
     background: #ffffff;
@@ -246,7 +480,7 @@
 .context-summary .msh-context-highlights {
     display: inline-block;
     margin-top: 4px;
-    font-size: 11px;
+    font-size: var(--msh-font-xxs);
     color: #55504a;
 }
 
@@ -277,7 +511,7 @@
 }
 
 .context-summary .edit-context-inline .dashicons {
-    font-size: 14px;
+    font-size: var(--msh-font-md);
 }
 
 .context-inline-editor {
@@ -309,7 +543,8 @@ tr.context-updated {
     }
 }
 
-#optimization-log {
+#optimization-log,
+#duplicate-log {
     background: #35332f;
     color: #faf9f6;
     padding: 15px;
@@ -318,7 +553,7 @@ tr.context-updated {
     width: 100%;
     border: none;
     font-family: monospace;
-    font-size: 12px;
+    font-size: var(--msh-font-xs);
     white-space: pre-wrap;
     resize: vertical;
     box-sizing: border-box;
@@ -381,7 +616,7 @@ tr.context-updated {
     color: #daff00;
     padding: 2px 6px;
     border-radius: 3px;
-    font-size: 11px;
+    font-size: var(--msh-font-xxs);
     font-weight: bold;
 }
 
@@ -390,7 +625,7 @@ tr.context-updated {
     color: #faf9f6;
     padding: 2px 6px;
     border-radius: 3px;
-    font-size: 11px;
+    font-size: var(--msh-font-xxs);
     font-weight: bold;
 }
 
@@ -399,7 +634,7 @@ tr.context-updated {
     color: #35332f;
     padding: 2px 6px;
     border-radius: 3px;
-    font-size: 11px;
+    font-size: var(--msh-font-xxs);
     font-weight: bold;
     border: 1px solid #35332f;
 }
@@ -409,7 +644,7 @@ tr.context-updated {
     padding: 2px 6px;
     margin: 1px;
     border-radius: 3px;
-    font-size: 10px;
+    font-size: var(--msh-font-min);
     font-weight: bold;
 }
 
@@ -434,7 +669,7 @@ tr.context-updated {
     display: inline-block !important;
     padding: 2px 6px !important;
     border-radius: 3px !important;
-    font-size: 11px !important;
+    font-size: var(--msh-font-xxs) !important;
     font-weight: 600 !important;
     line-height: 1.2 !important;
     text-transform: uppercase !important;
@@ -574,7 +809,7 @@ tr.context-updated {
 .filter-label {
     font-weight: 600;
     color: #35332f;
-    font-size: 14px;
+    font-size: var(--msh-font-md);
     white-space: nowrap;
 }
 
@@ -584,7 +819,7 @@ tr.context-updated {
     border-radius: 4px;
     background: #ffffff;
     color: #35332f;
-    font-size: 14px;
+    font-size: var(--msh-font-md);
     min-width: 150px;
 }
 
@@ -604,7 +839,7 @@ tr.context-updated {
 .results-count {
     font-weight: 600;
     color: #35332f;
-    font-size: 14px;
+    font-size: var(--msh-font-md);
     white-space: nowrap;
 }
 
@@ -636,7 +871,7 @@ tr.context-updated {
 
 .selected-count {
     color: #35332f;
-    font-size: 14px;
+    font-size: var(--msh-font-md);
     font-weight: 500;
     margin-left: auto;
 }
@@ -733,7 +968,7 @@ tr.context-updated {
     display: inline-block !important;
     padding: 4px 8px !important;
     border-radius: 4px !important;
-    font-size: 12px !important;
+    font-size: var(--msh-font-xs) !important;
     font-weight: 600 !important;
     text-transform: uppercase !important;
     letter-spacing: 0.5px !important;
@@ -769,7 +1004,7 @@ tr.context-updated {
     display: inline-block;
     padding: 4px 8px;
     border-radius: 4px;
-    font-size: 12px;
+    font-size: var(--msh-font-xs);
     font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 0.5px;
@@ -802,7 +1037,7 @@ tr.context-updated {
     display: inline-block;
     padding: 2px 6px;
     border-radius: 3px;
-    font-size: 10px;
+    font-size: var(--msh-font-min);
     font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 0.3px;
@@ -835,7 +1070,7 @@ tr.context-updated {
 
 .action-button {
     padding: 4px 8px;
-    font-size: 11px;
+    font-size: var(--msh-font-xxs);
     border-radius: 3px;
     border: 1px solid #35332f;
     background: #faf9f6;
@@ -915,7 +1150,7 @@ tr.context-updated {
 .status-value {
     padding: 4px 8px;
     border-radius: 4px;
-    font-size: 12px;
+    font-size: var(--msh-font-xs);
     font-weight: 600;
 }
 
@@ -972,7 +1207,7 @@ tr.context-updated {
     }
 
     .results-table {
-        font-size: 14px;
+        font-size: var(--msh-font-md);
     }
 
     .results-table th,

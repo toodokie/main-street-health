@@ -20,7 +20,7 @@ class MSH_Image_Optimizer_Admin {
      */
     public function add_admin_menu() {
         add_media_page(
-            'MSH Image Optimizer',
+            'The Dot Image Optimizer',
             'Image Optimizer',
             'manage_options',
             'msh-image-optimizer',
@@ -70,7 +70,7 @@ class MSH_Image_Optimizer_Admin {
     public function admin_page() {
         ?>
         <div class="wrap">
-            <h1><?php _e('MSH Image Optimizer', 'medicross-child'); ?></h1>
+            <h1><?php _e('The Dot Image Optimizer', 'medicross-child'); ?></h1>
             
             <div class="msh-optimizer-dashboard">
                 

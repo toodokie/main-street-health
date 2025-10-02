@@ -733,9 +733,10 @@ class MSH_Contextual_Meta_Generator {
                 $subject_slug = !empty($context['attachment_slug']) ? $this->truncate_slug($context['attachment_slug'], 3) : 'patient';
                 return $this->slugify('patient-testimonial-' . $subject_slug . '-' . $this->location_slug);
             case 'icon':
-                // Legacy fallback - redirect to service-icon processing
-                $context['type'] = 'service-icon';
-                return $this->generate_filename_slug($context);
+                // Legacy fallback - reuse service-icon generator with proper arguments
+                $normalized_context = $context;
+                $normalized_context['type'] = 'service-icon';
+                return $this->generate_filename_slug($attachment_id, $normalized_context, $extension);
             case 'service-icon':
                 // FIRST: Try filename extraction for high-quality names (same as icon case)
                 $original_filename = $context['original_filename'] ?? '';
@@ -1512,6 +1513,9 @@ class MSH_Image_Optimizer {
         add_action('wp_ajax_msh_optimize_high_priority', array($this, 'ajax_optimize_high_priority'));
         add_action('wp_ajax_msh_optimize_medium_priority', array($this, 'ajax_optimize_medium_priority'));
         add_action('wp_ajax_msh_optimize_all_remaining', array($this, 'ajax_optimize_all_remaining'));
+        add_action('wp_ajax_msh_verify_webp_status', array($this, 'ajax_verify_webp_status'));
+        add_action('wp_ajax_msh_get_attachment_count', array($this, 'ajax_get_attachment_count'));
+        add_action('wp_ajax_msh_get_remaining_count', array($this, 'ajax_get_remaining_count'));
 
         $this->contextual_meta_generator = new MSH_Contextual_Meta_Generator();
 
@@ -1668,7 +1672,7 @@ class MSH_Image_Optimizer {
                 $svg_count++;
             }
         }
-        error_log("MSH DEBUG: Total SVG attachments found in DB: {$svg_count}");
+        // Debug logging removed for production
 
         if (empty($attachments)) {
             // $cached_results = [];
@@ -1724,7 +1728,7 @@ class MSH_Image_Optimizer {
                 if (file_exists($full_path)) {
                     $attachment_map[$post_id]['file_path'] = $file_path;
                 } else {
-                    error_log("MSH DEBUG: Skipping attachment {$post_id} - file missing: {$full_path}");
+                    // Debug logging removed for production
                     // Leave file_path empty so it gets filtered out later
                 }
             }
@@ -1917,17 +1921,17 @@ class MSH_Image_Optimizer {
                 // SVGs without detected usage - add them with a default usage note
                 $attachment['used_in'] = ['SVG Icon (auto-included)' => true];
                 $svg_excluded_count++; // Count as "rescued" SVGs
-                error_log("MSH DEBUG: SVG rescued (no usage detected but included) - ID {$attachment['ID']}: {$attachment['post_title']}");
+                // Debug logging removed for production
             }
 
             if ($is_svg) {
                 $svg_included_count++;
-                error_log("MSH DEBUG: SVG included - ID {$attachment['ID']}: {$attachment['post_title']} used in: " . implode(', ', array_keys($attachment['used_in'])));
+                // Debug logging removed for production
             }
 
             // Skip images with missing files (empty file_path)
             if (empty($attachment['file_path'])) {
-                error_log("MSH DEBUG: Skipping image with missing file - ID {$attachment['ID']}: {$attachment['post_title']}");
+                // Debug logging removed for production
                 continue;
             }
 
@@ -1935,7 +1939,7 @@ class MSH_Image_Optimizer {
             $published_images[] = $attachment;
         }
 
-        error_log("MSH DEBUG: SVG summary - Total included: {$svg_included_count}, Rescued without usage: {$svg_excluded_count}");
+        // Debug logging removed for production
 
         usort($published_images, static function ($a, $b) {
             return $a['ID'] <=> $b['ID'];
@@ -3353,7 +3357,7 @@ class MSH_Image_Optimizer {
             $new_context = 'service-icon';
         }
 
-        error_log('MSH DEBUG: ajax_update_context - attachment_id: ' . $attachment_id . ', new_context: ' . $new_context);
+        // Debug logging removed for production
 
         $choices = $this->get_context_choices();
         if ($new_context !== '' && !array_key_exists($new_context, $choices)) {
@@ -3379,7 +3383,7 @@ class MSH_Image_Optimizer {
                 delete_post_meta($attachment_id, '_msh_auto_context');
             }
         } catch (Exception $e) {
-            error_log('MSH DEBUG: Error detecting context - ' . $e->getMessage());
+            // Debug logging removed for production
         }
 
         try {
@@ -3388,7 +3392,7 @@ class MSH_Image_Optimizer {
                 $error_message = is_array($image_data) && isset($image_data['error'])
                     ? $image_data['error']
                     : __('Unable to refresh analyzer data.', 'medicross-child');
-                error_log('MSH DEBUG: analyze_single_image error - ' . $error_message);
+                // Debug logging removed for production
                 wp_send_json_error($error_message);
             }
 
@@ -3396,7 +3400,7 @@ class MSH_Image_Optimizer {
                 'image' => $image_data,
             ]);
         } catch (Exception $e) {
-            error_log('MSH DEBUG: Exception in ajax_update_context - ' . $e->getMessage());
+            // Debug logging removed for production
             wp_send_json_error('Error updating context: ' . $e->getMessage());
         }
     }
@@ -3581,6 +3585,7 @@ class MSH_Image_Optimizer {
         $success_count = 0;
         $error_count = 0;
         $skipped_count = 0;
+        $test_count = 0;
 
         $batch_file_count = count($current_batch);
         $processed = 0;
@@ -3662,6 +3667,21 @@ class MSH_Image_Optimizer {
                 continue;
             }
 
+            if (!empty($result['test_mode'])) {
+                error_log("MSH Safe Rename: [Stage 4/4] 🧪 Test mode - no filesystem changes were applied");
+                $results[] = [
+                    'id' => $attachment_id,
+                    'status' => 'test',
+                    'old_url' => $result['old_url'],
+                    'new_url' => $result['new_url'],
+                    'references_updated' => $result['replaced'],
+                    'message' => __('Test mode - rename simulated only.', 'medicross-child')
+                ];
+                $test_count++;
+                $success_count++;
+                continue;
+            }
+
             if (!empty($result['skipped'])) {
                 error_log("MSH Safe Rename: [Stage 4/4] ⚠️ File skipped - filename already optimized");
                 delete_post_meta($attachment_id, '_msh_suggested_filename');
@@ -3727,6 +3747,9 @@ class MSH_Image_Optimizer {
         error_log("MSH Safe Rename: 📊   ✅ Successful renames: $success_count");
         error_log("MSH Safe Rename: 📊   ❌ Failed renames: $error_count");
         error_log("MSH Safe Rename: 📊   ⚠️ Skipped files: $skipped_count");
+        if ($test_count > 0) {
+            error_log("MSH Safe Rename: 📊   🧪 Test simulations: $test_count");
+        }
         error_log("MSH Safe Rename: 📊   🎯 Success rate: {$success_rate}%");
         error_log("MSH Safe Rename: 📊   ⏱️ Total duration: {$total_duration}s");
         error_log("MSH Safe Rename: 📊   ⚡ Average per file: {$avg_per_file}s");
@@ -3747,6 +3770,7 @@ class MSH_Image_Optimizer {
                 'success' => $success_count,
                 'errors' => $error_count,
                 'skipped' => $skipped_count,
+                'test' => $test_count,
                 'mode' => $mode,
                 'batch_complete' => true
             ],
@@ -4048,19 +4072,26 @@ class MSH_Image_Optimizer {
         // Get usage index instance
         $usage_index = MSH_Image_Usage_Index::get_instance();
 
-        // Check if force rebuild is requested (disabled for performance)
-        $force_rebuild = false; // isset($_POST['force_rebuild']) && $_POST['force_rebuild'] === 'true';
+        // Check if force rebuild is requested
+        $force_rebuild = !empty($_POST['force_rebuild']) && $_POST['force_rebuild'] === 'true';
 
         // Check current index status first
         $stats = $usage_index->get_index_stats();
-        $current_entries = $stats['summary']->total_entries ?? 0;
+        $current_entries = 0;
+        if (!empty($stats['summary']) && isset($stats['summary']->total_entries)) {
+            $current_entries = (int) $stats['summary']->total_entries;
+        }
+        $summary_payload = $this->format_index_summary($stats['summary'] ?? null);
 
         if ($current_entries > 0 && !$force_rebuild) {
             // Index already has data, return current stats (unless force rebuild)
             wp_send_json_success([
                 'message' => 'Usage index already exists with ' . $current_entries . ' entries.',
-                'processed_attachments' => $stats['summary']->indexed_attachments ?? 0,
-                'stats' => $stats,
+                'processed_attachments' => $summary_payload['indexed_attachments'] ?? 0,
+                'stats' => array(
+                    'summary' => $summary_payload,
+                    'by_context' => $stats['by_context'] ?? array(),
+                ),
                 'status' => 'already_built'
             ]);
             return;
@@ -4081,14 +4112,18 @@ class MSH_Image_Optimizer {
 
         // Get final stats
         $final_stats = $usage_index->get_index_stats();
+        $final_summary = $this->format_index_summary($final_stats['summary'] ?? null);
 
         // Mark system as ready
         update_option('msh_safe_rename_enabled', '1');
 
         wp_send_json_success([
             'message' => 'Usage index built successfully! Processed ' . $processed . ' attachments.',
-            'processed_attachments' => $processed,
-            'stats' => $final_stats,
+            'processed_attachments' => (int) $processed,
+            'stats' => array(
+                'summary' => $final_summary,
+                'by_context' => $final_stats['by_context'] ?? array(),
+            ),
             'status' => 'newly_built'
         ]);
     }
@@ -4156,6 +4191,78 @@ class MSH_Image_Optimizer {
         // Set options to mark tables as created
         update_option('msh_usage_index_table_version', '1');
         update_option('msh_backup_tables_version', '1');
+    }
+
+    private function format_index_summary($summary) {
+        if (!$summary) {
+            return null;
+        }
+
+        return array(
+            'total_entries' => isset($summary->total_entries) ? (int) $summary->total_entries : 0,
+            'indexed_attachments' => isset($summary->indexed_attachments) ? (int) $summary->indexed_attachments : 0,
+            'unique_locations' => isset($summary->unique_locations) ? (int) $summary->unique_locations : 0,
+            'last_update_raw' => $summary->last_update,
+            'last_update_display' => $summary->last_update ? mysql2date(get_option('date_format') . ' ' . get_option('time_format'), $summary->last_update, false) : null,
+        );
+    }
+
+    /**
+     * Get attachment count for UI display
+     */
+    public function ajax_get_attachment_count() {
+        check_ajax_referer('msh_image_optimizer', 'nonce');
+
+        if (!current_user_can('manage_options')) {
+            wp_die('Unauthorized');
+        }
+
+        global $wpdb;
+
+        $count = $wpdb->get_var(
+            "SELECT COUNT(*) FROM {$wpdb->posts}
+             WHERE post_type = 'attachment'
+             AND post_mime_type LIKE 'image/%'"
+        );
+
+        wp_send_json_success([
+            'count' => (int) $count
+        ]);
+    }
+
+    /**
+     * Get remaining unindexed attachment count
+     */
+    public function ajax_get_remaining_count() {
+        check_ajax_referer('msh_image_optimizer', 'nonce');
+
+        if (!current_user_can('manage_options')) {
+            wp_die('Unauthorized');
+        }
+
+        global $wpdb;
+
+        // Get total attachments
+        $total = $wpdb->get_var(
+            "SELECT COUNT(*) FROM {$wpdb->posts}
+             WHERE post_type = 'attachment'
+             AND post_mime_type LIKE 'image/%'"
+        );
+
+        // Get already indexed count
+        $indexed = $wpdb->get_var(
+            "SELECT COUNT(DISTINCT attachment_id)
+             FROM {$wpdb->prefix}msh_image_usage_index"
+        );
+
+        $remaining = max(0, $total - $indexed);
+
+        wp_send_json_success([
+            'total' => (int) $total,
+            'indexed' => (int) $indexed,
+            'remaining' => (int) $remaining,
+            'percent_complete' => $total > 0 ? round(($indexed / $total) * 100, 1) : 0
+        ]);
     }
 
     /**
@@ -4325,6 +4432,147 @@ class MSH_Image_Optimizer {
             'message' => 'Filename suggestion dismissed - current name will be kept',
             'image_id' => $image_id
         ]);
+    }
+
+    /**
+     * AJAX: Verify WebP status for all optimized images
+     */
+    public function ajax_verify_webp_status() {
+        // Debug logging removed for production
+
+        if (!current_user_can('manage_options')) {
+            // Debug logging removed for production
+            wp_send_json_error('Insufficient permissions');
+            return;
+        }
+
+        if (!wp_verify_nonce($_POST['nonce'], 'msh_image_optimizer')) {
+            // Debug logging removed for production
+            wp_send_json_error('Invalid nonce');
+            return;
+        }
+
+        try {
+            // Debug logging removed for production
+            $verification_results = $this->perform_webp_verification();
+            // Debug logging removed for production
+            wp_send_json_success($verification_results);
+        } catch (Exception $e) {
+            // Debug logging removed for production
+            // Debug logging removed for production
+            wp_send_json_error('Verification failed: ' . $e->getMessage());
+        } catch (Error $e) {
+            // Debug logging removed for production
+            // Debug logging removed for production
+            wp_send_json_error('Fatal error during verification: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Perform comprehensive WebP verification audit
+     */
+    private function perform_webp_verification() {
+        // Debug logging removed for production
+
+        try {
+            $published_images = $this->get_published_images();
+            // Debug logging removed for production
+        } catch (Exception $e) {
+            // Debug logging removed for production
+            throw $e;
+        }
+
+        $results = [
+            'total_images' => count($published_images),
+            'total_optimized' => 0,
+            'webp_compatible_optimized' => 0,
+            'webp_missing' => 0,
+            'svg_files' => 0,
+            'issues_found' => [],
+            'summary' => '',
+            'stats' => []
+        ];
+
+        foreach ($published_images as $image) {
+            $attachment_id = $image['ID'];
+            $status = $this->get_optimization_status($attachment_id);
+
+            // Only check optimized images
+            if ($status !== 'optimized') {
+                continue;
+            }
+
+            $results['total_optimized']++;
+
+            // Get file extension
+            $file_path = $image['file_path'] ?? '';
+            $file_extension = strtolower(pathinfo($file_path, PATHINFO_EXTENSION));
+
+            // Debug logging removed for production
+
+            // Handle SVG files separately
+            if ($file_extension === 'svg') {
+                $results['svg_files']++;
+                continue;
+            }
+
+            // For WebP-compatible formats (JPG, JPEG, PNG)
+            if (in_array($file_extension, ['jpg', 'jpeg', 'png'])) {
+                $results['webp_compatible_optimized']++;
+
+                // Check if WebP version exists
+                if (!empty($file_path) && file_exists($file_path)) {
+                    $webp_path = preg_replace('/\.(jpg|jpeg|png)$/i', '.webp', $file_path);
+
+                    if (!file_exists($webp_path)) {
+                        $results['webp_missing']++;
+                        $results['issues_found'][] = [
+                            'attachment_id' => $attachment_id,
+                            'filename' => basename($file_path),
+                            'issue' => 'webp_missing',
+                            'message' => 'Optimized but missing WebP version'
+                        ];
+
+                        // Debug logging removed for production
+                    } else {
+                        // Debug logging removed for production
+                    }
+                } else {
+                    $results['issues_found'][] = [
+                        'attachment_id' => $attachment_id,
+                        'filename' => 'File missing',
+                        'issue' => 'source_missing',
+                        'message' => 'Source file missing from disk'
+                    ];
+                }
+            }
+        }
+
+        // Calculate stats
+        $webp_success_rate = $results['webp_compatible_optimized'] > 0
+            ? (($results['webp_compatible_optimized'] - $results['webp_missing']) / $results['webp_compatible_optimized']) * 100
+            : 100;
+
+        // Generate summary
+        $results['summary'] = sprintf(
+            "WebP Verification Complete: %d optimized images checked. " .
+            "%d WebP-compatible images found, %d missing WebP versions (%.1f%% success rate). " .
+            "%d SVG files (WebP not needed).",
+            $results['total_optimized'],
+            $results['webp_compatible_optimized'],
+            $results['webp_missing'],
+            $webp_success_rate,
+            $results['svg_files']
+        );
+
+        $results['stats'] = [
+            'webp_success_rate' => round($webp_success_rate, 1),
+            'issues_count' => count($results['issues_found'])
+        ];
+
+        // Debug logging removed for production
+
+        return $results;
     }
 }
 

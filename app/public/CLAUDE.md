@@ -12,72 +12,28 @@ Create a comprehensive WordPress image optimization and duplicate cleanup tool f
 ## System Requirements
 
 ### Step 1: Image Optimization
-**Goal**: Optimize all published images with WebP conversion and healthcare-specific metadata
+Full specification, UX flow, and validation notes now live in `MSH_IMAGE_OPTIMIZER_DOCUMENTATION.md`. Use that doc for feature matrices, workflow details, and upgrade history.
 
-**Features**:
-- **WebP Conversion**: Create WebP versions (87-90% file size reduction) while preserving originals
-- **Complete WordPress Field Optimization**:
-  - Title: Professional healthcare titles
-  - Caption: Marketing-friendly descriptions  
-  - ALT Text: Accessibility + SEO descriptions with healthcare context
-  - Description: Detailed SEO content
-- **Smart Filename Suggestions**: SEO-friendly names (e.g., `msh-tmj-jaw-pain-treatment-3357.jpg`)
-- **Batch Rename**: "📝 Apply Filename Suggestions" button to rename files
-- **Healthcare Context Detection**: 
-  - Dental images → TMJ/jaw treatment (appropriate for chiropractic)
-  - Office/workplace pain → Ergonomics
-  - Exercise equipment → Rehabilitation
-- **Priority System**: Homepage (15+), Services (10-14), Blog (0-9)
-- **Rich Results Table**: Thumbnails, priority colors, file sizes, actions
-
-### Step 2: Duplicate Cleanup  
-**Goal**: Find and safely remove duplicate images to organize media library
-
-**Features**:
-- Quick Scan vs Deep Library Scan
-- Usage checking (prevents deletion of in-use images)
-- Batch processing for 345+ duplicates found
+### Step 2: Duplicate Cleanup
+Operational run-books, UI states, and dependency notes are documented in `docs/batch-3-4-review-report.md` and the dedicated optimizer manual. Refer there for cleanup heuristics and usage-detection logic.
 
 ## Current Status (UPDATED)
 
-### ✅ COMPLETED (SQL Performance Fix)
-- Site loads properly
-- Complete admin interface at Media > Image Optimizer
-- **SQL timeout FIXED** - analysis now completes in ~1-2 seconds ✅
-- Root cause recorded: original `get_published_images()` made multiple SQL calls per attachment (featured image + `LIKE '%file_path%'` scans) across ~748 items, triggering repeated table scans and browser freezes.
-- Fix summary: new `get_published_images()` loads attachment/meta in bulk, uses a single featured-image join, and scans published content once via `wp-image-{ID}` and upload URL matches—no more per-image queries, instant results.
-- **47 published images found** and displayed ✅ 
-- JavaScript click handlers working
-- WebP delivery system functional
-- Custom color palette implemented (#35332f, #faf9f6, #daff00)
-
-### ❌ REMAINING TASKS
-**Problem**: Basic results table missing rich functionality
-**Missing Features**:
-1. **Rich Results Table**: Need thumbnails, priority colors, file sizes like original
-2. **Complete Optimization**: Title/Caption/ALT/Description + WebP conversion
-3. **Filename Renaming**: Batch "📝 Apply Filename Suggestions" functionality
-4. **Optimization Buttons**: High/Medium/All priority buttons should work
-5. **Progress Stats**: Update progress overview after optimization
-
-## Previous Success Reference
-- Successfully optimized 34 images before with full functionality
-- Had rich table interface with thumbnails and priority colors
-- Filename suggestions and batch renaming worked
-- All 4 WordPress fields were optimized (Title/Caption/ALT/Description)
+### ✅ Status Notes
+Key performance fixes, analyzer regressions, and release history are tracked in `MSH_IMAGE_OPTIMIZER_DOCUMENTATION.md` (Step 1) and `docs/batch-3-4-review-report.md` (Step 2 cleanup sprint). This file now only points to the authoritative sources.
 
 ## File Structure
 ```
 /wp-content/themes/medicross-child/
-├── admin/image-optimizer-admin.php (complete interface)
+├── admin/image-optimizer-admin.php
 ├── inc/
-│   ├── class-msh-image-optimizer.php (SQL FIXED, need full optimization)
-│   ├── class-msh-media-cleanup.php (working)
-│   └── class-msh-webp-delivery.php (working)
+│   ├── class-msh-image-optimizer.php
+│   ├── class-msh-media-cleanup.php
+│   └── class-msh-webp-delivery.php
 ├── assets/
-│   ├── css/image-optimizer-admin.css (working)
-│   └── js/image-optimizer-admin.js (need rich table display)
-└── functions.php (all classes enabled)
+│   ├── css/image-optimizer-admin.css
+│   └── js/image-optimizer-admin.js
+└── functions.php
 ```
 
 ## Technical Notes
@@ -88,23 +44,54 @@ Create a comprehensive WordPress image optimization and duplicate cleanup tool f
 - Healthcare-specific image prioritization
 - Nonce security + capability checks
 
-## Success Metrics
-- ✅ SQL performance fixed (1-2 seconds vs 60+ seconds timeout)
-- ✅ 47 published images identified
-- ❌ Need rich results table with thumbnails and priority colors
-- ❌ Need complete optimization (Title/Caption/ALT/Description/WebP)
-- ❌ Need filename renaming functionality
-- Target: All 47 published images optimized with full functionality
-- Cleanup: 345 duplicate images processed safely (Step 2)
+## WebP Verification System
+Design goals, coverage metrics, and troubleshooting steps reside in `MSH_IMAGE_OPTIMIZER_DOCUMENTATION.md` under the verification tools section.
 
-## Next AI Instructions
-The SQL timeout is FIXED ✅. Now need to restore the complete optimization functionality:
+## Success Metrics & Next Steps
+Active KPIs, optimization backlog, and follow-up instructions are maintained in the optimizer manual (`MSH_IMAGE_OPTIMIZER_DOCUMENTATION.md`) and the batch review report for the duplicate-cleanup sprint. Reference those documents for the canonical task list before picking up new work.
 
-1. **Rich Results Display**: Restore thumbnails, priority colors, file sizes in results table
-2. **Complete Optimization**: Implement Title/Caption/ALT/Description + WebP conversion
-3. **Filename Suggestions**: Generate and enable batch renaming with "📝 Apply Filename Suggestions"
-4. **Priority Buttons**: Enable High/Medium/All optimization buttons
-5. **Progress Updates**: Update stats after optimization completes
-6. **Test Full Workflow**: Optimize some images and verify all features work
+## 🚨 CRITICAL DEVELOPER MEMO - IMAGE OPTIMIZER WORK
 
-The foundation is solid - just need to restore the rich functionality that was working before!
+**ALWAYS REFERENCE `MSH_IMAGE_OPTIMIZER_DOCUMENTATION.md` BEFORE WORKING ON THE OPTIMIZER**
+
+### Why This Memo Exists
+The MSH Image Optimizer is a complex system with numerous edge cases, performance gotchas, and architectural dependencies that have been discovered and documented through months of development. **Failing to consult the documentation leads to repeating solved problems.**
+
+### Before Any Optimizer Work:
+1. **READ THE TROUBLESHOOTING SECTION FIRST** - `MSH_IMAGE_OPTIMIZER_DOCUMENTATION.md` contains critical issue patterns
+2. **Check the Current Action Plan** - Understand what's in progress vs completed
+3. **Review Recent Incident Reports** - Learn from previous debugging sessions
+
+### Key Lessons Documented:
+- **AJAX Handler Registration** - Missing `wp_ajax_` action registration causes silent failures
+- **Debug Logging Performance** - Excessive `error_log()` calls create massive slowdowns
+- **Batch Processing Limits** - Server resource constraints require careful batch sizing
+- **Usage Index Dependencies** - Complex database relationships need proper setup
+- **Safe Rename System** - URL replacement requires precise sequencing
+
+### Critical Patterns to Avoid:
+❌ **Adding AJAX endpoints without registering handlers**
+❌ **Using debug logging in production-level code**
+❌ **Processing large batches without timeout handling**
+❌ **Modifying core indexing logic without understanding dependencies**
+
+### Development Protocol:
+1. **Consult documentation** before making changes
+2. **Test with small datasets** before processing full media library
+3. **Monitor server resources** during intensive operations
+4. **Document new issues** discovered during development
+5. **Update troubleshooting guide** with solutions found
+
+### Quick Reference Locations:
+- **Troubleshooting Guide**: Line ~910 in `MSH_IMAGE_OPTIMIZER_DOCUMENTATION.md`
+- **Architecture Overview**: Lines 1-100 in the documentation
+- **Performance Benchmarks**: Throughout troubleshooting sections
+- **Code Patterns**: Implementation examples in each section
+- **📊 Research & Development**: `MSH_IMAGE_OPTIMIZER_RND.md` - Experimental approaches, failed experiments, and optimization research
+
+### Documentation Structure:
+- **`MSH_IMAGE_OPTIMIZER_DOCUMENTATION.md`** - Complete implementation guide, troubleshooting, and operational documentation
+- **`MSH_IMAGE_OPTIMIZER_RND.md`** - Research findings, experimental code, performance analysis, and failed approaches
+- **`CLAUDE.md`** - This file - Project context and development guidelines
+
+**Remember: The documentation exists because these problems were painful to solve the first time. Use it.**

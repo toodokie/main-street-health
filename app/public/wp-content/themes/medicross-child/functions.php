@@ -142,19 +142,19 @@ function msh_enqueue_typography() {
         null
     );
     
-    // 2. Adobe Fonts - Bree
+    // 2. Adobe Fonts - Brand Kit (Futura PT + FF Real Text Pro)
     wp_enqueue_style(
-        'adobe-fonts-bree', 
-        'https://use.typekit.net/fkz3nwu.css', 
+        'adobe-fonts-brand', 
+        'https://use.typekit.net/gac6jnd.css', 
         [], 
         null
     );
-    
+
     // 3. Main Typography Styles
     wp_enqueue_style(
         'msh-typography', 
         get_stylesheet_directory_uri() . '/assets/css/typography.css', 
-        ['google-fonts-source-sans', 'adobe-fonts-bree'], 
+        ['google-fonts-source-sans', 'adobe-fonts-brand'], 
         '1.0.0'
     );
     
@@ -858,7 +858,7 @@ function msh_healthcare_privacy_compliance() {
 // Also hook into Slider Revolution's initialization
 add_filter('revslider_fe_before_init', function() {
     add_action('wp_enqueue_scripts', function() {
-        wp_enqueue_style('adobe-fonts-bree', 'https://use.typekit.net/fkz3nwu.css', [], null);
+        wp_enqueue_style('adobe-fonts-brand', 'https://use.typekit.net/gac6jnd.css', [], null);
         wp_enqueue_style('google-fonts-source', 'https://fonts.googleapis.com/css2?family=Source+Sans+Pro:wght@300;400;600;700&display=swap', [], null);
     }, 1);
 });

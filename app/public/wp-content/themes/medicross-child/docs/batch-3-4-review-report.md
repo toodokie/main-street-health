@@ -32,3 +32,6 @@ Batches 3 through 4 finalize the 2025 context engine rollout for the MSH Image O
 - Commit `Remove legacy context fallbacks` (main) – removes body-part heuristics and cleans metadata source handling.
 - Documentation updates live in `MSH_IMAGE_OPTIMIZER_DOCUMENTATION.md` (September 2025 context engine section).
 
+## Test Status
+- Pending: final rename-system regression (test + live modes) and relative-URL backup verification after latest safeguards.
+- Pending: usage-index rebuild so the temporary postmeta bypass can be removed; verify cached hits vs direct scan before next rollout.

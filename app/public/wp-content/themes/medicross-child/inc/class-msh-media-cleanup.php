@@ -10,6 +10,11 @@ if (!defined('ABSPATH')) {
 
 class MSH_Media_Cleanup {
     
+    /**
+     * @var MSH_Hash_Cache_Manager|null
+     */
+    private $hash_manager;
+    
     public function __construct() {
         add_action('wp_ajax_msh_analyze_duplicates', array($this, 'ajax_analyze_duplicates'));
         add_action('wp_ajax_msh_cleanup_media', array($this, 'ajax_cleanup_media'));
@@ -18,8 +23,32 @@ class MSH_Media_Cleanup {
         add_action('wp_ajax_msh_quick_duplicate_scan', array($this, 'ajax_quick_duplicate_scan'));
         add_action('wp_ajax_msh_deep_library_scan', array($this, 'ajax_deep_library_scan'));
         add_action('wp_ajax_msh_check_duplicate_usage', array($this, 'ajax_check_duplicate_usage'));
+
+        if (!class_exists('MSH_Hash_Cache_Manager')) {
+            $hash_manager_path = __DIR__ . '/class-msh-hash-cache-manager.php';
+            if (file_exists($hash_manager_path)) {
+                require_once $hash_manager_path;
+            }
+        }
+
+        if (class_exists('MSH_Hash_Cache_Manager')) {
+            $this->hash_manager = new MSH_Hash_Cache_Manager();
+        }
     }
-    
+
+    /**
+     * Retrieve the shared hash manager instance.
+     *
+     * @return MSH_Hash_Cache_Manager|null
+     */
+    private function get_hash_manager() {
+        if (!$this->hash_manager && class_exists('MSH_Hash_Cache_Manager')) {
+            $this->hash_manager = new MSH_Hash_Cache_Manager();
+        }
+
+        return $this->hash_manager;
+    }
+
     /**
      * Test AJAX handler to verify the class is working
      */
@@ -86,20 +115,206 @@ class MSH_Media_Cleanup {
     }
     
     /**
-     * Get base filename without size suffixes
+     * Retrieve scan progress transient key for the current user.
+     *
+     * @return string
+     */
+    private function get_progress_transient_key() {
+        $user_id = get_current_user_id();
+        $suffix = $user_id ? $user_id : 'guest';
+        return 'msh_scan_progress_' . $suffix;
+    }
+
+    /**
+     * Get the list of images to scan for content duplicates.
+     *
+     * @param int|null $limit Optional limit for query size.
+     * @return array
+     */
+    private function get_images_for_scanning($limit = null) {
+        global $wpdb;
+
+        $sql = "
+            SELECT
+                p.ID,
+                p.post_title,
+                p.post_date,
+                p.post_status,
+                pm.meta_value AS file_path
+            FROM {$wpdb->posts} p
+            INNER JOIN {$wpdb->postmeta} pm ON p.ID = pm.post_id AND pm.meta_key = '_wp_attached_file'
+            WHERE p.post_type = 'attachment'
+                AND p.post_mime_type LIKE 'image/%'
+                AND pm.meta_value IS NOT NULL
+                AND pm.meta_value <> ''
+            ORDER BY p.ID ASC
+        ";
+
+        if (null !== $limit && is_numeric($limit)) {
+            $sql .= ' LIMIT ' . intval($limit);
+        }
+
+        return $wpdb->get_results($sql);
+    }
+
+    /**
+     * Run a content-based duplicate scan with transient progress updates.
+     *
+     * @param int|null $limit Optional limit for how many images to process.
+     * @return array
+     */
+    public function find_content_duplicates($limit = null) {
+        $hash_manager = $this->get_hash_manager();
+
+        if (!$hash_manager) {
+            return [
+                'groups' => [],
+                'total_groups' => 0,
+                'total_duplicates' => 0,
+                'hash_map' => [],
+                'error' => 'Hash manager unavailable',
+            ];
+        }
+
+        $images = $this->get_images_for_scanning($limit);
+        if (empty($images)) {
+            return [
+                'groups' => [],
+                'total_groups' => 0,
+                'total_duplicates' => 0,
+                'hash_map' => [],
+                'error' => 'No images found',
+            ];
+        }
+
+        $progress_key = $this->get_progress_transient_key();
+        delete_transient($progress_key);
+
+        $total = count($images);
+        $processed = 0;
+        $hash_map = [];
+
+        set_transient($progress_key, [
+            'status' => 'processing',
+            'current' => 0,
+            'total' => $total,
+            'message' => __('Starting content scan...', 'medicross-child'),
+        ], 300);
+
+        foreach ($images as $image) {
+            $processed++;
+
+            $hash = $hash_manager->get_file_hash($image->ID);
+            if (!$hash) {
+                continue;
+            }
+
+            if (!isset($hash_map[$hash])) {
+                $hash_map[$hash] = [];
+            }
+
+            $thumb_url = wp_get_attachment_thumb_url($image->ID);
+            $hash_map[$hash][] = [
+                'id' => $image->ID,
+                'title' => $image->post_title,
+                'date' => $image->post_date,
+                'status' => $image->post_status,
+                'file' => $image->file_path,
+                'thumb_url' => $thumb_url ? $thumb_url : '',
+                'full_url' => wp_get_attachment_url($image->ID),
+            ];
+
+            if ($processed % 10 === 0 || $processed === $total) {
+                set_transient($progress_key, [
+                    'status' => 'processing',
+                    'current' => $processed,
+                    'total' => $total,
+                    'message' => sprintf(__('Processing image %1$d of %2$d...', 'medicross-child'), $processed, $total),
+                ], 300);
+            }
+        }
+
+        $duplicates = $this->process_hash_map($hash_map);
+
+        delete_transient($progress_key);
+
+        return $duplicates;
+    }
+
+    /**
+     * Convert a hash map into duplicate group metadata.
+     *
+     * @param array $hash_map
+     * @return array
+     */
+    private function process_hash_map(array $hash_map) {
+        $groups = [];
+        $total_duplicates = 0;
+
+        foreach ($hash_map as $hash => $items) {
+            if (count($items) < 2) {
+                continue;
+            }
+
+            $groups[] = [
+                'hash' => $hash,
+                'count' => count($items),
+                'images' => $items,
+            ];
+
+            $total_duplicates += count($items) - 1;
+        }
+
+        return [
+            'groups' => $groups,
+            'total_groups' => count($groups),
+            'total_duplicates' => $total_duplicates,
+            'hash_map' => $hash_map,
+        ];
+    }
+
+    /**
+     * Get base filename without size suffixes - ENHANCED VERSION
      */
     private function get_base_filename($file_path) {
         $filename = basename($file_path);
-        
+
         // Remove extension
         $name = pathinfo($filename, PATHINFO_FILENAME);
-        
-        // Remove size suffixes like -150x150, -300x200, etc.
+
+        // Enhanced pattern removal for better duplicate detection
+
+        // WordPress 5.3+ scaled images
+        $name = preg_replace('/-scaled$/', '', $name);
+
+        // Size suffixes like -150x150, -300x200, etc.
         $name = preg_replace('/-\d+x\d+$/', '', $name);
-        
-        // Remove numbered suffixes like -1, -2, etc.
+
+        // Retina images @2x, @3x
+        $name = preg_replace('/@\d+x$/', '', $name);
+
+        // Timestamp suffixes (e1234567890)
+        $name = preg_replace('/-e\d{10}$/', '', $name);
+
+        // Windows-style duplicates (1), (2), (copy)
+        $name = preg_replace('/\(\d+\)$/', '', $name);
+        $name = preg_replace('/\(copy\)$/i', '', $name);
+
+        // Common thumbnail patterns
+        $name = preg_replace('/(_thumb|_thumbnail|_tn)$/', '', $name);
+
+        // Version numbers v1, v2, final, new
+        $name = preg_replace('/([-_]v\d+|[-_]final|[-_]new)$/i', '', $name);
+
+        // Copy suffixes
+        $name = preg_replace('/([-_]copy\d*|[-_]duplicate)$/i', '', $name);
+
+        // Numbered suffixes like -1, -2, etc. (keep this last)
         $name = preg_replace('/-\d+$/', '', $name);
-        
+
+        // Clean up any remaining separators
+        $name = trim($name, '-_');
+
         return $name;
     }
     
@@ -116,12 +331,36 @@ class MSH_Media_Cleanup {
             $image['is_published'] = $this->quick_usage_check($image['ID']);
             if ($image['is_published']) $published_count++;
             
-            // Calculate "keep" score (simplified)
+            // Calculate "keep" score (ENHANCED FOR HEALTHCARE)
             $score = 0;
-            if ($image['is_published']) $score += 10;
+
+            // Core safety factors
+            if ($image['is_published']) $score += 15;  // Increased weight for published
+
+            // File quality indicators
             if (strpos($image['file_path'], '-scaled') === false) $score += 5;
             if (!preg_match('/-\d+x\d+/', $image['file_path'])) $score += 8;
-            if (strpos($image['post_title'], 'copy') === false) $score += 3;
+
+            // Healthcare-specific naming (Hamilton clinic)
+            $filename = strtolower($image['file_path']);
+            if (strpos($filename, 'hamilton') !== false) $score += 8;
+            if (strpos($filename, 'msh') !== false) $score += 6;
+            if (strpos($filename, 'main-street') !== false) $score += 6;
+
+            // Medical/professional naming
+            if (preg_match('/(therapy|treatment|rehab|chiro|physio|medical|health|care)/', $filename)) $score += 4;
+
+            // Negative factors (avoid keeping these)
+            if (strpos($image['post_title'], 'copy') !== false) $score -= 5;
+            if (strpos($filename, 'temp') !== false) $score -= 8;
+            if (strpos($filename, 'test') !== false) $score -= 3;
+            if (strpos($filename, 'old') !== false) $score -= 3;
+            if (preg_match('/untitled|image\d+|img_\d+/', $filename)) $score -= 2;
+
+            // Format preferences
+            if (strpos($image['file_path'], '.webp') !== false) $score += 10;  // Prefer WebP
+            if (strpos($image['file_path'], '.svg') !== false) $score += 7;   // SVG for icons
+            if (strpos($image['file_path'], '.jpg') !== false) $score += 3;   // JPG standard
             
             $image['keep_score'] = $score;
             $image['usage'] = []; // Populate later if needed
@@ -666,124 +905,149 @@ class MSH_Media_Cleanup {
     public function ajax_quick_duplicate_scan() {
         try {
             check_ajax_referer('msh_media_cleanup', 'nonce');
-            
+
             if (!current_user_can('manage_options')) {
                 wp_send_json_error(['message' => 'Unauthorized access']);
                 return;
             }
-            
+
             global $wpdb;
-            
-            // Ultra-fast query - minimal data, expanded patterns for more duplicates
-            $duplicate_files = $wpdb->get_results("
-                SELECT 
+
+            error_log('MSH DUPLICATE: Starting Quick Duplicate Scan - content-based detection (post-optimization compatible)');
+
+            // IMPROVED: Content-based duplicate detection that works even after Step 1 filename optimization
+            // Instead of relying on filename patterns, group by base names and file sizes
+            $all_images = $wpdb->get_results("
+                SELECT
                     p.ID,
                     p.post_title,
-                    pm.meta_value as file_path
+                    pm.meta_value as file_path,
+                    pm_size.meta_value as file_metadata
                 FROM {$wpdb->posts} p
                 INNER JOIN {$wpdb->postmeta} pm ON p.ID = pm.post_id AND pm.meta_key = '_wp_attached_file'
+                LEFT JOIN {$wpdb->postmeta} pm_size ON p.ID = pm_size.post_id AND pm_size.meta_key = '_wp_attachment_metadata'
                 WHERE p.post_type = 'attachment'
                 AND p.post_mime_type LIKE 'image/%'
-                AND (
-                    pm.meta_value LIKE '%-copy.%' OR
-                    pm.meta_value LIKE '%-scaled.%' OR
-                    pm.meta_value LIKE '%-1.%' OR
-                    pm.meta_value LIKE '%-2.%' OR
-                    pm.meta_value LIKE '%-3.%' OR
-                    pm.meta_value LIKE '%copy%' OR
-                    pm.meta_value LIKE '%-150x150.%' OR
-                    pm.meta_value LIKE '%-300x300.%' OR
-                    pm.meta_value LIKE '%-768x%' OR
-                    pm.meta_value LIKE '%-1024x%' OR
-                    pm.meta_value LIKE '%duplicate%' OR
-                    pm.meta_value LIKE '%resize%'
-                )
-                LIMIT 100
-            ", ARRAY_A);
-            
-            // Also get a small sample of all recent images to find similar names
-            $recent_images = $wpdb->get_results("
-                SELECT 
-                    p.ID,
-                    p.post_title,
-                    pm.meta_value as file_path
-                FROM {$wpdb->posts} p
-                INNER JOIN {$wpdb->postmeta} pm ON p.ID = pm.post_id AND pm.meta_key = '_wp_attached_file'
-                WHERE p.post_type = 'attachment'
-                AND p.post_mime_type LIKE 'image/%'
+                AND pm.meta_value != ''
+                AND pm.meta_value IS NOT NULL
                 ORDER BY p.post_date DESC
-                LIMIT 150
+                LIMIT 250
             ", ARRAY_A);
-            
-            // Combine both sets
-            $all_files = array_merge($duplicate_files, $recent_images);
-            
-            // Remove duplicates by ID
-            $unique_files = [];
-            $seen_ids = [];
-            foreach ($all_files as $file) {
-                if (!in_array($file['ID'], $seen_ids)) {
-                    $unique_files[] = $file;
-                    $seen_ids[] = $file['ID'];
-                }
+
+            error_log('MSH DUPLICATE: Loaded ' . count($all_images) . ' images for content-based analysis');
+
+            if (empty($all_images)) {
+                wp_send_json_success([
+                    'total_groups' => 0,
+                    'total_duplicates' => 0,
+                    'groups' => [],
+                    'debug_info' => [
+                        'message' => 'No images found in media library'
+                    ]
+                ]);
+                return;
             }
-            
+
+            // Group images by base filename + file size (content-based approach)
             $groups = [];
-            foreach ($unique_files as $file) {
-                $base_name = $this->get_base_filename($file['file_path']);
-                
-                if (!isset($groups[$base_name])) {
-                    $groups[$base_name] = [
-                        'images' => [],
-                        'total_count' => 0,
-                        'cleanup_potential' => 0,
-                        'published_count' => 0,
-                        'sizes_available' => []
-                    ];
+            $processed = 0;
+            $upload_dir = wp_upload_dir();
+
+            foreach ($all_images as $image) {
+                if (empty($image['file_path'])) {
+                    continue;
                 }
-                
-                // No usage check for speed - just mark as potential duplicate
-                $file['is_published'] = false;
-                $file['usage'] = [];
-                $file['keep_score'] = 1;
-                
-                $groups[$base_name]['images'][] = $file;
-                $groups[$base_name]['total_count']++;
-                $groups[$base_name]['cleanup_potential']++; // All are potential cleanup candidates
+
+                $processed++;
+
+                // Get base filename (removes WordPress size suffixes)
+                $base_name = $this->get_base_filename($image['file_path']);
+
+                if (empty($base_name)) {
+                    error_log('MSH DUPLICATE: Could not extract base name from: ' . $image['file_path']);
+                    continue;
+                }
+
+                // Extract file size from metadata or filesystem
+                $file_size = null;
+                if (!empty($image['file_metadata'])) {
+                    $metadata = maybe_unserialize($image['file_metadata']);
+                    if (isset($metadata['filesize'])) {
+                        $file_size = $metadata['filesize'];
+                    } elseif (isset($metadata['width']) && isset($metadata['height'])) {
+                        // Rough size estimate from dimensions
+                        $file_size = intval($metadata['width'] * $metadata['height'] * 0.3); // Approximate file size
+                    }
+                }
+
+                // Fallback: get actual file size
+                if (!$file_size) {
+                    $full_path = $upload_dir['basedir'] . '/' . $image['file_path'];
+                    if (file_exists($full_path)) {
+                        $file_size = filesize($full_path);
+                    }
+                }
+
+                // Group by base_name + size_bucket (handles truly identical content)
+                $size_bucket = $file_size ? intval($file_size / 5000) * 5000 : 'unknown'; // 5KB buckets
+                $group_key = $base_name . '_sz_' . $size_bucket;
+
+                if (!isset($groups[$group_key])) {
+                    $groups[$group_key] = [];
+                }
+
+                $groups[$group_key][] = [
+                    'ID' => $image['ID'],
+                    'post_title' => $image['post_title'],
+                    'file_path' => $image['file_path'],
+                    'file_size' => $file_size,
+                    'base_name' => $base_name,
+                    'is_published' => false, // Quick scan - skip usage check for speed
+                    'usage' => [],
+                    'keep_score' => 1
+                ];
             }
-            
-            // Filter to only groups with multiple images and set simple recommended keep
-            $filtered_groups = [];
-            foreach ($groups as $base_name => $group) {
-                if ($group['total_count'] > 1) {
-                    // Keep the first one found (simple logic for speed)
-                    $group['recommended_keep'] = $group['images'][0];
-                    $group['published_count'] = 0; // Skip expensive checks
-                    $group['sizes_available'] = ['Multiple sizes'];
-                    $group['cleanup_potential'] = $group['total_count'] - 1; // All but first
-                    
-                    $filtered_groups[$base_name] = $group;
+
+            error_log('MSH DUPLICATE: Processed ' . $processed . ' images into ' . count($groups) . ' content groups');
+
+            // Find groups with multiple files (potential duplicates)
+            $duplicate_groups = [];
+            $total_duplicates = 0;
+
+            foreach ($groups as $group_key => $images) {
+                if (count($images) > 1) {
+                    // Analyze this duplicate group
+                    $analyzed_group = $this->analyze_group($images);
+                    $analyzed_group['group_key'] = $group_key;
+                    $duplicate_groups[] = $analyzed_group;
+                    $total_duplicates += $analyzed_group['cleanup_potential'];
                 }
             }
-            
+
+            error_log('MSH DUPLICATE: Found ' . count($duplicate_groups) . ' duplicate groups with ' . $total_duplicates . ' files for potential cleanup');
+
+            // Success response
             wp_send_json_success([
-                'total_groups' => count($filtered_groups),
-                'total_duplicates' => array_sum(array_column($filtered_groups, 'cleanup_potential')),
-                'groups' => $filtered_groups,
+                'total_groups' => count($duplicate_groups),
+                'total_duplicates' => $total_duplicates,
+                'groups' => $duplicate_groups,
                 'debug_info' => [
-                    'pattern_matches' => count($duplicate_files),
-                    'recent_scanned' => count($recent_images),
-                    'total_scanned' => count($unique_files),
-                    'all_groups_found' => count($groups),
-                    'memory_usage' => memory_get_usage(),
-                    'sample_files' => array_slice(array_column($unique_files, 'file_path'), 0, 5)
+                    'approach' => 'content-based detection (base filename + file size)',
+                    'images_analyzed' => $processed,
+                    'content_groups_created' => count($groups),
+                    'duplicate_groups_found' => count($duplicate_groups),
+                    'sample_groups' => array_slice(array_keys($groups), 0, 3),
+                    'memory_usage' => round(memory_get_usage() / 1024 / 1024, 2) . 'MB',
+                    'post_optimization_compatible' => true
                 ]
             ]);
-            
+
         } catch (Exception $e) {
-            error_log('MSH Quick Scan Error: ' . $e->getMessage());
+            error_log('MSH DUPLICATE ERROR: ' . $e->getMessage() . ' in ' . $e->getFile() . ':' . $e->getLine());
             wp_send_json_error([
-                'message' => 'Quick scan failed: ' . $e->getMessage()
+                'message' => 'Quick scan failed: ' . $e->getMessage(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine()
             ]);
         }
     }

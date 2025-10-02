@@ -95,6 +95,28 @@ class MSH_Safe_Rename_System {
         $log_id = $this->log_intent($attachment_id, $current_basename, $new_filename, $old_url, $new_url, $old_relative, $new_relative);
 
         $old_metadata = wp_get_attachment_metadata($attachment_id);
+
+        if ($this->test_mode) {
+            $map = $this->build_search_replace_map($old_url, $new_url, $old_metadata, $upload_dir);
+            $replaced = $this->replace_references($map, $attachment_id, $current_basename, $new_filename);
+
+            if (is_wp_error($replaced)) {
+                $this->update_log($log_id, 'failed', 0, $replaced->get_error_message());
+                return $replaced;
+            }
+
+            $this->last_replacements = $replaced;
+            $this->update_log($log_id, 'test', $replaced, __('Test mode - no filesystem changes applied.', 'medicross-child'));
+
+            return [
+                'old_url' => $old_url,
+                'new_url' => $new_url,
+                'replaced' => $replaced,
+                'backup' => null,
+                'test_mode' => true
+            ];
+        }
+
         $rename = $this->rename_physical_files($current_path, $new_filename, $old_metadata);
         if (is_wp_error($rename)) {
             $this->update_log($log_id, 'failed', 0, $rename->get_error_message());
@@ -105,8 +127,14 @@ class MSH_Safe_Rename_System {
 
         $map = $this->build_search_replace_map($old_url, $new_url, $old_metadata, $upload_dir);
         $replaced = $this->replace_references($map, $attachment_id, $current_basename, $new_filename);
-        $this->last_replacements = $replaced;
 
+        if (is_wp_error($replaced)) {
+            $this->restore_failed_rename($attachment_id, $current_path, $rename, $old_metadata, $old_relative, $old_url);
+            $this->update_log($log_id, 'failed', 0, $replaced->get_error_message());
+            return $replaced;
+        }
+
+        $this->last_replacements = $replaced;
         $this->update_log($log_id, 'complete', $replaced, null);
 
         return [
@@ -115,6 +143,41 @@ class MSH_Safe_Rename_System {
             'replaced' => $replaced,
             'backup' => $rename['backup_path']
         ];
+    }
+
+    private function restore_failed_rename($attachment_id, $original_path, array $rename, $old_metadata, $old_relative, $old_url) {
+        $new_path = isset($rename['new_path']) ? $rename['new_path'] : '';
+        $backup_path = isset($rename['backup_path']) ? $rename['backup_path'] : '';
+
+        if ($new_path && file_exists($new_path)) {
+            @unlink($new_path);
+        }
+
+        if ($backup_path && file_exists($backup_path)) {
+            @rename($backup_path, $original_path);
+        }
+
+        update_attached_file($attachment_id, $original_path);
+
+        if (is_array($old_metadata)) {
+            wp_update_attachment_metadata($attachment_id, $old_metadata);
+        }
+
+        if ($old_relative) {
+            update_post_meta($attachment_id, '_wp_attached_file', $old_relative);
+        }
+
+        if ($old_url) {
+            $original_slug = $old_relative ? sanitize_title(pathinfo($old_relative, PATHINFO_FILENAME)) : sanitize_title(pathinfo($old_url, PATHINFO_FILENAME));
+            global $wpdb;
+            $wpdb->update(
+                $wpdb->posts,
+                ['guid' => $old_url, 'post_name' => $original_slug],
+                ['ID' => $attachment_id],
+                ['%s', '%s'],
+                ['%d']
+            );
+        }
     }
 
     private function log_intent($attachment_id, $old_filename, $new_filename, $old_url, $new_url, $old_relative, $new_relative) {
@@ -158,12 +221,82 @@ class MSH_Safe_Rename_System {
         $dir = dirname($old_path);
         $new_path = trailingslashit($dir) . $new_filename;
 
-        if (!copy($old_path, $new_path)) {
-            return new WP_Error('copy_failed', __('Unable to copy new file.', 'medicross-child'));
+        // Clear stat cache to avoid stale file information
+        clearstatcache(true, $old_path);
+        clearstatcache(true, $new_path);
+
+        // Apply Local by Flywheel specific permission fixes
+        $this->fix_local_permissions($old_path);
+        $this->fix_local_permissions($dir);
+
+        // Detailed permission and existence checks with logging
+        if (!file_exists($old_path)) {
+            error_log('MSH Rename: File does not exist at ' . $old_path);
+            return new WP_Error('file_not_found', 'Original file does not exist: ' . basename($old_path));
         }
 
-        $backup_path = $this->move_to_backup($old_path);
+        if (!is_readable($old_path)) {
+            error_log('MSH Rename: Cannot read file at ' . $old_path);
+            return new WP_Error('permission_denied', 'Cannot read original file: ' . basename($old_path));
+        }
 
+        if (!is_writable($dir)) {
+            error_log('MSH Rename: Directory not writable: ' . $dir . ' (perms: ' . substr(sprintf('%o', fileperms($dir)), -4) . ')');
+            return new WP_Error('permission_denied', 'Directory is not writable: ' . $dir);
+        }
+
+        // Create backup directory with explicit error checking
+        $upload_dir = wp_upload_dir();
+        $backup_dir = $upload_dir['basedir'] . '/msh-rename-backups';
+        if (!file_exists($backup_dir)) {
+            if (!wp_mkdir_p($backup_dir)) {
+                error_log('MSH Rename: Cannot create backup directory: ' . $backup_dir);
+                return new WP_Error('backup_failed', 'Cannot create backup directory');
+            }
+        }
+
+        // Create backup with explicit error checking - NO ERROR SUPPRESSION
+        $backup_path = trailingslashit($backup_dir) . basename($old_path) . '.' . time();
+        error_log('MSH Rename: Creating backup from ' . $old_path . ' to ' . $backup_path);
+
+        if (!copy($old_path, $backup_path)) {
+            $error = error_get_last();
+            error_log('MSH Rename: Backup failed - ' . ($error['message'] ?? 'Unknown error'));
+            return new WP_Error('backup_failed', 'Unable to create backup: ' . ($error['message'] ?? 'Unknown error'));
+        }
+
+        // CRITICAL: Perform the actual rename WITHOUT error suppression
+        error_log('MSH Rename: Attempting rename from ' . $old_path . ' to ' . $new_path);
+        $rename_result = rename($old_path, $new_path);
+
+        if (!$rename_result) {
+            $error = error_get_last();
+            error_log('MSH Rename: Rename failed - ' . ($error['message'] ?? 'Unknown error'));
+
+            // Try alternative: copy then delete
+            error_log('MSH Rename: Trying copy+delete fallback');
+            if (copy($old_path, $new_path)) {
+                if (unlink($old_path)) {
+                    error_log('MSH Rename: Copy+delete fallback succeeded');
+                    $rename_result = true;
+                } else {
+                    // Copy worked but delete failed - clean up the copy
+                    unlink($new_path);
+                    unlink($backup_path);
+                    $delete_error = error_get_last();
+                    error_log('MSH Rename: Could not delete original after copy - ' . ($delete_error['message'] ?? 'Unknown'));
+                    return new WP_Error('rename_failed', 'Could not complete rename operation: ' . ($delete_error['message'] ?? 'Permission denied'));
+                }
+            } else {
+                unlink($backup_path); // Clean up backup
+                $copy_error = error_get_last();
+                return new WP_Error('rename_failed', 'Unable to rename file: ' . ($copy_error['message'] ?? 'Unknown error'));
+            }
+        }
+
+        error_log('MSH Rename: Main file renamed successfully');
+
+        // Handle sized images (thumbnails) - WITHOUT error suppression
         if (is_array($old_metadata) && !empty($old_metadata['sizes'])) {
             foreach ($old_metadata['sizes'] as $size => $data) {
                 if (empty($data['file'])) {
@@ -176,19 +309,111 @@ class MSH_Safe_Rename_System {
                 }
 
                 $ext = pathinfo($data['file'], PATHINFO_EXTENSION);
-                $new_size_filename = pathinfo($new_filename, PATHINFO_FILENAME) . '-' . $data['width'] . 'x' . $data['height'] . '.' . $ext;
+                $new_size_filename = pathinfo($new_filename, PATHINFO_FILENAME) . '-' .
+                                    $data['width'] . 'x' . $data['height'] . '.' . $ext;
                 $new_size_path = trailingslashit($dir) . $new_size_filename;
 
-                if (@copy($old_size_path, $new_size_path)) {
-                    $this->move_to_backup($old_size_path);
+                // Backup thumbnail
+                $size_backup = $backup_dir . '/' . basename($old_size_path) . '.' . time();
+                copy($old_size_path, $size_backup);
+
+                // Rename thumbnail WITHOUT error suppression
+                if (!rename($old_size_path, $new_size_path)) {
+                    // Try copy + delete
+                    if (copy($old_size_path, $new_size_path)) {
+                        unlink($old_size_path);
+                        error_log('MSH Rename: Thumbnail renamed via copy+delete: ' . basename($old_size_path));
+                    } else {
+                        error_log('MSH Rename: Failed to rename thumbnail ' . basename($old_size_path));
+                    }
+                } else {
+                    error_log('MSH Rename: Thumbnail renamed successfully: ' . basename($old_size_path));
                 }
             }
         }
+
+        // Schedule cleanup of backups
+        wp_schedule_single_event(time() + $this->backup_retention, 'msh_cleanup_rename_backup', [$backup_path]);
 
         return [
             'new_path' => $new_path,
             'backup_path' => $backup_path
         ];
+    }
+
+    /**
+     * Fix Local by Flywheel specific permission issues
+     */
+    private function fix_local_permissions($file_path) {
+        // Local by Flywheel specific permission fix
+        $is_local = (
+            defined('LOCAL_DEVELOPMENT') ||
+            (isset($_SERVER['SERVER_SOFTWARE']) && strpos($_SERVER['SERVER_SOFTWARE'], 'nginx') !== false) ||
+            file_exists('/tmp/mysql.sock') ||
+            (isset($_SERVER['FLYWHEEL_LOCAL']) && $_SERVER['FLYWHEEL_LOCAL'])
+        );
+
+        if ($is_local) {
+            $dir = is_dir($file_path) ? $file_path : dirname($file_path);
+
+            // Try to set proper permissions
+            if (is_dir($dir)) {
+                chmod($dir, 0755);
+                error_log('MSH Rename: Set directory permissions 0755 for ' . $dir);
+            }
+
+            if (file_exists($file_path) && !is_dir($file_path)) {
+                chmod($file_path, 0644);
+                error_log('MSH Rename: Set file permissions 0644 for ' . $file_path);
+            }
+
+            // Clear opcache if available (Local uses it)
+            if (function_exists('opcache_invalidate') && file_exists($file_path)) {
+                opcache_invalidate($file_path, true);
+            }
+
+            // Clear realpath cache
+            clearstatcache(true, $file_path);
+            clearstatcache(true, $dir);
+        }
+    }
+
+    /**
+     * Test method to verify rename capability
+     */
+    public function test_simple_rename() {
+        $upload_dir = wp_upload_dir();
+        $test_file = $upload_dir['basedir'] . '/test-rename-' . time() . '.txt';
+
+        // Create test file
+        file_put_contents($test_file, 'test content for rename verification');
+        error_log('MSH Test: Created test file at ' . $test_file);
+
+        // Apply permission fixes
+        $this->fix_local_permissions($test_file);
+
+        // Test rename
+        $new_name = $upload_dir['basedir'] . '/test-renamed-' . time() . '.txt';
+        $result = rename($test_file, $new_name);
+
+        if ($result) {
+            error_log('MSH Test: SUCCESS - File renamed to ' . $new_name);
+            unlink($new_name); // Clean up
+            return [
+                'success' => true,
+                'message' => 'Rename test successful'
+            ];
+        } else {
+            $error = error_get_last();
+            error_log('MSH Test: FAILED - ' . ($error['message'] ?? 'Unknown error'));
+            if (file_exists($test_file)) {
+                unlink($test_file); // Clean up
+            }
+            return [
+                'success' => false,
+                'message' => 'Rename test failed: ' . ($error['message'] ?? 'Unknown error')
+            ];
+        }
     }
 
     private function ensure_unique_filename($filename, $directory) {
@@ -312,24 +537,22 @@ class MSH_Safe_Rename_System {
 
         // Use the new targeted replacement engine if available and we have the required info
         if (class_exists('MSH_Targeted_Replacement_Engine') && $attachment_id && $old_filename && $new_filename) {
-            error_log('MSH Safe Rename: Using enhanced targeted replacement engine for attachment ' . $attachment_id);
 
             $replacement_engine = MSH_Targeted_Replacement_Engine::get_instance();
             $result = $replacement_engine->replace_attachment_urls($attachment_id, $old_filename, $new_filename, $this->test_mode);
 
             if (is_wp_error($result)) {
-                error_log('MSH Safe Rename: Targeted replacement failed: ' . $result->get_error_message());
-                return 0;
+                return $result;
             } else {
-                error_log('MSH Safe Rename: Targeted replacement successful. Updated: ' . $result['updated_count']);
                 return $result['updated_count'];
             }
         }
 
-        // If targeted replacement not available, skip database updates for safety
-        error_log('MSH Safe Rename: Targeted replacement engine not available - skipping URL replacement for safety');
-        return 0;
+        // If targeted replacement not available, use fallback method
 
+        $total_updates = 0; // Initialize the counter
+
+        // Update posts table
         foreach ($map as $old => $new) {
             if ($old === $new) {
                 continue;
@@ -351,6 +574,7 @@ class MSH_Safe_Rename_System {
             }
         }
 
+        // Update meta tables
         $this->replace_in_serialized_table($wpdb->postmeta, 'meta_id', 'meta_value', $map);
         $this->replace_in_serialized_table($wpdb->options, 'option_id', 'option_value', $map);
         if (isset($wpdb->termmeta)) {
