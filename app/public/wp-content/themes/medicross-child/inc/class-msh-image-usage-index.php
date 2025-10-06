@@ -68,6 +68,7 @@ class MSH_Image_Usage_Index {
         global $wpdb;
 
         // Clear existing index
+        $this->invalidate_stats_cache();
         $wpdb->query("TRUNCATE TABLE {$this->index_table}");
 
         $processed = 0;
@@ -102,6 +103,8 @@ class MSH_Image_Usage_Index {
         }
 
         update_option('msh_usage_index_last_build', current_time('mysql'));
+        $this->rebuild_usage_status_index();
+        $this->invalidate_stats_cache();
         error_log("MSH Usage Index: Index build complete! Total processed: {$processed}");
         return $processed;
     }
@@ -118,6 +121,7 @@ class MSH_Image_Usage_Index {
         error_log("MSH Usage Index: Starting robust server-side rebuild...");
 
         // Clear existing index
+        $this->invalidate_stats_cache();
         $wpdb->query("TRUNCATE TABLE {$this->index_table}");
 
         $processed = 0;
@@ -171,6 +175,8 @@ class MSH_Image_Usage_Index {
 
         update_option('msh_usage_index_last_build', current_time('mysql'));
         update_option('msh_safe_rename_enabled', '1');
+        $this->rebuild_usage_status_index();
+        $this->invalidate_stats_cache();
 
         error_log("MSH Usage Index: Robust rebuild complete!");
         error_log("MSH Usage Index: - Processed: {$processed} attachments");
@@ -261,24 +267,30 @@ class MSH_Image_Usage_Index {
                     if ($result && $result['success']) {
                         if ($result['stats']['processed'] === 0) {
                             // Nothing to process
+                            $smart_stats = $this->get_index_stats();
+                            $summary_payload = $this->format_stats_for_ui($smart_stats);
+
                             wp_send_json_success([
                                 'processed' => 0,
                                 'offset' => 0,
                                 'next_offset' => 0,
                                 'total' => $total_attachments,
                                 'has_more' => false,
-                                'summary' => $this->get_index_stats()['summary'] ?? null,
+                                'summary' => $summary_payload,
                                 'message' => $result['message'],
                             ]);
                         } else {
                             // Processed some items
+                            $smart_stats = $this->get_index_stats();
+                            $summary_payload = $this->format_stats_for_ui($smart_stats);
+
                             wp_send_json_success([
                                 'processed' => $result['stats']['processed'],
                                 'offset' => $result['stats']['processed'],
                                 'next_offset' => $result['stats']['processed'],
                                 'total' => $total_attachments,
                                 'has_more' => false,
-                                'summary' => $this->get_index_stats()['summary'] ?? null,
+                                'summary' => $summary_payload,
                                 'message' => $result['message'],
                             ]);
                         }
@@ -319,7 +331,7 @@ class MSH_Image_Usage_Index {
             $summary = null;
             if (!$has_more) {
                 $stats = $this->get_index_stats();
-                $summary = $stats['summary'] ?? null;
+                $summary = $this->format_stats_for_ui($stats);
                 update_option('msh_usage_index_last_build', current_time('mysql'));
                 update_option('msh_safe_rename_enabled', '1');
             }
@@ -366,9 +378,11 @@ class MSH_Image_Usage_Index {
                 $attachment_id
             ));
 
-            if ($existing_count > 0 && !$force_rebuild) {
-                return $existing_count;
-            }
+        if ($existing_count > 0 && !$force_rebuild) {
+            $file_relative = get_post_meta($attachment_id, '_wp_attached_file', true);
+            $this->apply_usage_status($attachment_id, (int) $existing_count, $file_relative);
+            return (int) $existing_count;
+        }
 
             // Remove existing entries for this attachment
             $wpdb->delete($this->index_table, ['attachment_id' => $attachment_id], ['%d']);
@@ -419,6 +433,9 @@ class MSH_Image_Usage_Index {
             error_log('MSH INDEX ERROR: Exception during indexing process for attachment ' . $attachment_id . ': ' . $e->getMessage());
             throw $e;
         }
+
+        $file_relative = get_post_meta($attachment_id, '_wp_attached_file', true);
+        $this->apply_usage_status($attachment_id, $usage_count, $file_relative);
 
         return $usage_count;
     }
@@ -867,6 +884,13 @@ class MSH_Image_Usage_Index {
      * Get index statistics
      */
     public function get_index_stats() {
+        // Cache for 5 minutes to avoid expensive queries on every page load
+        $cache_key = 'msh_index_stats_cache';
+        $cached = get_transient($cache_key);
+        if ($cached !== false && is_array($cached)) {
+            return $cached;
+        }
+
         global $wpdb;
 
         $stats = $wpdb->get_row("
@@ -885,28 +909,397 @@ class MSH_Image_Usage_Index {
             ORDER BY count DESC
         ");
 
+        $orphan_summary = $this->get_orphaned_attachment_summary(50);
+        $derived_summary = $this->get_derived_attachment_summary(25);
+
+        $result = [
+            'summary'    => $stats,
+            'by_context' => $context_stats,
+            'orphans'    => $orphan_summary,
+            'derived'    => $derived_summary,
+        ];
+
+        set_transient($cache_key, $result, 5 * MINUTE_IN_SECONDS);
+        return $result;
+    }
+
+    /**
+     * Clear cached index statistics so subsequent reads fetch fresh totals.
+     */
+    private function invalidate_stats_cache() {
+        delete_transient('msh_index_stats_cache');
+    }
+
+    /**
+     * Retrieve orphaned attachment details (attachments with no indexed references).
+     *
+     * @param int $limit Number of preview items to return.
+     * @return array
+     */
+    public function get_orphaned_attachment_summary($limit = 50) {
+        global $wpdb;
+
+        $limit = max(1, absint($limit));
+
+        $count = (int) $wpdb->get_var("
+            SELECT COUNT(*)
+            FROM {$wpdb->posts} p
+            LEFT JOIN {$wpdb->postmeta} status ON status.post_id = p.ID AND status.meta_key = '_msh_usage_status'
+            WHERE p.post_type = 'attachment'
+              AND p.post_mime_type LIKE 'image/%'
+              AND NOT EXISTS (
+                SELECT 1 FROM {$this->index_table} idx
+                WHERE idx.attachment_id = p.ID
+              )
+              AND (status.meta_value IS NULL OR status.meta_value = 'orphan')
+        ");
+
+        $items = [];
+
+        if ($count > 0) {
+            $rows = $wpdb->get_results(
+                $wpdb->prepare(
+                    "SELECT p.ID, p.post_title, p.post_date, p.post_mime_type, pm.meta_value AS file_path
+                     FROM {$wpdb->posts} p
+                     LEFT JOIN {$wpdb->postmeta} pm
+                        ON pm.post_id = p.ID AND pm.meta_key = '_wp_attached_file'
+                     LEFT JOIN {$wpdb->postmeta} status ON status.post_id = p.ID AND status.meta_key = '_msh_usage_status'
+                     WHERE p.post_type = 'attachment'
+                       AND p.post_mime_type LIKE 'image/%'
+                       AND NOT EXISTS (
+                           SELECT 1 FROM {$this->index_table} idx
+                           WHERE idx.attachment_id = p.ID
+                       )
+                       AND (status.meta_value IS NULL OR status.meta_value = 'orphan')
+                     ORDER BY p.post_date DESC
+                     LIMIT %d",
+                    $limit
+                )
+            );
+
+            if (!empty($rows)) {
+                foreach ($rows as $row) {
+                    $attachment_id = (int) $row->ID;
+                    $items[] = [
+                        'ID'        => $attachment_id,
+                        'title'     => $row->post_title,
+                        'post_date' => $row->post_date,
+                        'mime'      => $row->post_mime_type,
+                        'file_path' => $row->file_path,
+                        'url'       => wp_get_attachment_url($attachment_id) ?: '',
+                        'thumb_url' => wp_get_attachment_thumb_url($attachment_id) ?: '',
+                        'edit_url'  => get_edit_post_link($attachment_id, ''),
+                    ];
+                }
+            }
+        }
+
         return [
-            'summary' => $stats,
-            'by_context' => $context_stats
+            'count' => $count,
+            'items' => $items,
         ];
     }
 
     /**
-     * OPTIMIZED: High-performance complete index rebuild
-     * Uses single table scans instead of nested loops
-     * Completes all 219 attachments in ~2 minutes instead of hours
+     * Retrieve derived attachment summary (mirrors of primary assets).
      */
-    public function build_optimized_complete_index($force_rebuild = false) {
+    public function get_derived_attachment_summary($limit = 25) {
+        global $wpdb;
+
+        $limit = max(1, absint($limit));
+
+        $rows = $wpdb->get_results(
+            $wpdb->prepare(
+                "SELECT p.ID, p.post_title, p.post_date, p.post_mime_type, pm.meta_value AS file_path, parent.meta_value AS parent_id
+                 FROM {$wpdb->posts} p
+                 INNER JOIN {$wpdb->postmeta} status ON status.post_id = p.ID AND status.meta_key = '_msh_usage_status' AND status.meta_value = 'derived'
+                 LEFT JOIN {$wpdb->postmeta} parent ON parent.post_id = p.ID AND parent.meta_key = '_msh_usage_parent'
+                 LEFT JOIN {$wpdb->postmeta} pm ON pm.post_id = p.ID AND pm.meta_key = '_wp_attached_file'
+                 WHERE p.post_type = 'attachment'
+                   AND p.post_mime_type LIKE 'image/%'
+                 ORDER BY p.post_date DESC
+                 LIMIT %d",
+                $limit
+            )
+        );
+
+        $items = [];
+        foreach ($rows as $row) {
+            $attachment_id = (int) $row->ID;
+            $items[] = [
+                'ID'        => $attachment_id,
+                'title'     => $row->post_title,
+                'post_date' => $row->post_date,
+                'mime'      => $row->post_mime_type,
+                'file_path' => $row->file_path,
+                'url'       => wp_get_attachment_url($attachment_id) ?: '',
+                'thumb_url' => wp_get_attachment_thumb_url($attachment_id) ?: '',
+                'parent_id' => isset($row->parent_id) ? (int) $row->parent_id : 0,
+                'edit_url'  => get_edit_post_link($attachment_id, ''),
+            ];
+        }
+
+        $count = (int) $wpdb->get_var("
+            SELECT COUNT(*)
+            FROM {$wpdb->postmeta}
+            WHERE meta_key = '_msh_usage_status' AND meta_value = 'derived'
+        ");
+
+        return [
+            'count' => $count,
+            'items' => $items,
+        ];
+    }
+
+    private function get_normalized_basename($file_path) {
+        if (empty($file_path) || !is_string($file_path)) {
+            return '';
+        }
+
+        $basename = pathinfo($file_path, PATHINFO_FILENAME);
+        $basename = str_replace('\\', '/', $basename);
+        $basename = basename($basename);
+
+        $candidate = $basename;
+
+        // Reuse media cleanup normaliser if available for consistency
+        if (class_exists('MSH_Media_Cleanup') && method_exists('MSH_Media_Cleanup', 'normalize_base_filename')) {
+            $candidate = MSH_Media_Cleanup::normalize_base_filename($file_path);
+        } else {
+            $candidate = $this->strip_wp_resize_suffix($candidate);
+            $candidate = $this->strip_numeric_suffix($candidate);
+        }
+
+        return strtolower($candidate);
+    }
+
+    private function strip_wp_resize_suffix($value) {
+        $stripped = preg_replace('/-(scaled|rotated)(?:-[0-9x]+)*/i', '', $value);
+        $stripped = preg_replace('/(-copy)+$/i', '', $stripped);
+        return $stripped ?: $value;
+    }
+
+    private function strip_numeric_suffix($value) {
+        $stripped = preg_replace('/(-\d+)+$/', '', $value);
+        return $stripped ?: $value;
+    }
+
+    private function set_usage_status($attachment_id, $status, $details = []) {
+        $status = $status ?: 'orphan';
+        update_post_meta($attachment_id, '_msh_usage_status', $status);
+
+        if ($status === 'derived' && !empty($details['parent'])) {
+            update_post_meta($attachment_id, '_msh_usage_parent', (int) $details['parent']);
+        } else {
+            delete_post_meta($attachment_id, '_msh_usage_parent');
+        }
+    }
+
+    private function find_primary_attachment_for_base($normalized_base, $exclude_attachment_id) {
+        global $wpdb;
+
+        if (!$normalized_base) {
+            return 0;
+        }
+
+        $like = '%' . $wpdb->esc_like($normalized_base) . '%';
+        $candidates = $wpdb->get_results($wpdb->prepare(
+            "SELECT pm.post_id, pm.meta_value
+             FROM {$wpdb->postmeta} pm
+             WHERE pm.meta_key = '_wp_attached_file'
+               AND pm.meta_value LIKE %s
+               AND pm.post_id <> %d
+             ORDER BY pm.post_id ASC
+             LIMIT 25",
+            $like,
+            $exclude_attachment_id
+        ));
+
+        foreach ($candidates as $candidate) {
+            $candidate_base = $this->get_normalized_basename($candidate->meta_value);
+            if ($candidate_base !== $normalized_base) {
+                continue;
+            }
+
+            $usage = (int) $wpdb->get_var($wpdb->prepare(
+                "SELECT COUNT(*) FROM {$this->index_table} WHERE attachment_id = %d",
+                $candidate->post_id
+            ));
+
+            if ($usage > 0) {
+                return (int) $candidate->post_id;
+            }
+
+            $candidate_status = get_post_meta($candidate->post_id, '_msh_usage_status', true);
+            if ('in_use' === $candidate_status) {
+                return (int) $candidate->post_id;
+            }
+        }
+
+        return 0;
+    }
+
+    private function apply_usage_status($attachment_id, $usage_count, $file_path = '') {
+        $file_path = $file_path ?: get_post_meta($attachment_id, '_wp_attached_file', true);
+        if ($usage_count > 0) {
+            $this->set_usage_status($attachment_id, 'in_use');
+            return;
+        }
+
+        $normalized = $this->get_normalized_basename($file_path);
+        $parent_id = $this->find_primary_attachment_for_base($normalized, $attachment_id);
+
+        if ($parent_id) {
+            $this->set_usage_status($attachment_id, 'derived', ['parent' => $parent_id]);
+        } else {
+            $this->set_usage_status($attachment_id, 'orphan');
+        }
+    }
+
+    private function update_usage_status_for_attachments($attachment_ids) {
+        global $wpdb;
+
+        if (empty($attachment_ids)) {
+            return;
+        }
+
+        $ids = array_map('intval', array_filter(array_unique($attachment_ids)));
+        if (empty($ids)) {
+            return;
+        }
+
+        foreach ($ids as $id) {
+            $usage_count = (int) $wpdb->get_var($wpdb->prepare(
+                "SELECT COUNT(*) FROM {$this->index_table} WHERE attachment_id = %d",
+                $id
+            ));
+            $file_path = get_post_meta($id, '_wp_attached_file', true);
+            $this->apply_usage_status($id, $usage_count, $file_path);
+        }
+    }
+
+    private function rebuild_usage_status_index() {
+        global $wpdb;
+
+        $attachments = $wpdb->get_results("
+            SELECT ID FROM {$wpdb->posts}
+            WHERE post_type = 'attachment' AND post_mime_type LIKE 'image/%'
+        ");
+
+        if (empty($attachments)) {
+            return;
+        }
+
+        foreach ($attachments as $attachment) {
+            $attachment_id = (int) $attachment->ID;
+            $usage_count = (int) $wpdb->get_var($wpdb->prepare(
+                "SELECT COUNT(*) FROM {$this->index_table} WHERE attachment_id = %d",
+                $attachment_id
+            ));
+            $file_path = get_post_meta($attachment_id, '_wp_attached_file', true);
+            $this->apply_usage_status($attachment_id, $usage_count, $file_path);
+        }
+    }
+
+    /**
+     * Format stats for UI consumption (counts, context mix, orphan preview).
+     *
+     * @param array|null $stats Raw stats payload from get_index_stats().
+     * @return array|null
+     */
+    public function format_stats_for_ui($stats) {
+        if (!is_array($stats) || empty($stats['summary'])) {
+            return null;
+        }
+
+        $summary = $stats['summary'];
+
+        $result = [
+            'total_entries'       => isset($summary->total_entries) ? (int) $summary->total_entries : 0,
+            'indexed_attachments' => isset($summary->indexed_attachments) ? (int) $summary->indexed_attachments : 0,
+            'unique_locations'    => isset($summary->unique_locations) ? (int) $summary->unique_locations : 0,
+            'last_update_raw'     => $summary->last_update,
+            'last_update_display' => $summary->last_update
+                ? mysql2date(get_option('date_format') . ' ' . get_option('time_format'), $summary->last_update, false)
+                : null,
+            'by_context'          => [],
+            'orphaned_entries'    => isset($stats['orphans']['count']) ? (int) $stats['orphans']['count'] : 0,
+            'orphan_preview'      => [],
+            'derived_count'       => 0,
+            'derived_preview'     => [],
+        ];
+
+        if (!empty($stats['by_context'])) {
+            foreach ($stats['by_context'] as $context_row) {
+                $result['by_context'][] = [
+                    'context_type' => $context_row->context_type,
+                    'count'        => isset($context_row->count) ? (int) $context_row->count : 0,
+                ];
+            }
+        }
+
+        if (!empty($stats['orphans']['items'])) {
+            foreach ($stats['orphans']['items'] as $item) {
+                $result['orphan_preview'][] = [
+                    'ID'        => isset($item['ID']) ? (int) $item['ID'] : 0,
+                    'title'     => $item['title'] ?? '',
+                    'post_date' => $item['post_date'] ?? '',
+                    'mime'      => $item['mime'] ?? '',
+                    'file_path' => $item['file_path'] ?? '',
+                    'url'       => $item['url'] ?? '',
+                    'thumb_url' => $item['thumb_url'] ?? '',
+                    'edit_url'  => $item['edit_url'] ?? '',
+                ];
+            }
+        }
+
+        $derivedSummary = $stats['derived'] ?? $this->get_derived_attachment_summary(25);
+        if (!empty($derivedSummary['count'])) {
+            $result['derived_count'] = (int) $derivedSummary['count'];
+        }
+        if (!empty($derivedSummary['items'])) {
+            foreach ($derivedSummary['items'] as $item) {
+                $result['derived_preview'][] = [
+                    'ID'        => isset($item['ID']) ? (int) $item['ID'] : 0,
+                    'title'     => $item['title'] ?? '',
+                    'post_date' => $item['post_date'] ?? '',
+                    'mime'      => $item['mime'] ?? '',
+                    'file_path' => $item['file_path'] ?? '',
+                    'url'       => $item['url'] ?? '',
+                    'thumb_url' => $item['thumb_url'] ?? '',
+                    'parent_id' => $item['parent_id'] ?? 0,
+                    'edit_url'  => $item['edit_url'] ?? '',
+                ];
+            }
+        }
+
+        return $result;
+    }
+
+    /**
+     * OPTIMIZED: High-performance complete index rebuild
+     * Uses Content-First lookup for fast scanning (~49s for 219 attachments)
+     *
+     * @param bool $force_rebuild Whether to clear existing index first
+     * @param array|null $lookup Pre-built Content-First lookup from MSH_Content_Usage_Lookup
+     * @param array $context Context info for logging (trigger, source, etc.)
+     * @return array Result with success status, message, stats
+     */
+    public function build_optimized_complete_index($force_rebuild = false, $lookup = null, $context = []) {
         global $wpdb;
 
         set_time_limit(0); // No time limit
         ignore_user_abort(true); // Continue even if user navigates away
         ini_set('memory_limit', '1G'); // Increase memory
 
-        error_log("MSH Usage Index: Starting OPTIMIZED index build");
+        $trigger = $context['trigger'] ?? 'manual';
+        $source = $context['source'] ?? 'ajax';
+
+        error_log("MSH Usage Index: Starting OPTIMIZED index build (trigger: $trigger, source: $source)");
 
         // Clear existing index if force rebuild
         if ($force_rebuild) {
+            $this->invalidate_stats_cache();
             $wpdb->query("TRUNCATE TABLE {$this->index_table}");
             error_log("MSH Usage Index: Cleared existing index for optimized rebuild");
         }
@@ -928,8 +1321,31 @@ class MSH_Image_Usage_Index {
         $total = count($attachments);
         error_log("MSH Usage Index: Found $total attachments to index");
 
-        // Call the complete optimized build process
-        return $this->complete_optimized_build($attachments);
+        // Use Content-First lookup if provided (FAST path ~49s)
+        if ($lookup !== null && is_array($lookup) && !empty($lookup['entries'])) {
+            error_log("MSH Usage Index: Using Content-First lookup (FAST mode)");
+            $result = $this->build_from_content_lookup($attachments, $lookup, $context);
+            $this->invalidate_stats_cache();
+            return $result;
+        }
+
+        // Fallback to building lookup ourselves if not provided
+        error_log("MSH Usage Index: Building Content-First lookup...");
+        $content_lookup = MSH_Content_Usage_Lookup::get_instance();
+        $lookup = $content_lookup->build_lookup(true, ['trigger' => $trigger, 'source' => $source]);
+
+        if ($lookup && is_array($lookup) && !empty($lookup['entries'])) {
+            error_log("MSH Usage Index: Using newly built Content-First lookup");
+            $result = $this->build_from_content_lookup($attachments, $lookup, $context);
+            $this->invalidate_stats_cache();
+            return $result;
+        }
+
+        // Last resort: fall back to old slow method (should never happen)
+        error_log("MSH Usage Index: WARNING - Falling back to slow nested-loop method!");
+        $result = $this->complete_optimized_build($attachments);
+        $this->invalidate_stats_cache();
+        return $result;
 
         error_log("MSH Usage Index: Building URL variation map...");
         foreach ($attachments as $attachment) {
@@ -1138,6 +1554,87 @@ class MSH_Image_Usage_Index {
     /**
      * Complete the optimized index build method
      */
+    /**
+     * FAST: Build index from Content-First lookup (< 1 minute for 219 attachments)
+     * Uses pre-scanned /uploads/ references instead of nested loops
+     */
+    private function build_from_content_lookup($attachments, $lookup, $context = []) {
+        global $wpdb;
+        $start_time = microtime(true);
+
+        error_log("MSH Usage Index: Building from Content-First lookup with " . count($lookup['entries']) . " entries");
+
+        // Build attachment URL map (attachment_id => [variations])
+        $detector = MSH_URL_Variation_Detector::get_instance();
+        $attachment_variations = [];
+
+        foreach ($attachments as $attachment) {
+            $variations = $detector->get_all_variations($attachment->ID);
+            foreach ($variations as $variation) {
+                if (!empty($variation)) {
+                    // Store both ways for fast bidirectional lookup
+                    $attachment_variations[$variation] = $attachment->ID;
+                }
+            }
+        }
+
+        error_log("MSH Usage Index: Built " . count($attachment_variations) . " URL variations");
+
+        // Now match lookup entries to attachment variations
+        $entries_added = 0;
+        $matched_attachments = [];
+
+        foreach ($lookup['entries'] as $entry) {
+            // Try to match this lookup entry to an attachment variation
+            $matched_id = null;
+
+            // Check full URL
+            if (!empty($entry['url_full']) && isset($attachment_variations[$entry['url_full']])) {
+                $matched_id = $attachment_variations[$entry['url_full']];
+            }
+            // Check relative URL
+            elseif (!empty($entry['url_relative']) && isset($attachment_variations[$entry['url_relative']])) {
+                $matched_id = $attachment_variations[$entry['url_relative']];
+            }
+            // Check filename
+            elseif (!empty($entry['url_filename']) && isset($attachment_variations[$entry['url_filename']])) {
+                $matched_id = $attachment_variations[$entry['url_filename']];
+            }
+
+            if ($matched_id) {
+                // Insert into index
+                $wpdb->insert($this->index_table, [
+                    'attachment_id' => $matched_id,
+                    'url_variation' => $entry['url_full'] ?: $entry['url_relative'] ?: $entry['url_filename'],
+                    'table_name' => $entry['table'],
+                    'row_id' => $entry['row_id'],
+                    'column_name' => $entry['column'],
+                    'context_type' => $entry['context'],
+                    'post_type' => $entry['post_type']
+                ]);
+
+                $entries_added++;
+                $matched_attachments[$matched_id] = true;
+            }
+        }
+
+        $duration = microtime(true) - $start_time;
+        $total_matched = count($matched_attachments);
+
+        error_log("MSH Usage Index: Content-First build complete - $total_matched attachments, $entries_added entries in " . round($duration, 2) . "s");
+
+        return [
+            'success' => true,
+            'message' => "Content-First build complete: $total_matched attachments, $entries_added entries",
+            'duration' => $duration,
+            'stats' => [
+                'total_attachments' => $total_matched,
+                'total_entries' => $entries_added,
+                'lookup_entries_processed' => count($lookup['entries'])
+            ]
+        ];
+    }
+
     private function complete_optimized_build($attachments) {
         $start_time = microtime(true);
         $total = count($attachments);
@@ -1205,6 +1702,9 @@ class MSH_Image_Usage_Index {
             $missing = $total_images - $actual_indexed;
             error_log("MSH Usage Index: OPTIMIZED build PARTIAL - $actual_indexed/$total_images attachments ($completion_rate%), $missing failed/timed out");
 
+            $this->rebuild_usage_status_index();
+            $this->invalidate_stats_cache();
+
             return [
                 'success' => false,
                 'message' => "Optimized build incomplete: $actual_indexed of $total_images attachments processed ($completion_rate%). $missing attachments failed or timed out.",
@@ -1221,6 +1721,9 @@ class MSH_Image_Usage_Index {
         }
 
         error_log("MSH Usage Index: OPTIMIZED build complete - $actual_indexed attachments, $total_entries entries in " . round($duration, 2) . "s");
+
+        $this->rebuild_usage_status_index();
+        $this->invalidate_stats_cache();
 
         return [
             'success' => true,
@@ -1400,6 +1903,8 @@ class MSH_Image_Usage_Index {
 
         // Update last build timestamp
         update_option('msh_usage_index_last_build', current_time('mysql'));
+        $this->update_usage_status_for_attachments(array_merge($new_attachments, $affected_attachments, $orphaned_entries));
+        $this->invalidate_stats_cache();
 
         $duration = microtime(true) - $start_time;
 
@@ -1420,12 +1925,15 @@ class MSH_Image_Usage_Index {
         error_log("MSH Usage Index: Starting TRUE force rebuild - clearing everything");
 
         // 1. Always clear everything
+        $this->invalidate_stats_cache();
         $wpdb->query("TRUNCATE TABLE {$this->index_table}");
         delete_option('msh_image_usage_index');
         delete_option('msh_usage_index_last_build');
 
         // 2. Always rebuild from scratch using optimized method
         $result = $this->build_optimized_complete_index(true);
+
+        $this->invalidate_stats_cache();
 
         error_log("MSH Usage Index: TRUE force rebuild complete");
 
@@ -1443,6 +1951,7 @@ class MSH_Image_Usage_Index {
 
         // Clear everything on first chunk only
         if ($offset === 0) {
+            $this->invalidate_stats_cache();
             $wpdb->query("TRUNCATE TABLE {$this->index_table}");
             delete_option('msh_image_usage_index');
             delete_option('msh_usage_index_last_build');
@@ -1695,6 +2204,8 @@ class MSH_Image_Usage_Index {
         // Handle completion
         if (!$has_more) {
             update_option('msh_usage_index_last_build', current_time('mysql'));
+            $this->rebuild_usage_status_index();
+            $this->invalidate_stats_cache();
 
             // Get final statistics
             $final_stats = $this->get_index_stats();

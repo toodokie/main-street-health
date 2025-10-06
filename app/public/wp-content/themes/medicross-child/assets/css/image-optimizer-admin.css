@@ -263,12 +263,11 @@
     background: #faf9f6;
     border: 1px solid #dce2ec;
     border-radius: 6px;
-    padding: 12px 16px;
-    display: flex;
-    flex-wrap: wrap;
-    gap: 12px;
-    align-items: center;
-    justify-content: space-between;
+    padding: 16px 20px;
+    display: grid;
+    grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+    gap: 16px 24px;
+    align-items: flex-start;
 }
 
 .index-status-info {
@@ -277,6 +276,125 @@
     gap: 4px;
     color: #35332f;
     font-size: 14px;
+}
+
+.index-status-summary-line {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+}
+
+.index-health-badge {
+    display: inline-block;
+    padding: 4px 12px;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    background: #e5e7eb;
+    color: #1f2937;
+}
+
+.index-health-badge.healthy {
+    background: #ecfdf3;
+    color: #065f46;
+}
+
+.index-health-badge.queued {
+    background: #fef3c7;
+    color: #92400e;
+}
+
+.index-health-badge.attention {
+    background: #fee2e2;
+    color: #b91c1c;
+}
+
+.index-health-copy {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.index-queue-warning {
+    background: #fff7ed;
+    border: 1px solid #fed7aa;
+    color: #9a3412;
+    border-radius: 4px;
+    padding: 6px 10px;
+    font-size: 12px;
+}
+
+.index-scheduler-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 6px 12px;
+    margin-top: 8px;
+    font-size: 12px;
+    color: #35332f;
+}
+
+.index-table-mix {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-top: 12px;
+    font-size: 12px;
+    color: #35332f;
+}
+
+.index-mix-bar {
+    position: relative;
+    display: flex;
+    width: 100%;
+    height: 10px;
+    border-radius: 999px;
+    overflow: hidden;
+    background: #e5e7eb;
+}
+
+.index-mix-segment {
+    display: block;
+    height: 100%;
+}
+
+.index-mix-segment.posts {
+    background: #60a5fa;
+}
+
+.index-mix-segment.postmeta {
+    background: #c084fc;
+}
+
+.index-mix-segment.options {
+    background: #facc15;
+}
+
+.index-mix-legend {
+    display: flex;
+    gap: 12px;
+    font-size: 11px;
+    color: #4b5563;
+}
+
+.index-mix-legend .dot {
+    display: inline-block;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    margin-right: 4px;
+}
+
+.index-mix-legend .dot.posts { background: #60a5fa; }
+.index-mix-legend .dot.postmeta { background: #c084fc; }
+.index-mix-legend .dot.options { background: #facc15; }
+
+.index-scheduler-grid > div {
+    display: flex;
+    align-items: baseline;
+    gap: 4px;
 }
 
 .index-status-label {
@@ -296,18 +414,39 @@
 .index-status-actions {
     display: flex;
     flex-direction: column;
-    gap: 6px;
-    align-items: flex-end;
+    gap: 8px;
+    align-items: flex-start;
+    max-width: 260px;
 }
 
 .index-status-actions .button {
     border: 1px solid #35332f;
     color: #35332f;
     background: #faf9f6;
+    width: 100%;
 }
 
 .index-status-actions .button:hover {
     background: #f1f4f8;
+}
+
+.index-status-actions .button.is-busy {
+    opacity: 0.6;
+    pointer-events: none;
+}
+
+.index-status-actions .mm-chip {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    margin-left: 6px;
+    min-width: 20px;
+    padding: 1px 6px;
+    border-radius: 12px;
+    background: #e5e7eb;
+    color: #111827;
+    font-size: 11px;
+    font-weight: 600;
 }
 
 .index-status-hint {
@@ -315,14 +454,34 @@
     color: #666666;
 }
 
+.index-orphan-list {
+    margin-top: 10px;
+    padding: 12px;
+    border: 1px solid #dce2ec;
+    border-radius: 6px;
+    background: #ffffff;
+    max-height: 200px;
+    overflow-y: auto;
+}
+
+.index-orphan-list ul {
+    margin: 0;
+    padding-left: 18px;
+}
+
+.index-orphan-list li {
+    margin-bottom: 6px;
+    font-size: 13px;
+    line-height: 1.4;
+}
+
+.index-orphan-list li:last-child {
+    margin-bottom: 0;
+}
+
 @media (max-width: 768px) {
     .index-status-card {
-        flex-direction: column;
-        align-items: flex-start;
-    }
-
-    .index-status-actions {
-        align-items: flex-start;
+        grid-template-columns: 1fr;
     }
 }
 

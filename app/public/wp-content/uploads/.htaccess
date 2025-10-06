@@ -1,0 +1,27 @@
+# MSH Emergency Image Redirect Fix - TEMPORARY
+# Created: October 2025
+# Purpose: Fix broken images caused by database/filesystem mismatch
+# Status: REMOVE AFTER PERMANENT FIX IS IMPLEMENTED
+
+# Specific known broken images
+RedirectMatch 301 ^/wp-content/uploads/2024/09/motor-injuries-photo\.png$ /wp-content/uploads/2024/09/motor-vehicle-accident-hamilton.png
+
+# Pattern-based redirects for common naming patterns
+# Pattern: *-photo.* → *-hamilton.*
+RedirectMatch 301 ^/wp-content/uploads/(.*)([^/]+)-photo\.(png|jpg|jpeg|webp)$ /wp-content/uploads/$1$2-hamilton.$3
+
+# Pattern: *-injuries-* → *-injury-*
+RedirectMatch 301 ^/wp-content/uploads/(.*)([^/]+)-injuries-([^/]+)\.(png|jpg|jpeg|webp)$ /wp-content/uploads/$1$2-injury-$3.$4
+
+# Pattern: *-services-* → *-service-*
+RedirectMatch 301 ^/wp-content/uploads/(.*)([^/]+)-services-([^/]+)\.(png|jpg|jpeg|webp)$ /wp-content/uploads/$1$2-service-$3.$4
+
+# Fallback for any remaining -photo variants
+RedirectMatch 301 ^/wp-content/uploads/(.*)photo([^/]*)\.(png|jpg|jpeg|webp)$ /wp-content/uploads/$1hamilton$2.$3
+
+# Log redirects for monitoring (optional - remove if causes issues)
+# LogLevel warn
+# ErrorLog /tmp/msh_redirect.log
+# CustomLog /tmp/msh_redirect_access.log combined
+
+# END MSH EMERGENCY REDIRECTS

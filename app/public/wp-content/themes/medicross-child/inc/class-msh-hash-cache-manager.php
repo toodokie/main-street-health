@@ -13,6 +13,13 @@ if (!defined('ABSPATH')) {
     exit; // Exit if accessed directly
 }
 
+if (!class_exists('MSH_Perceptual_Hash')) {
+    $perceptual_hash_path = __DIR__ . '/class-msh-perceptual-hash.php';
+    if (file_exists($perceptual_hash_path)) {
+        require_once $perceptual_hash_path;
+    }
+}
+
 class MSH_Hash_Cache_Manager {
 
     /**
@@ -21,6 +28,11 @@ class MSH_Hash_Cache_Manager {
     const HASH_META_KEY = '_msh_file_hash';
     const HASH_TIME_KEY = '_msh_hash_time';
     const FILE_MODIFIED_KEY = '_msh_file_modified';
+
+    /**
+     * @var MSH_Perceptual_Hash|null
+     */
+    private $perceptual_manager = null;
 
     /**
      * Constructor
@@ -107,6 +119,8 @@ class MSH_Hash_Cache_Manager {
         update_post_meta($attachment_id, self::HASH_META_KEY, $hash);
         update_post_meta($attachment_id, self::HASH_TIME_KEY, time());
         update_post_meta($attachment_id, self::FILE_MODIFIED_KEY, $modified);
+
+        $this->invalidate_perceptual_cache($attachment_id);
 
         $this->ensure_filesize_meta($attachment_id, $filesize);
 
@@ -296,6 +310,8 @@ class MSH_Hash_Cache_Manager {
         delete_post_meta($attachment_id, self::HASH_TIME_KEY);
         delete_post_meta($attachment_id, self::FILE_MODIFIED_KEY);
 
+        $this->invalidate_perceptual_cache($attachment_id);
+
         error_log("MSH Hash Cache: Cleared cache for attachment {$attachment_id}");
     }
 
@@ -307,12 +323,26 @@ class MSH_Hash_Cache_Manager {
     public function clear_all_caches() {
         global $wpdb;
 
+        $keys = [
+            self::HASH_META_KEY,
+            self::HASH_TIME_KEY,
+            self::FILE_MODIFIED_KEY,
+        ];
+
+        if (class_exists('MSH_Perceptual_Hash')) {
+            $keys = array_merge($keys, [
+                MSH_Perceptual_Hash::META_HASH,
+                MSH_Perceptual_Hash::META_TIME,
+                MSH_Perceptual_Hash::META_MODIFIED,
+                MSH_Perceptual_Hash::META_STATUS,
+            ]);
+        }
+
+        $placeholders = implode(',', array_fill(0, count($keys), '%s'));
         $deleted = $wpdb->query(
             $wpdb->prepare(
-                "DELETE FROM {$wpdb->postmeta} WHERE meta_key IN (%s, %s, %s)",
-                self::HASH_META_KEY,
-                self::HASH_TIME_KEY,
-                self::FILE_MODIFIED_KEY
+                "DELETE FROM {$wpdb->postmeta} WHERE meta_key IN ({$placeholders})",
+                ...$keys
             )
         );
 
@@ -432,5 +462,30 @@ class MSH_Hash_Cache_Manager {
         }
 
         return $results;
+    }
+
+    /**
+     * Lazily retrieve perceptual hash manager.
+     *
+     * @return MSH_Perceptual_Hash|null
+     */
+    private function get_perceptual_manager() {
+        if (null === $this->perceptual_manager && class_exists('MSH_Perceptual_Hash')) {
+            $this->perceptual_manager = MSH_Perceptual_Hash::get_instance();
+        }
+
+        return $this->perceptual_manager;
+    }
+
+    /**
+     * Clear perceptual cache for attachment when MD5 cache invalidates.
+     *
+     * @param int $attachment_id Attachment ID.
+     */
+    private function invalidate_perceptual_cache($attachment_id) {
+        $manager = $this->get_perceptual_manager();
+        if ($manager) {
+            $manager->clear_cache($attachment_id);
+        }
     }
 }

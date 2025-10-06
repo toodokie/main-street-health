@@ -4077,11 +4077,8 @@ class MSH_Image_Optimizer {
 
         // Check current index status first
         $stats = $usage_index->get_index_stats();
-        $current_entries = 0;
-        if (!empty($stats['summary']) && isset($stats['summary']->total_entries)) {
-            $current_entries = (int) $stats['summary']->total_entries;
-        }
-        $summary_payload = $this->format_index_summary($stats['summary'] ?? null);
+        $summary_payload = $this->format_index_summary($stats);
+        $current_entries = isset($summary_payload['total_entries']) ? (int) $summary_payload['total_entries'] : 0;
 
         if ($current_entries > 0 && !$force_rebuild) {
             // Index already has data, return current stats (unless force rebuild)
@@ -4112,7 +4109,7 @@ class MSH_Image_Optimizer {
 
         // Get final stats
         $final_stats = $usage_index->get_index_stats();
-        $final_summary = $this->format_index_summary($final_stats['summary'] ?? null);
+        $final_summary = $this->format_index_summary($final_stats);
 
         // Mark system as ready
         update_option('msh_safe_rename_enabled', '1');
@@ -4193,18 +4190,39 @@ class MSH_Image_Optimizer {
         update_option('msh_backup_tables_version', '1');
     }
 
-    private function format_index_summary($summary) {
+    private function format_index_summary($stats) {
+        if (empty($stats)) {
+            return null;
+        }
+
+        $usage_index = MSH_Image_Usage_Index::get_instance();
+
+        if (is_array($stats)) {
+            $formatted = $usage_index->format_stats_for_ui($stats);
+            if ($formatted !== null) {
+                return $formatted;
+            }
+            $summary = $stats['summary'] ?? null;
+        } else {
+            $summary = $stats;
+        }
+
         if (!$summary) {
             return null;
         }
 
-        return array(
-            'total_entries' => isset($summary->total_entries) ? (int) $summary->total_entries : 0,
+        $base = array(
+            'total_entries'       => isset($summary->total_entries) ? (int) $summary->total_entries : 0,
             'indexed_attachments' => isset($summary->indexed_attachments) ? (int) $summary->indexed_attachments : 0,
-            'unique_locations' => isset($summary->unique_locations) ? (int) $summary->unique_locations : 0,
-            'last_update_raw' => $summary->last_update,
+            'unique_locations'    => isset($summary->unique_locations) ? (int) $summary->unique_locations : 0,
+            'last_update_raw'     => $summary->last_update,
             'last_update_display' => $summary->last_update ? mysql2date(get_option('date_format') . ' ' . get_option('time_format'), $summary->last_update, false) : null,
+            'by_context'          => array(),
+            'orphaned_entries'    => 0,
+            'orphan_preview'      => array(),
         );
+
+        return $base;
     }
 
     /**

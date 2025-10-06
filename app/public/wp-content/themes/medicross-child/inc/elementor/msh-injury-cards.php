@@ -540,6 +540,68 @@ class MSH_Injury_Cards_Widget extends \Elementor\Widget_Base {
 
         $this->end_controls_section();
 
+        // Title Style Section
+        $this->start_controls_section(
+            'title_style_section',
+            [
+                'label' => __('Title Style', 'medicross-child'),
+                'tab' => \Elementor\Controls_Manager::TAB_STYLE,
+            ]
+        );
+
+        $this->add_group_control(
+            \Elementor\Group_Control_Typography::get_type(),
+            [
+                'name' => 'title_typography',
+                'label' => __('Typography', 'medicross-child'),
+                'selector' => '{{WRAPPER}} .card-title',
+            ]
+        );
+
+        $this->add_control(
+            'title_color',
+            [
+                'label' => __('Color', 'medicross-child'),
+                'type' => \Elementor\Controls_Manager::COLOR,
+                'selectors' => [
+                    '{{WRAPPER}} .card-title' => 'color: {{VALUE}} !important;',
+                ],
+            ]
+        );
+
+        $this->end_controls_section();
+
+        // Description Style Section
+        $this->start_controls_section(
+            'description_style_section',
+            [
+                'label' => __('Description Style', 'medicross-child'),
+                'tab' => \Elementor\Controls_Manager::TAB_STYLE,
+            ]
+        );
+
+        $this->add_group_control(
+            \Elementor\Group_Control_Typography::get_type(),
+            [
+                'name' => 'description_typography',
+                'label' => __('Typography', 'medicross-child'),
+                'selector' => '{{WRAPPER}} .card-desc',
+            ]
+        );
+
+        $this->add_control(
+            'description_color',
+            [
+                'label' => __('Color', 'medicross-child'),
+                'type' => \Elementor\Controls_Manager::COLOR,
+                'selectors' => [
+                    '{{WRAPPER}} .card-desc' => 'color: {{VALUE}} !important;',
+                ],
+            ]
+        );
+
+        $this->end_controls_section();
+
         // Link Style Section
         $this->start_controls_section(
             'link_style_section',
@@ -590,6 +652,17 @@ class MSH_Injury_Cards_Widget extends \Elementor\Widget_Base {
                 'name' => 'link_typography',
                 'label' => __('Typography', 'medicross-child'),
                 'selector' => '{{WRAPPER}} .msh-read-more',
+            ]
+        );
+
+        $this->add_control(
+            'link_typography_color',
+            [
+                'label' => __('Typography Color', 'medicross-child'),
+                'type' => \Elementor\Controls_Manager::COLOR,
+                'selectors' => [
+                    '{{WRAPPER}} .msh-read-more' => 'color: {{VALUE}} !important;',
+                ],
             ]
         );
 

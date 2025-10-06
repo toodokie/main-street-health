@@ -8,6 +8,7 @@
 5. [Security Features](#security-features)
 6. [Recreation Guide](#recreation-guide)
 7. [Troubleshooting](#troubleshooting)
+8. [Additional Resources](#additional-resources)
 
 ---
 
@@ -199,6 +200,17 @@ The rename feature will become an opt-in toggle to accommodate different use cas
 │       ├── image-optimizer-modern.js      # Current analyzer + duplicate cleanup UI
 │       └── image-optimizer-admin.js       # Legacy UI kept for reference
 └── functions.php                          # Class initialization
+
+### Current Indexing Work (Oct 3, 2025)
+
+- Variation filtering: `class-msh-image-usage-index.php` keeps a transient “usage reference index” of real `/uploads` URLs; `get_all_variations()` trims to ~1 k actual strings per rebuild (down from 16 k).
+- Postmeta streaming: Set-based rebuild now tiers postmeta by size—≤128 KB rows stay in-memory, and oversized `_elementor_data` values stream through 128 KB windows with overlap. Latest profiling shows the postmeta pass at **10.4 s** (down from ~41 s legacy) for 48 k matches. Full trace stored in `msh_usage_index_profiling_last`.
+- Options slicing: Option scans read 128 KB excerpts per row and reuse the same variation lookup. The most recent run completed the options pass in **0.036 s** over 14 heavy rows (88 matches) instead of expanding N×M LIKE loops.
+- Fallback sweep: Any attachments left unindexed after the set-based scan now feed a deterministic direct-search sweep (configurable cap/timeout); the latest run processed every pending ID in one pass before reporting the remaining 96 true outliers.
+- CLI sweep: `run-msh-fallback.php` (CLI-only) now drives the deterministic sweep without HTTP timeouts; the latest run recovered 1,270 references total and pushed the index to **206/219** attachments.
+- Derivative awareness: The indexer classifies zero-reference files as `derived` when a sibling attachment with the same normalized basename is already tracked. These alternates (WebP exports, logo variants, etc.) inherit the parent’s context, are surfaced in the dashboard separately from true orphans, and no longer trigger the “Attention” health badge.
+- Filename permutations: URL detection now generates additional permutations (sanitized slugs, lower/upper-case, suffix-free, decoded entities) so CDN rewrites and Elementor slug rewrites resolve to the same attachment ID.
+- Remaining tasks: review the 13 `no_reference` orphans (SVG/logos: 13377, 13378, 14481, 14483, 14490, 14506, 14517, 16881, 16895, 17024, 18686, 18687, 18689) and decide whether to keep them excluded from rename scope; then cache the handful of giant options so they aren’t deserialised every rebuild.
 ```
 
 ## Related Documentation
@@ -528,13 +540,34 @@ Use the filter checkboxes to show only:
 
 After optimizing your published images:
 
-1. **Quick Duplicate Scan** – Instantly groups obvious duplicates and auto-runs a silent builder check on any group with candidate removals.
-2. **Deep Library Scan** – Processes the full media library in 50-item chunks, tracks progress in a modal, and persists results through transients so long scans survive network hiccups.
+1. **Quick Duplicate Scan (recent uploads)** – Scans the most recent ~500 attachments for hash/filename collisions so you can review new uploads within seconds. Treat the results as a review queue—run the per-group “Check builders/Deep scan” buttons before removing files.
+2. **Deep Library Scan (full library)** – Crawls the entire media catalogue in 50-item chunks using the hash cache manager, surfaces legacy duplicate chains (e.g., `injury-care-scaled-…`), and persists progress so long scans survive network hiccups. Use this periodically to reconcile older media.
 3. **Builder/ACF Verification** – Per-group buttons trigger medium (page builder/widget) and deep (serialized postmeta) usage checks; any discovered references flip the row to “In Use” or “Mixed.”
 4. **Review & Plan** – The review modal lets you pick a keeper, auto-flag unused copies, and shows live plan badges (“Not reviewed,” “Keeper selected,” “Ready – remove N”). Audio cues play on completion or error to mirror the optimization workflow.
 5. **Apply Cleanup Plan** – Deletes in 20-item batches, re-validates usage immediately before each deletion, and logs every deletion/skip (e.g., “Used in published content”) so nothing in use is removed.
 
+**Latest verification (Oct 2025)**: Quick scan removed 5 unused attachments; Deep scan confirmed 1 duplicate group with live references (0 safe deletes). Any remaining flagged files require page-builder content updates before the safe cleanup will remove them.
+
 **Important**: Always optimize published images first, then use the cleanup planner so filename updates propagate into the verification scans.
+
+#### Visual Similarity Roadmap (Perceptual Hash)
+- **Goal**: Catch visually identical creatives that differ only by compression, format, or filename (e.g., `landing-page_GettyImages-1343539369-1.png` vs `physiotherapy-hamilton-landing-page-gettyimages.png`).
+- **Technique**: Generate a lightweight 64-bit perceptual hash (dHash via the GD extension) per attachment and compare hashes with a Hamming-distance threshold.
+- **Proposed thresholds**:
+  - 0–5 bits different (≥95 % similarity): mark as *Definite duplicate*.
+  - 6–10 bits different (85–94 %): mark as *Likely duplicate – review recommended*.
+  - 11–15 bits different (75–84 %): mark as *Possibly related* (opt-in view).
+  - ≥16 bits different (<75 %): treat as distinct imagery.
+- **Generation strategy**:
+  - On-demand batches (100 attachments at a time) when the user triggers the visual scan.
+  - Cache results in `_msh_perceptual_hash` with `_msh_phash_time` / `_msh_phash_file_modified` metadata, mirroring the existing MD5 cache.
+  - Background queue (Action Scheduler) to pre-hash new uploads without blocking editors.
+- **UI integration**:
+  - New “Visual Similarity Scan” action merges MD5, perceptual, and filename groups but labels each row with its detection reason and similarity score.
+  - Provide filters/toggles so admins can hide slug-only collisions and focus on high-confidence matches.
+- **Compliance notes**:
+  - All heavy work runs in background batches with progress snapshots (no blocking ajax calls).
+  - Capability checks, nonces, and documented thresholds keep the feature plugin-review friendly.
 
 ### Monitoring Progress
 
@@ -949,13 +982,23 @@ $treatment_keywords = [
 - ✅ **Full audit trail** (can see exactly what was changed where)
 - ✅ **Rollback capability** available if issues arise
 
-**Implementation Highlights**:
-- **On-Demand Approach**: Instead of pre-building a massive index, the system now searches for specific URLs only when renaming, making it 15x faster
-- **Targeted Replacement**: Only touches database rows that actually contain the image URLs
-- **Automatic Backups**: Every rename operation is backed up before execution
-- **Verification System**: Confirms all replacements were successful
-- **One-Time Setup**: "Rebuild Usage Index" button on the dashboard creates the tables and enables the system (hold Shift while clicking to force a full rebuild)
-- **Chunked Rebuilds**: The button processes attachments in 25-item batches with a progress bar, preventing PHP timeouts on large libraries
+- **Implementation Highlights**:
+  - **On-Demand Approach**: Instead of pre-building a massive index, the system now searches for specific URLs only when renaming, making it 15x faster
+  - **Targeted Replacement**: Only touches database rows that actually contain the image URLs
+  - **Automatic Backups**: Every rename operation is backed up before execution
+  - **Verification System**: Confirms all replacements were successful
+  - **One-Time Setup**: "Rebuild Usage Index" button on the dashboard creates the tables and enables the system (hold Shift while clicking to force a full rebuild)
+  - **Chunked Rebuilds**: The button processes attachments in 25-item batches with a progress bar, preventing PHP timeouts on large libraries
+
+> **Upcoming Optimization (Plugin Compliance)**  
+> To align with WordPress.org plugin review guidelines, we plan to move the usage index rebuild into a background architecture before release:
+> - **Chunked batches** (100–200 records) with checkpoint markers so the crawl can pause/resume cleanly.
+> - **Action Scheduler queue** so batches run off the main request thread, with lightweight status snapshots for UI polling.
+> - **Throttled execution** (delay between batches, max concurrent jobs) plus an admin “Stop/Rebuild” button.
+> - **Efficient selectors** using `ID > last_id` patterns and trimmed serialized excerpts to keep memory low.
+> - **Resilient logging** with backoff retries and surfaced errors, plus CLI/filters for advanced control.
+> 
+> These changes keep the usage index fresh without blocking wp-admin while staying within plugin-compliance expectations.
 
 **Future Enhancement**: Once fully tested, the index button should be removed and tables should auto-create on plugin activation, making safe rename seamless and automatic.
 
@@ -2250,6 +2293,69 @@ The 2025 context engine release strengthens the balance between automation and e
 The strategic filename generation enhancement ensures that the system preserves and enhances the semantic value of source filenames, providing SEO-optimized suggestions that target actual healthcare search queries.
 
 For recreation or extension, focus on the shared metadata generator, maintain the security-first approach, and preserve the healthcare context intelligence (auto + manual) that makes this system uniquely valuable for medical practices.
+
+**For plugin distribution and monetization, refer to the Additional Resources section below for comprehensive guides on compliance, market positioning, and multi-language support.**
+
+---
+
+## Additional Resources
+
+### Plugin Distribution & Monetization Documentation
+
+📄 **[WordPress.org Plugin Compliance Checklist](WP_PLUGIN_COMPLIANCE_CHECKLIST.md)**
+- GPL licensing requirements and implementation
+- Security standards (sanitization, escaping, nonces)
+- Internationalization (i18n/l10n) requirements
+- Code quality and WordPress coding standards
+- Distribution preparation checklist
+- **Estimated effort:** 57-81 hours for full compliance
+- **Current compliance:** ~27% (needs work before distribution)
+
+📄 **[AI Monetization Strategy](AI_MONETIZATION_STRATEGY.md)**
+- AI-powered features and pricing models
+- Freemium strategy (WordPress.org FREE + Freemius PRO)
+- Credit-based vs subscription pricing comparison
+- **Revenue projections:** Year 1: ~$22.5k → Year 3: ~$135k
+- OpenAI Vision API integration guide
+- Multi-tier pricing recommendations (Pro/Business/Agency)
+- **Pricing sweet spot:** $99-399/year with AI credits included
+
+📄 **[Competitor Analysis - AI Image Plugins](COMPETITOR_ANALYSIS_AI_IMAGE_PLUGINS.md)**
+- Detailed analysis of 6 major competitors
+- **Key competitors:** Media File Renamer (40k+ installs, $39-199/year), AltText.ai ($5-229/month)
+- Pricing comparison and market positioning
+- Feature gap analysis and opportunities
+- **Market opportunity score:** 8.1/10 (Excellent)
+- **Your unique advantages:** Only complete solution with AI + rename + WebP + duplicate cleanup
+- Recommended competitive strategy and launch timeline
+
+📄 **[Multi-Language Implementation Guide](MSH_IMAGE_OPTIMIZER_MULTILANGUAGE_GUIDE.md)**
+- **Layer 1:** Plugin interface translation (WordPress i18n/l10n)
+- **Layer 2:** AI-generated metadata in 50+ languages
+- OpenAI multi-language support (no extra cost per language!)
+- **Implementation timeline:** 4-6 weeks (45-65 hours total)
+- Competitive parity with AltText.ai (130 languages) and ImgSEO (25 languages)
+- Step-by-step implementation checklist with code examples
+- **Cost analysis:** Same AI cost regardless of language ($0.02/image)
+
+### Quick Reference Guide
+
+**For Plugin Migration Timeline:**
+1. ✅ Weeks 1-4: Stabilization (indexer, Step 2 testing) - Current phase
+2. ✅ Weeks 5-8: Compliance work (GPL, i18n, debug removal)
+3. 🚀 Weeks 9-12: AI integration + Freemius setup
+4. 💰 Week 12+: Launch and monetization
+
+**For Market Positioning:**
+- **Target:** Healthcare/medical practices first (proven use case)
+- **Pricing:** Pro $99/year, Business $199/year, Agency $399/year
+- **Differentiator:** Business context AI + duplicate cleanup (no competitor has both)
+- **Timeline to revenue:** ~3 months from today
+
+**For Multi-Language Support:**
+- **Priority 1:** Plugin interface (6 languages) - WordPress.org requirement
+- **Priority 2:** AI metadata (50+ languages) - Competitive advantage
+- **Total effort:** 45-65 hours across 4-6 weeks
 
 ---
 

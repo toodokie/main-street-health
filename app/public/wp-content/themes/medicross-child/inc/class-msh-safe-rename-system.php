@@ -332,8 +332,12 @@ class MSH_Safe_Rename_System {
             }
         }
 
-        // Schedule cleanup of backups
-        wp_schedule_single_event(time() + $this->backup_retention, 'msh_cleanup_rename_backup', [$backup_path]);
+        // Schedule cleanup of backups (suppress errors to prevent log spam)
+        $scheduled = @wp_schedule_single_event(time() + $this->backup_retention, 'msh_cleanup_rename_backup', [$backup_path]);
+        if (is_wp_error($scheduled)) {
+            // Silently fail if cron scheduling fails - backups will be cleaned manually
+            error_log('MSH Rename: Could not schedule backup cleanup for ' . basename($backup_path) . ' (cron system issue)');
+        }
 
         return [
             'new_path' => $new_path,
@@ -452,7 +456,8 @@ class MSH_Safe_Rename_System {
 
         $backup_path = trailingslashit($backup_dir) . basename($path) . '.' . time();
         if (@rename($path, $backup_path)) {
-            wp_schedule_single_event(time() + $this->backup_retention, 'msh_cleanup_rename_backup', [$backup_path]);
+            // Schedule cleanup (suppress errors to prevent log spam)
+            @wp_schedule_single_event(time() + $this->backup_retention, 'msh_cleanup_rename_backup', [$backup_path]);
             return $backup_path;
         }
 
@@ -686,5 +691,48 @@ class MSH_Safe_Rename_System {
         if (is_dir($dir) && count(glob($dir . '/*')) === 0) {
             @rmdir($dir);
         }
+    }
+
+    /**
+     * Manual cleanup of old backups (run this if cron fails)
+     *
+     * @return array Statistics about cleanup
+     */
+    public function cleanup_old_backups() {
+        $upload_dir = wp_upload_dir();
+        $backup_dir = trailingslashit($upload_dir['basedir']) . 'msh-rename-backups';
+
+        if (!is_dir($backup_dir)) {
+            return ['cleaned' => 0, 'errors' => 0, 'message' => 'Backup directory does not exist'];
+        }
+
+        $cutoff_time = time() - $this->backup_retention;
+        $cleaned = 0;
+        $errors = 0;
+
+        $files = glob($backup_dir . '/*');
+        foreach ($files as $file) {
+            if (!is_file($file)) {
+                continue;
+            }
+
+            // Extract timestamp from filename (format: filename.ext.timestamp)
+            $parts = explode('.', basename($file));
+            $timestamp = (int) end($parts);
+
+            if ($timestamp > 0 && $timestamp < $cutoff_time) {
+                if (@unlink($file)) {
+                    $cleaned++;
+                } else {
+                    $errors++;
+                }
+            }
+        }
+
+        return [
+            'cleaned' => $cleaned,
+            'errors' => $errors,
+            'message' => "Cleaned {$cleaned} old backup files" . ($errors > 0 ? " ({$errors} errors)" : '')
+        ];
     }
 }

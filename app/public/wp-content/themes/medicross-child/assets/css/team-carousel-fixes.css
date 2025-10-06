@@ -1,0 +1,149 @@
+/**
+ * Team Carousel Layout 1 Fixes
+ * Fixes text line breaking and navigation arrow positioning
+ */
+
+/* Fix description text line breaking issues */
+.pxl-team-carousel1 .pxl-item--desc {
+    word-wrap: break-word;
+    word-break: normal;
+    white-space: normal;
+    overflow-wrap: break-word;
+    hyphens: none;
+    line-height: 1.6;
+    text-align: justify;
+    text-justify: inter-word;
+}
+
+.pxl-team-carousel1 .pxl-item--desc p {
+    word-wrap: break-word;
+    word-break: normal;
+    white-space: normal;
+    overflow-wrap: break-word;
+    hyphens: none;
+    margin-bottom: 15px;
+}
+
+.pxl-team-carousel1 .pxl-item--desc p:last-child {
+    margin-bottom: 0;
+}
+
+/* Fix navigation arrows positioning on large screens */
+.pxl-team-carousel1 .pxl-swiper-arrow-wrap {
+    position: relative;
+    width: 100%;
+    max-width: 100%;
+    overflow: visible;
+    margin: 20px 0 0 0;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 15px;
+}
+
+.pxl-team-carousel1 .pxl-swiper-arrow {
+    position: relative !important;
+    top: auto !important;
+    left: auto !important;
+    right: auto !important;
+    transform: none !important;
+    margin: 0 !important;
+    width: 50px;
+    height: 50px;
+    border-radius: 50%;
+    background: #fff;
+    box-shadow: 0 3px 12px rgba(0,0,0,0.15);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.3s ease;
+    cursor: pointer;
+    z-index: 10;
+}
+
+.pxl-team-carousel1 .pxl-swiper-arrow:hover {
+    background: #5CB3CC;
+    color: #fff;
+    transform: scale(1.1);
+}
+
+.pxl-team-carousel1 .pxl-swiper-arrow i {
+    font-size: 18px;
+    color: #5CB3CC;
+    transition: color 0.3s ease;
+}
+
+.pxl-team-carousel1 .pxl-swiper-arrow:hover i {
+    color: #fff;
+}
+
+/* Additional container adjustments to prevent overflow */
+.pxl-team-carousel1 {
+    overflow: visible;
+    position: relative;
+}
+
+.pxl-team-carousel1 .pxl-carousel-inner {
+    overflow: visible;
+    position: relative;
+}
+
+/* Responsive adjustments for arrows */
+@media (max-width: 768px) {
+    .pxl-team-carousel1 .pxl-swiper-arrow {
+        width: 40px;
+        height: 40px;
+    }
+
+    .pxl-team-carousel1 .pxl-swiper-arrow i {
+        font-size: 16px;
+    }
+}
+
+/* Fix any width constraints that might cause text breaking */
+.pxl-team-carousel1 .pxl-item--inner {
+    min-width: 280px;
+    max-width: 100%;
+}
+
+.pxl-team-carousel1 .pxl-item--holder {
+    width: 100%;
+    max-width: 100%;
+}
+
+.pxl-team-carousel1 .pxl-item--meta {
+    width: 100%;
+    max-width: 100%;
+    padding: 0 10px;
+}
+
+/* Ensure proper spacing and text flow */
+.pxl-team-carousel1 .pxl-item--title {
+    margin-bottom: 10px;
+    line-height: 1.4;
+}
+
+.pxl-team-carousel1 .pxl-item--position {
+    margin-bottom: 15px;
+    line-height: 1.4;
+}
+
+/* Better text justification for descriptions */
+.pxl-team-carousel1 .pxl-item--desc {
+    text-align: left;
+    font-size: 14px;
+    line-height: 1.7;
+    color: #666;
+}
+
+/* Prevent any forced width constraints on mobile */
+@media (max-width: 480px) {
+    .pxl-team-carousel1 .pxl-item--inner {
+        min-width: 250px;
+    }
+
+    .pxl-team-carousel1 .pxl-item--desc {
+        font-size: 13px;
+        line-height: 1.6;
+    }
+}

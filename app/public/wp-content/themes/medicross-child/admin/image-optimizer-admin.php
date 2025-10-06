@@ -51,15 +51,9 @@ class MSH_Image_Optimizer_Admin {
         if (class_exists('MSH_Image_Usage_Index')) {
             $usage_index = MSH_Image_Usage_Index::get_instance();
             $stats = $usage_index->get_index_stats();
-            if (!empty($stats['summary'])) {
-                $summary = $stats['summary'];
-                $index_summary = array(
-                    'total_entries' => isset($summary->total_entries) ? (int) $summary->total_entries : 0,
-                    'indexed_attachments' => isset($summary->indexed_attachments) ? (int) $summary->indexed_attachments : 0,
-                    'unique_locations' => isset($summary->unique_locations) ? (int) $summary->unique_locations : 0,
-                    'last_update_raw' => $summary->last_update,
-                    'last_update_display' => $summary->last_update ? mysql2date(get_option('date_format') . ' ' . get_option('time_format'), $summary->last_update, false) : null,
-                );
+            $formatted = $usage_index->format_stats_for_ui($stats);
+            if ($formatted) {
+                $index_summary = $formatted;
             }
         }
 
@@ -80,7 +74,19 @@ class MSH_Image_Optimizer_Admin {
                 'analyzing' => __('Analyzing images...', 'medicross-child'),
                 'optimizing' => __('Optimizing images...', 'medicross-child'),
                 'complete' => __('Optimization complete!', 'medicross-child'),
-                'error' => __('An error occurred. Please try again.', 'medicross-child')
+                'error' => __('An error occurred. Please try again.', 'medicross-child'),
+                'indexHealthy' => __('Healthy', 'medicross-child'),
+                'indexQueued' => __('Queued', 'medicross-child'),
+                'indexAttention' => __('Attention', 'medicross-child'),
+                'indexNotBuilt' => __('Not Built', 'medicross-child'),
+                'queueWarning' => __('Background indexing in progress - attachments queued for processing', 'medicross-child'),
+                'queueInfo' => __('Background refresh queued; no action needed unless jobs pile up.', 'medicross-child'),
+                'orphanWarning' => __('Orphaned entries detected - references to deleted attachments', 'medicross-child'),
+                'viewOrphans' => __('View Orphan List', 'medicross-child'),
+                'hideOrphans' => __('Hide Orphan List', 'medicross-child'),
+                'noOrphans' => __('No orphaned attachments detected.', 'medicross-child'),
+                'derivedHeading' => __('Derived copies (alternate formats)', 'medicross-child'),
+                'derivedInfo' => __('Alternate formats detected; these mirror another attachment.', 'medicross-child')
             )
         ));
         
@@ -189,26 +195,54 @@ class MSH_Image_Optimizer_Admin {
                     <div class="progress-status" id="progress-status">Waiting for analysis…</div>
                     <div class="index-status-card">
                         <div class="index-status-info">
-                            <div>
-                                <span class="index-status-label"><?php _e('Usage Index:', 'medicross-child'); ?></span>
+                            <div class="index-health-copy">
+                                <div>
+                                    <span class="index-status-label"><?php _e('Usage Index:', 'medicross-child'); ?></span>
+                                    <span id="index-health-badge" class="index-health-badge">Loading...</span>
+                                </div>
                                 <span id="index-status-summary" class="index-status-value">&mdash;</span>
                             </div>
                             <div id="index-last-updated" class="index-status-timestamp"></div>
+                            <div id="index-queue-warning" class="index-queue-warning" style="display: none;"></div>
+                            <div class="index-table-mix">
+                                <div style="font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; color: #6b7280; margin-bottom: 4px;">Reference Distribution</div>
+                                <div id="index-mix-bar" class="index-mix-bar">
+                                    <span class="index-mix-segment posts" style="width: 33%;" title="Posts"></span>
+                                    <span class="index-mix-segment meta" style="width: 33%;" title="Post Meta"></span>
+                                    <span class="index-mix-segment options" style="width: 34%;" title="Options"></span>
+                                </div>
+                                <div class="index-mix-legend" style="display: flex; gap: 12px; margin-top: 6px; font-size: 11px;">
+                                    <span><span style="display: inline-block; width: 10px; height: 10px; background: #60a5fa; border-radius: 2px; margin-right: 4px;"></span>Posts: <span id="mix-posts-count">0</span></span>
+                                    <span><span style="display: inline-block; width: 10px; height: 10px; background: #34d399; border-radius: 2px; margin-right: 4px;"></span>Meta: <span id="mix-meta-count">0</span></span>
+                                    <span><span style="display: inline-block; width: 10px; height: 10px; background: #fbbf24; border-radius: 2px; margin-right: 4px;"></span>Options: <span id="mix-options-count">0</span></span>
+                                </div>
+                            </div>
                         </div>
                         <div class="index-status-actions">
-                            <button id="rebuild-usage-index" class="button button-secondary">
+                            <button id="trigger-incremental-refresh" class="button button-secondary">
+                                <?php _e('Trigger Incremental Refresh', 'medicross-child'); ?>
+                            </button>
+                            <button id="rebuild-usage-index" class="button button-secondary" style="margin-left: 10px;">
                                 <?php _e('Smart Build Index', 'medicross-child'); ?>
                             </button>
                             <button id="force-rebuild-usage-index" class="button button-primary" style="margin-left: 10px;">
                                 <?php _e('Force Rebuild', 'medicross-child'); ?>
                             </button>
+                            <button id="view-orphan-list" class="button button-secondary" style="margin-left: 10px; display: none;">
+                                <?php _e('View Orphan List', 'medicross-child'); ?>
+                            </button>
+                            <button id="cleanup-orphans" class="button button-secondary" style="margin-left: 10px; display: none;">
+                                <?php _e('Clean Orphans', 'medicross-child'); ?> <span id="orphan-chip" class="index-orphan-chip" style="display: inline-block; margin-left: 4px; padding: 2px 6px; background: #fee2e2; color: #b91c1c; border-radius: 999px; font-size: 10px; font-weight: 600;">0</span>
+                            </button>
                             <div class="index-button-help" style="margin-top: 8px; font-size: 12px; color: #666;">
+                                <div><strong>Trigger Incremental Refresh:</strong> Queues background lookup refresh for next cron cycle</div>
                                 <div><strong>Smart Build:</strong> Only processes new/changed attachments (fast, incremental)</div>
                                 <div><strong>Force Rebuild:</strong> Clears everything and rebuilds from scratch (slow, complete)</div>
                             </div>
                         </div>
                     </div>
                 </div>
+                <div id="index-orphan-panel" class="index-orphan-list" style="display: none;"></div>
                 
                 <!-- Step 1: Image Optimization -->
                 <div class="msh-actions-section">
@@ -337,9 +371,17 @@ class MSH_Image_Optimizer_Admin {
                     <h2 style="color: #35332f;"><?php _e('Step 2: Clean Up Duplicate Images', 'medicross-child'); ?></h2>
                     <p style="margin-bottom: 15px; color: #35332f; font-size: 14px; background: #faf9f6; padding: 10px; border-radius: 4px;">
                         <strong>AFTER OPTIMIZATION:</strong> Find and safely remove duplicate images to free up storage space and organize your media library.
+                        <br><br>
+                        <strong>Detection Methods:</strong>
+                        <span style="display: inline-block; margin-left: 8px; padding: 2px 6px; background: #e0f2fe; color: #0369a1; border-radius: 3px; font-size: 11px;">🔒 MD5</span> Exact file matches &nbsp;|&nbsp;
+                        <span style="display: inline-block; padding: 2px 6px; background: #fef3c7; color: #92400e; border-radius: 3px; font-size: 11px;">👁️ Perceptual</span> Visually similar images &nbsp;|&nbsp;
+                        <span style="display: inline-block; padding: 2px 6px; background: #e0e7ff; color: #4338ca; border-radius: 3px; font-size: 11px;">📝 Filename</span> Name-based matches
                     </p>
                     <div class="action-buttons">
-                        <button id="quick-duplicate-scan" class="button" style="background: #35332f; color: #ffffff; border: 1px solid #35332f;">
+                        <button id="visual-similarity-scan" class="button" style="background: #35332f; color: #ffffff; border: 1px solid #35332f;">
+                            <?php _e('Visual Similarity Scan', 'medicross-child'); ?>
+                        </button>
+                        <button id="quick-duplicate-scan" class="button" style="background: #daff00; color: #35332f; border: 1px solid #35332f;">
                             <?php _e('Quick Duplicate Scan', 'medicross-child'); ?>
                         </button>
                         <button id="full-library-scan" class="button" style="background: #daff00; color: #35332f; border: 1px solid #35332f;">

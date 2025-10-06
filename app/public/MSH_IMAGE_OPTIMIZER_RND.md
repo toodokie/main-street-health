@@ -22,6 +22,34 @@ This file contains ongoing research, experimental approaches, performance invest
 
 ---
 
+## 🚨 CRITICAL CORRECTIONS (Based on Code Review)
+
+**This document contained several fundamental inaccuracies that have been corrected:**
+
+### ❌ **Wrong Bottleneck Analysis**
+- **Claimed**: `get_all_variations()` takes 30-50s per file as primary bottleneck
+- **Reality**: `get_all_variations()` takes ~0.1-0.5s per file (fast metadata lookup)
+- **Actual Bottleneck**: Table scanning loops O(variations × content_rows) in `index_all_posts_optimized`
+
+### ❌ **Outdated Database Schema**
+- **Claimed**: Columns `location_type`, `location_id`, `url_found`
+- **Reality**: Current schema uses `url_variation`, `table_name`, `row_id`, `column_name`
+
+### ❌ **Incorrect Batch Processing Claims**
+- **Claimed**: Using 25-file batches consistently
+- **Reality**: `chunked_force_rebuild()` defaults to 50, not 25
+
+### ❌ **Missing Features Already Implemented**
+- **Claimed**: Need bespoke Elementor/ACF/Gutenberg processors
+- **Reality**: `MSH_Targeted_Replacement_Engine` already handles JSON/serialized data
+
+### ✅ **Confirmed Critical Issue: GUID Modification**
+- **Issue**: `class-msh-safe-rename-system.php:494` updates `wp_posts.guid`
+- **Problem**: WordPress GUIDs should never be modified per research warnings
+- **Action Required**: Audit and fix GUID preservation
+
+---
+
 ## Current Architecture Analysis
 
 ### Core Components
@@ -32,31 +60,36 @@ MSH Image Optimizer System
 │   ├── chunked_force_rebuild() - Slow per-attachment method
 │   └── smart_build_index() - Incremental updates
 ├── MSH_URL_Variation_Detector (URL pattern generator)
-│   ├── get_all_variations() - **BOTTLENECK** 30-50s per file
+│   ├── get_all_variations() - Fast metadata lookup ~0.1-0.5s per file
 │   └── get_file_variations() - Multiple URL formats
+├── **REAL BOTTLENECK**: Table scanning loops O(variations × content_rows)
 ├── MSH_Safe_Rename_System (Rename orchestrator)
 └── Database: wp_msh_image_usage_index (Custom index table)
 ```
 
-### Performance Characteristics (As of October 2025)
-- **Fast Path**: `build_optimized_complete_index()` → 4 total DB operations → 1-2 minutes
-- **Slow Path**: `chunked_force_rebuild()` → 876+ DB operations → 10+ minutes (AVOIDED)
-- **Critical Bottleneck**: `MSH_URL_Variation_Detector::get_all_variations()` → 30-50s per attachment
+### CORRECTED: Performance Characteristics (As of October 2025)
+- **Current Path**: `build_optimized_complete_index()` → Hundreds of queries in table scans → 7-10 minutes (when working)
+- **Chunked Path**: `chunked_force_rebuild()` → Default batch size 50 → Individual processing
+- **Real Bottleneck**: Table scanning loops in `index_all_posts_optimized` → O(variations × content_rows)
+- **Variation Generation**: `get_all_variations()` → ~0.1-0.5s per attachment (NOT the bottleneck)
 
-### Database Schema
+### CORRECTED: Current Database Schema
 ```sql
 CREATE TABLE wp_msh_image_usage_index (
-    id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
-    attachment_id bigint(20) unsigned NOT NULL,
-    location_type varchar(20) NOT NULL,
-    location_id bigint(20) unsigned NOT NULL,
-    field_name varchar(255) DEFAULT NULL,
-    url_found text NOT NULL,
-    context text DEFAULT NULL,
+    id int(11) NOT NULL AUTO_INCREMENT,
+    attachment_id int(11) NOT NULL,
+    url_variation text NOT NULL,
+    table_name varchar(64) NOT NULL,
+    row_id int(11) NOT NULL,
+    column_name varchar(64) NOT NULL,
+    context_type varchar(50) DEFAULT 'content',
+    post_type varchar(20) DEFAULT NULL,
+    last_updated datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     PRIMARY KEY (id),
     KEY attachment_id (attachment_id),
-    KEY location_type (location_type),
-    KEY location_id (location_id)
+    KEY table_row (table_name, row_id),
+    KEY url_variation (url_variation(191)),
+    KEY context_type (context_type)
 );
 ```
 
@@ -86,7 +119,7 @@ CREATE TABLE wp_msh_image_usage_index (
 ```php
 // The smoking gun - Force Rebuild was using slow method
 if ($force_rebuild) {
-    $result = $this->chunked_force_rebuild(25, $offset); // BAD: O(n) operations
+    $result = $this->chunked_force_rebuild(50, $offset); // BAD: O(variations × rows) table scanning
 }
 
 // Meanwhile, fast test script used:
@@ -97,33 +130,56 @@ $result = $this->build_optimized_complete_index(true); // GOOD: O(1) operations
 
 | Method | DB Operations | Time for 219 Files | Notes |
 |--------|---------------|--------------------|---------|
-| `chunked_force_rebuild()` | 219 × 4 = 876+ | 10+ minutes | Per-attachment processing |
+| `chunked_force_rebuild()` | 219 × variations × rows | 33+ minutes | Table scanning bottleneck |
 | `build_optimized_complete_index()` | 4 total | 1-2 minutes | Batch processing |
 | **Improvement** | **99.5% reduction** | **83% faster** | Algorithmic difference |
 
-#### URL Variation Detector Bottleneck
+#### Recent Progress (3 Oct 2025)
 
-**Current Implementation Analysis**:
+| Change | Effect | Notes |
+|--------|--------|-------|
+| Variation whitelist (reference index of real `/uploads` URLs) | `get_all_variations()` → ~1 k uniques per rebuild | Built once per run from posts, postmeta, options; variation generation now ~0.05 s |
+| Postmeta streaming tiers | Set-scan rebuild keeps ≤128 KB rows in memory and streams larger `_elementor_data` via 128 KB windows | Latest force rebuild: **10.4 s** postmeta pass, 2 006 rows considered, 48 187 matches |
+| Options excerpt scanning | 128 KB excerpts per option feed the shared variation lookup | Options pass now **0.036 s** for 14 heavy rows (88 matches), no N×M LIKE expansion |
+| Deterministic fallback sweep | Direct-search recovery runs across every unindexed attachment in a single pass (CLI helper `run-msh-fallback.php`) | Latest CLI pass recovered 271 references; index now at **204/219** with 15 SVG/icon orphans logged as `no_reference` |
+| Content-first lookup | New `MSH_Content_Usage_Lookup` builds `/uploads/` references into a cached transient before any variation work | Posts/postmeta/options are scanned once; lookup is reused by the whitelist filter and incremental jobs (Action Scheduler if present, WP-Cron fallback); change hooks queue a single refresh job |
+| Pathological attachment fallback (SVG/huge rasters) | Bounded recovery loop (5 IDs/run, strict timeouts) | All remaining IDs handled by fallback CLI sweep; 15 orphaned assets held out of rename scope pending audit |
+| Derived attachment tagging | Zero-reference variants inherit usage metadata from siblings with the same normalized basename | Dashboard now lists “derived copies” separately from true orphans, protecting WebP/logo alternates from triggering health warnings |
+
+**Current status:** Force rebuild (set path) completes in **~49 s**, streaming `_elementor_data` and options through 128 KB slices with the normalized variation lookup. `MSH_Content_Usage_Lookup` now captures content-first references (cached transient + scheduled refresh), and the October CLI sweep brought the index to **204/219** attachments; 15 outliers remain deliberately excluded alongside `no_reference` flags. Incremental refresh jobs enqueue automatically—ensure WP-Cron/Action Scheduler runs routinely—and optional host-specific optimisations remain a backlog item.
+
+### Duplicate Cleanup Verification (Oct 2025)
+
+- **Quick Scan (recent uploads)** – Reports only the newest ~500 attachments for speed. Latest run flagged 8 groups / 10 files; safe cleanup deleted 5 true orphans and skipped any file still referenced in published Elementor content (skip logged as “Used in published content”).
+- **Deep Library Scan (full library)** – Swept ~200 attachments and surfaced 1 legacy duplicate group with live references, yielding 0 safe deletions. Confirms the safe cleanup gate is working.
+- **Operational note** – Leave Quick vs Deep as two buttons: quick for “just uploaded” triage, deep for periodic full audits. Update UI copy to read “Needs Manual Review” in quick results so counts aren’t mistaken for ready-to-delete totals.
+
+#### CORRECTED: Real Performance Bottleneck Analysis
+
+**Actual Bottleneck - Table Scanning Loops**:
 ```php
-// BOTTLENECK: Called 219 times in optimized method
-foreach ($attachments as $attachment) {
-    $variations = $detector->get_all_variations($attachment->ID); // 30-50s EACH
-    // Generates: original + thumbnails + WebP versions + URL formats
-    // For WebP with 8 sizes: ~32 variations per attachment
+// REAL BOTTLENECK: Nested loops in index_all_posts_optimized
+foreach ($variation_to_attachment as $variation => $attachment_id) {
+    // Check ALL variations against EVERY post - O(N×M) complexity
+    if (strpos($post->post_content, $variation) !== false) {
+        // Database insert for each match
+    }
 }
+// This runs for: posts table, postmeta table, options table
+// With 1,500 variations × thousands of content rows = massive complexity
 ```
 
-**What `get_all_variations()` Does**:
-1. Queries `wp_get_attachment_metadata()` - Database hit
-2. Calls `get_attached_file()` - Filesystem check
-3. Generates variations for each image size - File existence checks
-4. Creates WebP variations - More filesystem operations
-5. Multiple URL format variations - String processing
+**What `get_all_variations()` Actually Does**:
+1. Queries `wp_get_attachment_metadata()` - Single database hit
+2. Calls `get_attached_file()` - Metadata lookup, no filesystem
+3. Generates URL string variations - Pure string processing
+4. Returns array of URL variations - No filesystem operations
 
-**Performance Impact**:
-- 219 attachments × 30-50 seconds = 1.8-4.5 hours total
-- Each attachment: 4-8 filesystem calls + metadata query
-- Total filesystem operations: 876-1,752 per rebuild
+**Corrected Performance Impact**:
+- `get_all_variations()`: ~0.1-0.5 seconds per attachment (NOT 30-50s)
+- Real bottleneck: Table scanning loops in `index_all_posts_optimized`
+- Complexity: O(variations × content_rows) = O(1,500 × ~10,000) operations
+- Total table scans: posts + postmeta + options = hundreds of thousands of `strpos()` calls
 
 ---
 
@@ -213,16 +269,104 @@ if ($actually_processed === 0 && !empty($attachments)) {
 
 ---
 
+## Visual Similarity Detection (Perceptual Hash) – Implementation Blueprint (October 2025)
+
+### Objectives
+- Catch visually identical creatives that evade MD5/filename grouping (different compression, formats, or filenames).
+- Keep detection tiers explainable to users while staying within WordPress plugin review guidelines (background/batched processing, non-blocking UI).
+- Reuse existing hash cache patterns to minimize new infrastructure.
+
+### Detection Thresholds (64-bit dHash via GD)
+| Hamming Distance | Similarity | Treatment |
+|------------------|------------|-----------|
+| 0–5 bits | ≥95 % | Auto-flag as **Definite Duplicate** |
+| 6–10 bits | 85–94 % | Flag as **Likely Duplicate – Review** |
+| 11–15 bits | 75–84 % | Optional **Possibly Related** bucket |
+| ≥16 bits | <75 % | Treat as distinct imagery |
+
+Calibration plan: run the first deep scan at 10-bit (85 %) threshold, manually audit the top 10 groups, then adjust if false-positives surface.
+
+### Storage & Caching Strategy
+- New meta keys: `_msh_perceptual_hash`, `_msh_phash_time`, `_msh_phash_file_modified` (mirror the MD5 cache keys).
+- Hash invalidation mirrors MD5 workflow: recompute when `filemtime()` changes or when a forced rebuild is invoked.
+- Missing meta → compute on demand; successful scans persist hashes for future runs.
+
+### Execution Architecture
+1. **On-demand batches**
+   - `msh_visual_similarity_scan` AJAX endpoint triggers batch work (100 attachments per batch, similar to `ajax_prepare_hash_cache`).
+   - Each batch: ensure hash exists, compute if missing, stash results in a transient keyed to the user/session.
+   - Return progress payload (processed, total, batches remaining) so UI can poll/update.
+
+2. **Background queue (Phase 2)**
+   - Hook `add_attachment` → schedule background Action Scheduler job to compute the hash asynchronously.
+   - Queue also handles “refresh stale hash” jobs flagged by the cache invalidation logic.
+
+3. **Comparison service**
+   - Group attachments by MIME + coarse dimension bucket (±5 % width/height) to reduce comparisons.
+   - Compute pairwise Hamming distance inside each bucket, caching comparison results in-memory per scan to avoid repeats.
+   - Persist final similarity groups in a transient so the UI can fetch them without re-running comparisons.
+
+### UI & Workflow Changes
+- Add a “Visual Similarity Scan” button beside the existing deep scan.
+- Present groups with detection labels (e.g., “Hash match”, “Visual 96 %”, “Slug only”) and similarity percentages.
+- Provide toggles to hide/show slug-only collisions and low-confidence matches.
+- Reuse the modal review workflow, but surface similarity rationale in the header so the reviewer understands why files were grouped.
+
+### Step-by-Step Implementation Plan
+1. **Scaffold core class** (`class-msh-perceptual-hash.php`)
+   - `generate_hash( $attachment_id, $force = false )`
+   - `ensure_hash_for_batch( array $attachment_ids )`
+   - `compare_hashes( $hash_a, $hash_b )` → returns distance & similarity %
+   - `group_similar( array $attachments, $threshold_bits = 10 )`
+   - Include GD fallback checks and WP_Error responses if unsupported.
+
+2. **Add metadata integration**
+   - Extend `MSH_Hash_Cache_Manager` to orchestrate both MD5 & perceptual hashes (shared invalidation path).
+   - Register hooks on file updates/rename operations so caches stay current.
+
+3. **Implement batched AJAX runner**
+   - New handler `wp_ajax_msh_visual_similarity_scan_start` to initialize the job (store attachment IDs, reset progress transient).
+   - Subsequent requests `msh_visual_similarity_scan_batch` process the next chunk and append results.
+   - UI polls a progress endpoint (`msh_visual_similarity_scan_status`) for percentage, ETA, and any errors.
+
+4. **Result presentation**
+   - Transform final groups into the existing duplicate result format, adding:
+     - `detection_method`, `similarity_score`, `distance_bits`.
+     - Visual badges (“Definite”, “Likely”, “Possible”) based on thresholds.
+   - Update review modal to display the similarity rationale and thresholds.
+
+5. **Testing & Verification**
+   - Unit tests for hash generation and comparison accuracy using a controlled image set (identical, slightly compressed, resized, and distinct images).
+   - Integration test: run scan on staging library, confirm the expected GettyImages chain lands in the “Definite” group.
+   - Performance test: measure batch runtime with 200/500 attachments, adjust batch size if needed.
+
+6. **Documentation & Support**
+   - Update admin tooltips and docs (done) with thresholds and workflow.
+   - Log detection summary (number of groups per tier) so support can trace decisions.
+   - Provide CLI command (`wp msh phash rebuild`) for advanced users to precompute hashes.
+
+### Compliance & Safeguards
+- Heavy workloads are chunked and executed via AJAX polling or Action Scheduler jobs.
+- All requests gated by nonces + `manage_options` capability.
+- Memory usage controlled by batching + dimension bucketing.
+- Clear admin messaging about detection confidence and manual review expectations.
+
+### Pending Decisions Before Coding
+- Finalize default batch size (100 vs 150) after profiling GD performance locally.
+- Confirm whether we include SVGs in v1 (GD rasterization can be lossy; may defer or add opt-in flag).
+- Decide on cache TTL for similarity groups stored in transients (e.g., 24 hours) to avoid recomputing during active review sessions.
+
 ## Optimization Opportunities
 
 ### Immediate Wins (High Impact, Low Risk)
 
-#### 1. URL Variation Detector Optimization
+#### 1. Table Scanning Loop Optimization
 **Current Bottleneck**:
 ```php
-// Called 219 times - VERY SLOW
-foreach ($attachments as $attachment) {
-    $variations = $detector->get_all_variations($attachment->ID);
+// REAL BOTTLENECK: O(variations × content_rows) in usage index
+foreach ($variation_to_attachment as $variation => $attachment_id) {
+    // Scans entire content tables for each variation
+    $this->scan_table_for_usage($table, $variation);
 }
 ```
 
@@ -570,90 +714,53 @@ $perf = MSH_Performance_Monitor::end('url_variation_generation');
 
 ## Benchmarking Results
 
-### October 2025 Performance Testing
+### Profiling Snapshot — 3 Oct 2025
 
 #### Environment
-- **Hardware**: Local by Flywheel (MacOS, M1 Pro, 16GB RAM)
+- **Hardware**: Local by Flywheel (macOS, M1 Pro, 16 GB RAM)
 - **WordPress**: 6.3+, PHP 7.4, MySQL 8.0
-- **Dataset**: 219 image attachments, ~1,500 URL variations
-- **Page Builders**: Elementor, ACF
+- **Dataset**: 219 image attachments, ~16 k URL variations
+- **Builders/Plugins**: Elementor, ACF, custom theme extensions
+- **Profiling**: `MSH_INDEX_PROFILING=1`, legacy loops enabled (`MSH_INDEX_USE_SET_SCAN=0`)
 
-#### Force Rebuild Performance Timeline
+#### Run 1: `build_optimized_complete_index(true)` (Legacy loops)
+| Stage | Duration | Workload Notes |
+|-------|----------|----------------|
+| Variation map | **0.03 s** | 16,386 unique variations generated (no hotspot) |
+| Posts scan | **2.97 s** | 223 posts, ~3.65 M string comparisons, 688 matches |
+| **Postmeta scan** | **465.74 s** | 6,024 rows, **~98.7 M comparisons**, 39,469 matches (main bottleneck) |
+| Options scan | **0.73 s** | 14 rows, 229 k comparisons, 87 matches |
+| Overall | **469.56 s** | 149/219 attachments processed (70 still pending) |
 
-| Date | Method | Duration | Attachments Processed | Success Rate | Notes |
-|------|--------|----------|---------------------|--------------|--------|
-| Oct 1 (Before) | `chunked_force_rebuild` | 10+ min | 143/219 (65%) | 0% | Timeout failures |
-| Oct 1 (After timeout fix) | `chunked_force_rebuild` | 8+ min | 17/219 | 0% | Still too slow |
-| Oct 2 (Method switch) | `build_optimized_complete_index` | 5-7 min | 219/219 | 100% | Still slow due to variation bottleneck |
-| Oct 2 (Timeout removal) | `build_optimized_complete_index` | **7-10 min** | **219/219** | **100%** | Working but not optimal |
+**Timed-out attachments (70 IDs, MIME mix)**
+- _SVGs:_ 149, 152, 154, 158, 161, 175, 177, 179–183, 186, 660, 14642, 14766, 16360, 16361, 17760, 17761, 17787, 18182, 18183, 18185, 18191, 18743, 18744, 18746, 18747, 18778, 18795, 19912
+- _PNG/WebP:_ 13456, 13459, 14506, 14513, 14516, 14517, 15278, 16760, 16818, 16822, 16826, 16895, 17006, 17024, 17073, 17078, 17133, 17139, 17209, 17786, 18686, 18687, 18689, 19887
+- _JPEG:_ 13241, 14481, 14483, 15977, 15991, 16008, 18584, 18589, 18599, 18609–18613, 18610, 18611, 18612, 18613 (duplicate IDs left intentionally for investigation)
 
-#### Detailed Breakdown (Current State)
-```
-Total Force Rebuild Time: 7-10 minutes
-├── Database clearing: ~1 second
-├── URL variation generation: ~6-8 minutes (BOTTLENECK)
-│   └── 219 attachments × 30-50s each
-├── Posts table scan: ~30 seconds
-├── Postmeta table scan: ~45 seconds
-└── Options table scan: ~15 seconds
-```
+#### Run 2: Set-based prototype (posts, postmeta, options toggled on)
+- Toggle: `MSH_INDEX_USE_SET_SCAN=1`, variation chunk 25 (posts) / 20 (postmeta/options)
+- Outcome: Process ran for **>1,040 s** then still stopped at 147/219 attachments (same failures). CLI attempts to invoke `index_all_postmeta_set_based()` alone triggered memory exhaustion (>256 MB) despite 1 GB limit.
+- Profiling snapshot (first run before timeout): posts comparisons collapsed to ~3,800 but postmeta/options scans still dominated (454 s + 475 s) due to large serialized blobs being pulled into PHP per chunk.
 
-#### Individual Component Performance
-| Component | Current Performance | Target Performance | Optimization Potential |
-|-----------|-------------------|-------------------|----------------------|
-| `get_all_variations()` | 30-50s per file | 1-2s per file | 95% improvement possible |
-| Posts table scan | 30s total | 15s total | 50% improvement possible |
-| Postmeta scan | 45s total | 20s total | 55% improvement possible |
-| Options scan | 15s total | 10s total | 33% improvement possible |
+### Postmeta Payload Analysis
+| Bucket | Rows (meta_value containing `uploads`) |
+|--------|---------------------------------------|
+| 64–256 KB | 3,253 |
+| 16–64 KB | 2,540 |
+| 4–16 KB | 184 |
+| <1 KB | 28 |
+| 1–4 KB | 17 |
+| ≥256 KB | 2 |
 
-### Memory Usage Analysis
-```
-Peak Memory Usage During Force Rebuild:
-├── PHP baseline: ~50MB
-├── WordPress core: ~80MB
-├── Index generation: ~120MB
-├── Variation storage: ~200MB
-└── Peak total: ~450MB (within 1GB limit)
-```
+Top offenders (`_elementor_data`): 696 KB (ID 16951/8946), 193–189 KB (multiple pages), etc. These large serialized arrays explain the CPU and memory load when scanning postmeta.
 
-### Database Query Analysis
-```sql
--- Current query pattern (inefficient):
-SELECT * FROM wp_posts WHERE ID = 123;        -- 219 times
-SELECT * FROM wp_postmeta WHERE post_id = 123; -- 219 times
--- Total: 438+ individual queries
+### Key Observations
+- Variation generation is already cheap (<0.05 s); the issue is still O(variations × rows) scanning of huge serialized blobs.
+- Postmeta holds thousands of Elementor/ACF records between 64 KB and 256 KB; every rebuild re-parses these strings dozens of times.
+- Set-based SQL reduces redundant comparisons in posts but still drags massive rows back to PHP and currently increases runtime/memory usage.
+- The same 70 attachments time out in every run; many are SVGs but large PNG/JPEG/WebP files also appear. Individual profiling per attachment is required to pinpoint corrupt metadata or missing files.
+- To move forward we need: (a) smarter pre-filtering (hashes, precomputed reference tables, or FULLTEXT/REGEXP), (b) chunk-level safeguards/metrics, and (c) attachment-specific diagnostics.
 
--- Optimized pattern (target):
-SELECT * FROM wp_posts WHERE post_type = 'attachment'; -- 1 time
-SELECT * FROM wp_postmeta WHERE post_id IN (...);      -- 1 time
--- Total: 2-3 queries
-```
-
----
-
-## Research References & External Resources
-
-### WordPress Performance Studies
-- [WordPress VIP Performance Best Practices](https://wpvip.com/documentation/performance-best-practices/)
-- [Query Monitor Plugin Performance Analysis](https://querymonitor.com/)
-- [WordPress.org Make Core Performance Team](https://make.wordpress.org/core/tag/performance/)
-
-### Database Optimization Resources
-- [MySQL Performance Tuning Guide](https://dev.mysql.com/doc/refman/8.0/en/optimization.html)
-- [WordPress Database Optimization Techniques](https://codex.wordpress.org/Database_Description)
-- [Percona MySQL Performance Blog](https://www.percona.com/blog/)
-
-### Image Processing & CDN Research
-- [WebP Performance Analysis](https://developers.google.com/speed/webp/docs/webp_study)
-- [Modern Image Formats Comparison](https://web.dev/uses-webp-images/)
-- [CDN Performance Impact Studies](https://www.keycdn.com/blog/website-performance-cdns)
-
-### WordPress Media Handling Evolution
-- [Block Editor (Gutenberg) Media Handling](https://developer.wordpress.org/block-editor/reference-guides/data/data-core/#media)
-- [WordPress REST API Media Endpoints](https://developer.wordpress.org/rest-api/reference/media/)
-- [WordPress Multisite Media Management](https://wordpress.org/support/article/multisite-network-administration/)
-
----
 
 ## External Research: WordPress Media Renaming Best Practices
 
@@ -681,1239 +788,144 @@ SELECT * FROM wp_postmeta WHERE post_id IN (...);      -- 1 time
 **4. Performance Analysis**
 > "Index-based updates are much faster than scanning for each file. With an index, the cost of renaming N files is roughly O(N + M), where N is number of files and M is total references, instead of O(N×DatabaseSize) with a naive approach."
 
-**Our Discovery**: ⚠️ **This explains our bottleneck!** Our URL variation generation is still O(N×DatabaseSize) because `get_all_variations()` queries the database for each attachment individually.
+**Our Discovery**: ⚠️ Earlier profiling blamed variation generation; deeper review shows the table-scanning loops below are the real O(variations × content_rows) cost driver.
 
 #### Research Insights for Our Optimization:
 
-**🎯 Critical Optimization Opportunity: Batch Variation Generation**
+**Primary Optimization Focus: Table Scan Algorithm**
 
-The research validates that our current approach of calling `get_all_variations()` for each attachment is the wrong pattern:
+Code review and profiling show that the expensive work happens when every generated variation is checked against every content row. The nested loops in `index_all_posts_optimized()` and `index_all_postmeta_optimized()` create O(variations × content_rows) behaviour that dwarfs the cost of generating variations.
 
 ```php
-// CURRENT (SLOW): O(N×DatabaseSize)
-foreach ($attachments as $attachment) {
-    $variations = $detector->get_all_variations($attachment->ID); // DB query per file
-}
-
-// RESEARCH RECOMMENDATION: O(N + M)
-// "Loop through all posts in batches, check post_content for any media file URLs"
-// "Single query for all metadata... Generate variations in memory"
-```
-
-**Implementation Strategy:**
-```php
-// Batch approach suggested by research
-class MSH_Batch_Variation_Generator {
-    public function build_all_variations_batch($attachment_ids) {
-        // Single query for all attachment metadata
-        $all_metadata = $wpdb->get_results("
-            SELECT post_id, meta_value
-            FROM wp_postmeta
-            WHERE meta_key = '_wp_attachment_metadata'
-            AND post_id IN (" . implode(',', $attachment_ids) . ")
-        ");
-
-        // Single query for all file paths
-        $all_files = $wpdb->get_results("
-            SELECT post_id, meta_value
-            FROM wp_postmeta
-            WHERE meta_key = '_wp_attached_file'
-            AND post_id IN (" . implode(',', $attachment_ids) . ")
-        ");
-
-        // Generate all variations in memory (no more DB calls)
-        return $this->generate_variations_from_batch_data($all_metadata, $all_files);
+// CURRENT BOTTLENECK: set-based data fed into row-by-row scanning
+foreach ($posts as $post) {
+    foreach ($variation_to_attachment as $variation => $attachment_id) {
+        if (strpos($post->post_content, $variation) !== false) {
+            $this->record_match($attachment_id, $variation, $post);
+        }
     }
 }
 ```
 
-**Expected Impact**: Research suggests this could reduce our Force Rebuild time from 7-10 minutes to 1-2 minutes.
+**Implementation Strategy:**
+- Push pattern matching into MySQL so each table is scanned once per batch (e.g., REGEXP/LIKE clauses built from grouped variations).
+- Pre-group variations by filename/slug to shrink the pattern list before querying each table.
+- Cache variation hashes so repeated scans can skip known-miss patterns.
+
+**Expected Impact**: Removing the double loop should cut Force Rebuild time from 7–10 minutes down to low minutes (target < 2–3 minutes) by trading millions of string comparisons for a handful of set-based queries per table.
 
 #### Additional Validation Points:
 
 **Widget and Options Handling**
 > "WordPress widget data and theme customizer settings can also contain image references... stored in serialized arrays within the wp_options table."
 
-**Our Implementation**: ✅ Our system scans wp_options table with proper serialization handling.
+**Our Implementation**: ✅ Our system already scans `wp_options` with proper serialization handling, so optimised queries must continue to include these sources.
 
 **Batch Processing Recommendations**
 > "Process 50 posts at a time, or 50 media files at a time... Each file's operation stays under ~5 seconds prevents the process from timing out."
 
-**Our Implementation**: ✅ We use 25-file batches with timeout protection.
+**Our Implementation**: ⚠️ Currently defaulting to 50-file batches; evaluate whether reducing to 25 improves memory headroom or cooperates better with new set-based scans.
 
 **SVG Performance Issues**
 > "SVGs causing delays: The scenario noted 30–50 second delays for SVGs... If your code tries to handle SVG like other images, you might want to bypass heavy operations."
 
-**Our Discovery**: ✅ Matches our experience! SVGs were taking 30-50 seconds each in our system.
+**Our Discovery**: Needs fresh timing after the table-scan fix to confirm whether SVG processing remains a concern or was simply trapped inside the same bottleneck.
 
 #### Research-Backed Optimization Roadmap:
 
-**Priority 1: Implement Batch Variation Generation**
-- Replace individual `get_all_variations()` calls with batch queries
-- **Expected impact**: 85-90% reduction in Force Rebuild time
-- **Risk**: Low - research validates this approach
+**Priority 1: Table Scan Optimization**
+- Replace nested PHP loops with set-based SQL queries or temporary tables.
+- Pre-build pattern lists per table (posts, postmeta, options) and execute a single query per batch.
+- Add instrumentation around each scan to confirm < 0.5s targets from research.
 
 **Priority 2: SVG-Specific Optimization**
-- Implement separate, lighter processing for SVG files
-- **Expected impact**: Eliminate 30-50 second per-file delays
-- **Implementation**: Skip thumbnail generation, simplify metadata handling
+- Instrument SVG attachments once table scans are fixed.
+- If still slow, skip thumbnail logic and short-circuit metadata work for SVG mime types.
 
 **Priority 3: Enhanced Plugin Pattern Detection**
-- Add specific handling for common plugins mentioned in research
-- **Plugins to target**: Yoast SEO, slider plugins, form builders
-- **Implementation**: Plugin-specific meta key patterns
+- Add specific handling for common plugins mentioned in research.
+- Plugins to target: Yoast SEO, slider plugins, form builders.
 
 **Priority 4: Real-time Index Updates**
 > "Hook into events (saving posts, saving widgets, etc.) to update the index incrementally"
-- **Benefit**: Eliminate need for full index rebuilds
-- **Implementation**: WordPress action hooks on content save
+- Benefit: Eliminates the need for frequent full rebuilds once the baseline scan is fast.
+
+---
+
+## 🎯 STRATEGIC QUESTIONS ANSWERED
+
+### Q1: Do we still see real-world timing data showing 30-50s per attachment after correcting for table-scan bottleneck?
+
+**Answer**: **No, not after isolating the loops.** Variation generation alone finishes in well under a second per attachment. The multi-minute delays appear once the variation list is applied to content tables. Follow-up profiling should record separate timings for variation generation, each table scan, and SVG handling to give us a clean baseline.
+
+### Q2: Should we explicitly document the next optimization target?
+
+**Answer**: **Yes.**
+
+**Primary Target**: Reduce the O(variations × content_rows) complexity in table scanning.
+- **File**: `class-msh-image-usage-index.php` lines 984+.
+- **Pattern**: `foreach ($variation_to_attachment as $variation => $attachment_id)`.
+- **Solution**: Batch SQL queries or temporary tables instead of inner PHP loops.
+- **Expected Impact**: 85–90% reduction in Force Rebuild runtime.
+
+**Secondary Target**: Preserve GUID integrity.
+- **File**: `class-msh-safe-rename-system.php` line 494.
+- **Issue**: WordPress GUIDs must remain immutable.
+- **Action**: Update rename flow to stop modifying `wp_posts.guid` and rely on canonical URL sources instead.
 
 #### Research Validation Summary:
 
 | Aspect | Research Recommendation | Our Implementation | Status |
 |--------|------------------------|-------------------|---------|
 | Index-based approach | ✅ Recommended | ✅ Implemented | **CORRECT** |
-| Batch processing | ✅ 25-50 files | ✅ 25 files | **OPTIMAL** |
+| Batch size tuning | ✅ 25–50 files | ⚠️ Currently fixed at 50; evaluate lowering when optimising | **REVIEW** |
 | Serialization handling | ✅ Use WP functions | ✅ `maybe_unserialize()` | **CORRECT** |
 | URL variation tracking | ✅ ~6-7 per image | ✅ ~6.8 per image | **ACCURATE** |
-| **Variation generation** | ⚠️ **Batch queries** | ❌ **Individual queries** | **NEEDS FIX** |
+| Table scanning algorithm | ✅ Set-based queries / indexed lookup | ❌ Nested PHP loops per variation | **NEEDS FIX** |
 | wp_options scanning | ✅ Target specific keys | ✅ Comprehensive scan | **CORRECT** |
 
-**Conclusion**: The research strongly validates our overall architecture but confirms that our URL variation generation is the primary bottleneck. Implementing batch variation generation should resolve the remaining performance issues and align us with industry best practices.
+**Conclusion**: The research validates our overall architecture but makes clear that the table scanning strategy is the true performance blocker. Addressing the nested-loop algorithm must precede any lower-impact ideas like batch variation generation.
 
 #### Implementation Action Plan:
 
-Based on this research validation, we have a clear roadmap for achieving 85-90% performance improvement:
-
-**🎯 Phase 1: Batch Variation Generator (Immediate)**
+**Phase 1: Table Scan Optimisation (Immediate)**
 ```php
-// Target implementation in MSH_URL_Variation_Detector
-public function batch_get_all_variations($attachment_ids) {
-    global $wpdb;
-
-    // Single batch query for all metadata (replaces 219 individual queries)
-    $metadata_query = $wpdb->prepare("
-        SELECT post_id, meta_value
-        FROM {$wpdb->postmeta}
-        WHERE meta_key = '_wp_attachment_metadata'
-        AND post_id IN (" . implode(',', array_fill(0, count($attachment_ids), '%d')) . ")
-    ", ...$attachment_ids);
-
-    $files_query = $wpdb->prepare("
-        SELECT post_id, meta_value
-        FROM {$wpdb->postmeta}
-        WHERE meta_key = '_wp_attached_file'
-        AND post_id IN (" . implode(',', array_fill(0, count($attachment_ids), '%d')) . ")
-    ", ...$attachment_ids);
-
-    // Process all variations in memory
-    return $this->generate_variations_from_batch_data(
-        $wpdb->get_results($metadata_query),
-        $wpdb->get_results($files_query)
-    );
-}
-```
-
-**Expected Outcome**: Force Rebuild 7-10 minutes → 1-2 minutes
-
-#### 🔒 Risk Analysis: Batch Variation Generator
-
-**SECURITY & STABILITY RISKS: ⭐⭐⭐ (LOW)**
-
-**Code Stability Risks:**
-- **✅ LOW RISK**: Batch queries are standard WordPress/MySQL patterns
-- **✅ MINIMAL CHANGE**: Only affects variation generation, not reference updates
-- **✅ BACKWARD COMPATIBLE**: Can fallback to individual queries if batch fails
-- **⚠️ MEMORY CONCERN**: Loading 219 attachment metadata at once (~200-400KB)
-  - **Mitigation**: Already set 1G memory limit, actual usage well within bounds
-  - **Fallback**: Batch in chunks of 50-100 attachments if memory issues arise
-
-**Database Performance Risks:**
-- **✅ IMPROVEMENT**: 2 queries vs 219 queries reduces database load significantly
-- **✅ STANDARD PATTERN**: `IN (...)` queries are MySQL-optimized
-- **⚠️ QUERY SIZE**: Large IN clause with 219 IDs
-  - **MySQL Limit**: `max_allowed_packet` typically 64MB+, our query <1KB
-  - **Performance**: MySQL handles IN clauses with hundreds of values efficiently
-
-**WordPress Integration Risks:**
-- **✅ CORE FUNCTIONS**: Uses standard `$wpdb->get_results()` and `$wpdb->prepare()`
-- **✅ NO HOOKS BYPASSED**: Doesn't skip WordPress security or caching layers
-- **✅ SERIALIZATION SAFE**: Still uses `maybe_unserialize()` properly
-- **✅ MULTISITE COMPATIBLE**: No cross-site data access
-
-**SEO & CONTENT INTEGRITY RISKS: ⭐ (VERY LOW)**
-
-**URL Reference Accuracy:**
-- **✅ IDENTICAL OUTPUT**: Batch method generates same variations as individual method
-- **✅ NO LOGIC CHANGES**: Same URL generation algorithms, just batched data retrieval
-- **✅ NO BROKEN LINKS**: Reference finding/replacement logic unchanged
-
-**Content Corruption Risks:**
-- **✅ READ-ONLY OPTIMIZATION**: Batch approach only affects data retrieval, not updates
-- **✅ SERIALIZATION PRESERVED**: WordPress meta functions handle serialization correctly
-- **✅ NO DATA LOSS**: All existing safeguards (backups, verification) remain
-
-**SEO Impact:**
-- **✅ NO SEO CHANGES**: Faster indexing doesn't affect SEO rankings
-- **✅ NO URL CHANGES**: Image URLs remain exactly the same
-- **✅ IMPROVED UX**: Faster admin operations indirectly benefit SEO (site maintenance)
-
-**OPERATIONAL RISKS: ⭐⭐ (LOW-MEDIUM)**
-
-**Deployment Risks:**
-- **✅ NON-BREAKING**: Can be deployed gradually with feature flags
-- **✅ ROLLBACK READY**: Simple to revert to individual queries if issues
-- **⚠️ TESTING REQUIRED**: Need thorough testing with full dataset first
-  - **Mitigation**: Test on staging with identical data
-
-**Hosting Compatibility:**
-- **✅ SHARED HOSTING**: Standard MySQL queries work on all WordPress hosts
-- **✅ NO NEW DEPENDENCIES**: Uses existing WordPress/MySQL capabilities
-- **⚠️ TIMEOUT CONSIDERATIONS**: Still needs proper PHP execution time management
-  - **Current**: Already handled with `set_time_limit(0)`
-
-**Data Consistency Risks:**
-- **⚠️ RACE CONDITIONS**: If attachments modified during batch processing
-  - **Current Risk**: Already exists in individual method
-  - **Mitigation**: Same as current - atomic operations where possible
-- **✅ TRANSACTION SAFETY**: Read-only operations don't need transactions
-
-**EDGE CASE RISKS: ⭐⭐ (LOW-MEDIUM)**
-
-**Large Dataset Scenarios:**
-- **1000+ Attachments**: Batch queries still efficient, may need chunking
-- **Complex Metadata**: Some plugins store massive serialized data
-  - **Mitigation**: Size checks and graceful degradation to individual queries
-- **Corrupted Metadata**: Batch processing could fail on single bad record
-  - **Mitigation**: Error handling to skip corrupted entries
-
-**Plugin Compatibility:**
-- **✅ CORE WORDPRESS**: Only uses standard WordPress functions
-- **⚠️ CUSTOM METADATA**: Plugins with non-standard metadata storage patterns
-  - **Risk Level**: LOW - most plugins follow WordPress conventions
-  - **Mitigation**: Comprehensive testing with site's actual plugin stack
-
-**Performance Edge Cases:**
-- **Shared Hosting Limits**: Some hosts limit query complexity/size
-  - **Mitigation**: Chunked batch processing (e.g., 50 attachments per batch)
-- **Database Locks**: Large queries might impact site performance
-  - **Current**: Already running during maintenance windows
-
-**RECOMMENDED RISK MITIGATION STRATEGY:**
-
-**Phase 1: Cautious Implementation**
-```php
-// Gradual rollout with fallback
-public function get_all_variations_with_fallback($attachment_ids) {
-    if (count($attachment_ids) > 100 || !$this->batch_mode_enabled()) {
-        // Fallback to individual processing
-        return $this->get_variations_individually($attachment_ids);
-    }
-
-    try {
-        return $this->batch_get_all_variations($attachment_ids);
-    } catch (Exception $e) {
-        error_log('Batch variation generation failed, falling back: ' . $e->getMessage());
-        return $this->get_variations_individually($attachment_ids);
-    }
-}
-```
-
-**Phase 2: Testing Protocol**
-1. **Staging Test**: Full Force Rebuild on exact production data copy
-2. **Partial Test**: Batch process 25-50 attachments first
-3. **Verification**: Compare batch vs individual output for accuracy
-4. **Performance Test**: Monitor memory usage and execution time
-5. **Rollback Plan**: Keep individual method as instant fallback
-
-**Phase 3: Production Deployment**
-1. **Feature Flag**: Deploy behind admin setting toggle
-2. **Monitoring**: Enhanced logging for first few runs
-3. **Gradual Adoption**: Enable for small batches first, then full Force Rebuild
-
-**OVERALL RISK ASSESSMENT: ⭐⭐ (LOW)**
-
-**Summary:**
-- **High Confidence**: Research-validated approach using standard WordPress patterns
-- **Low Breaking Change Risk**: Only optimizes data retrieval, doesn't change core logic
-- **High Rollback Safety**: Can instantly revert to current working method
-- **Excellent Performance Gain**: 85-90% improvement for manageable risk
-
-**Recommendation**: **PROCEED** with cautious implementation including comprehensive testing and fallback mechanisms.
-
-**🔧 Phase 2: SVG Optimization (Follow-up)**
-- Separate processing path for SVG files
-- Skip thumbnail operations that cause 30-50s delays
-- Simplified metadata handling for vector files
-
-**📈 Phase 3: Plugin-Specific Enhancements**
-- Yoast SEO meta patterns: `_yoast_wpseo_opengraph-image*`
-- Slider plugin table scanning
-- Form builder template detection
-
-**⚡ Phase 4: Real-time Index Updates**
-- WordPress action hooks on content save
-- Incremental index updates vs full rebuilds
-- Event-driven reference tracking
-
-**Success Metrics**:
-- Force Rebuild completion time: < 2 minutes
-- Individual file processing: < 2 seconds average
-- Database query reduction: 99% (219 queries → 2 queries)
-- User satisfaction: Eliminate "i will cry soon" moments 😊
-
----
-
-## Pending Research Integration
-
-This section is prepared for additional research findings. As new research becomes available, it will be integrated here following the same analysis pattern:
-
-### Research Integration Template:
-
-**Research Source**: [Title/URL]
-**Date Reviewed**: [Date]
-**Summary**: [Brief overview]
-
-#### Key Findings:
-- [Finding 1]
-- [Finding 2]
-- [etc.]
-
-#### Validation Against Our Implementation:
-| Research Point | Our Status | Action Needed |
-|---------------|------------|---------------|
-| [Point] | ✅/❌/⚠️ [Status] | [Action] |
-
-#### Optimization Opportunities:
-- **Priority X**: [Description]
-- **Expected Impact**: [Performance/feature improvement]
-- **Implementation Notes**: [Technical details]
-
-#### Action Items:
-- [ ] [Specific task 1]
-- [ ] [Specific task 2]
-
-*This template ensures consistent analysis and actionable insights from all research sources.*
-
----
-
-## Code Review Analysis: Current Implementation vs R&D Proposal
-
-**Source**: Internal code review and architectural analysis
-**Date Reviewed**: October 2, 2025
-**Context**: Review of current bottlenecks against proposed R&D optimizations
-
-### Current State Assessment
-
-**Bottleneck Confirmation**:
-> "complete_optimized_build still loops every attachment and calls MSH_URL_Variation_Detector::get_all_variations() one-by-one, so every rebuild pays for 219 metadata lookups plus filesystem checks"
-
-**Reference**: `class-msh-image-usage-index.php:1141`
-
-**Root Cause Validation**:
-> "The detector itself pulls metadata, file paths, and URLs individually for each attachment, doing repeated DB queries and disk hits that scale poorly as the library grows"
-
-**Reference**: `class-msh-url-variation-detector.php:33`
-
-**Performance Impact Confirmed**:
-> "The R&D notes flag this exact hot path—30‑50 s per attachment—as the primary reason Force Rebuilds stretch past seven minutes today"
-
-**Current Reality**: Force Rebuild now taking 20+ minutes for 25 attachments = 48s/attachment average
-
-### R&D Proposal Validation
-
-**Architecture Alignment**:
-> "The batch variation generator design replaces those repeated calls with a pair of IN queries and in-memory expansion, which should collapse the rebuild from hundreds of queries to a handful"
-
-**Strategic Priority Confirmation**:
-> "The roadmap elevates this change to top priority because it unlocks the promised 85‑90% runtime reduction; everything else in the doc builds on that performance headroom"
-
-**Risk Management Validated**:
-> "Detailed risk analysis shows the batch approach is low risk, keeps fallbacks, and highlights mitigations (chunking, feature flag) we can adopt directly"
-
-**Future-Proofing Approach**:
-> "Medium-term ideas—incremental updates, caching variations, background workers—fill gaps the current codebase doesn't yet cover, so the R&D plan is additive rather than disruptive"
-
-### Implementation Considerations
-
-**Technical Requirements**:
-> "Implementing the batch path means recreating what wp_get_attachment_metadata() normally returns; we must remember to maybe_unserialize() the meta rows just as the prototype shows"
-
-**Scalability Planning**:
-> "For sites much larger than Hamilton's 219 attachments, we should chunk IN lists to keep memory and packet sizes comfortable—again already called out in the mitigation list"
-
-**Quality Assurance Protocol**:
-> "Before flipping the switch, compare batch-generated variation maps against today's output to guarantee search/replace fidelity; a temporary fallback to the current method is an easy safety net"
-
-### Strategic Recommendation
-
-**Primary Action**:
-> "Adopt the R&D batch variation generator path (with chunking + fallback) as the next iteration—the proposed architecture directly fixes the known scaling limit while preserving existing indexing logic"
-
-**Implementation Approach**:
-> "Prototype the batch detector on staging, diff its variation map against the legacy implementation, and measure rebuild timing to confirm the expected gains"
-
-**Roadmap Continuation**:
-> "Once performance is stable, schedule the follow-on items (SVG fast path, incremental updates) so we keep chipping away at the secondary bottlenecks the R&D doc singles out"
-
-### Analysis Summary
-
-#### Validation Points:
-| R&D Prediction | Code Review Confirmation | Current Reality |
-|----------------|--------------------------|-----------------|
-| ✅ Individual calls are bottleneck | ✅ Confirmed in `complete_optimized_build` | ✅ 48s per attachment |
-| ✅ 30-50s per attachment timing | ✅ R&D documented correctly | ✅ Currently experiencing |
-| ✅ Batch approach reduces queries | ✅ Architecture review validates | ⏳ Ready to implement |
-| ✅ 85-90% improvement possible | ✅ Math checks out (219→2 queries) | ⏳ Awaiting implementation |
-
-#### Strategic Alignment:
-- **R&D Research**: Correctly identified root cause and solution
-- **Current Implementation**: Matches predicted performance problems
-- **Proposed Solution**: Directly addresses confirmed bottlenecks
-- **Risk Assessment**: Conservative approach with proven fallbacks
-
-#### Implementation Readiness:
-- **✅ Problem Understood**: Exact bottleneck location identified
-- **✅ Solution Designed**: Batch variation generator architecture complete
-- **✅ Risks Mitigated**: Fallback mechanisms and chunking strategies planned
-- **✅ Testing Protocol**: Staging comparison and validation process defined
-
-**Conclusion**: The R&D proposal demonstrates excellent alignment with actual code bottlenecks. The current Force Rebuild performance (20+ minutes for 11% completion) validates every prediction in the research. Implementation of the batch variation generator should proceed immediately as it directly addresses the confirmed performance crisis.
-
-**Next Action**: Implement batch variation generator prototype with staging validation as outlined in R&D Phase 1.
-
----
-
-## External Research: Production-Ready WordPress Media Optimization Strategies
-
-**Source**: "WordPress Media File Renaming Optimization: Production-Ready Strategies for 500-1000 Image Libraries"
-**Date Reviewed**: October 2, 2025
-**Summary**: Comprehensive production-focused research covering incremental indexing, batch processing, audit logging, and performance optimization for medium-scale WordPress media libraries. Emphasizes verification-first patterns and transaction-based safety.
-
-### Key Research Findings
-
-#### **1. Incremental Index Updates (Sub-Second Performance)**
-> "Incremental index updates can achieve sub-second performance through proper database indexing and UPSERT patterns... properly indexed single-row updates achieve 5-10x performance improvements over full table scans, reducing query times from 0.53 seconds to 0.08 seconds"
-
-**Our Implementation Status**: ✅ We have custom index table (`wp_msh_image_usage_index`) but still doing full rebuilds
-**Gap Identified**: Missing incremental update capability - we rebuild entire index instead of updating changed files
-
-#### **2. UPSERT Pattern for Database Efficiency**
-> "The UPSERT pattern using INSERT ON DUPLICATE KEY UPDATE provides the fastest single-query execution... cutting operation time in half compared to traditional approaches"
-
-**Our Implementation**: ❌ We use separate DELETE then INSERT operations
-**Optimization Opportunity**: Replace our current pattern with UPSERT for 50% faster individual updates
-
-#### **3. Batch Processing Thresholds**
-> "On shared hosting with 256MB memory limits, process small images in batches of 50-100, medium images in batches of 25-50... WooCommerce's Action Scheduler uses default batch size of 25 actions and continues until reaching 90% of available memory"
-
-**Our Implementation**: ✅ Using 25-file batches - **OPTIMAL** according to research
-**Validation**: Our batch sizing aligns with production-tested recommendations
-
-#### **4. Performance Monitoring Requirements**
-> "Appropriate thresholds are 0.5 seconds for database queries, 0.1 seconds for index lookups, and 2.0 seconds for AJAX responses. When an operation exceeds its threshold by 3x, trigger critical alerts"
-
-**Our Implementation**: ❌ No automated performance monitoring
-**Missing Feature**: Performance threshold monitoring with automated alerts
-
-#### **5. Verification-First Pattern**
-> "Rather than detecting problems after commit, implement verification before finalizing changes... 'verify-then-commit' pattern catches issues when they can still be rolled back cleanly"
-
-**Our Implementation**: ⚠️ Partial - we have post-operation verification but not pre-commit verification
-**Enhancement Needed**: Move verification before commit in transaction
-
-### Architecture Comparison
-
-#### Database Schema Optimization
-**Research Recommendation**:
-```sql
-CREATE TABLE wp_media_index (
-    id mediumint(9) NOT NULL AUTO_INCREMENT,
-    attachment_id bigint(20) unsigned NOT NULL,
-    post_id bigint(20) unsigned NOT NULL,
-    file_hash varchar(64) NOT NULL,
-    last_updated datetime NOT NULL,
-    PRIMARY KEY (id),
-    UNIQUE KEY attachment_id_unique (attachment_id),
-    INDEX post_id_index (post_id),
-    INDEX hash_index (file_hash),
-    INDEX by_attachment_and_post (attachment_id, post_id)
-) ENGINE=InnoDB;
-```
-
-**Our Current Schema**:
-```sql
-CREATE TABLE wp_msh_image_usage_index (
-    id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
-    attachment_id bigint(20) unsigned NOT NULL,
-    location_type varchar(20) NOT NULL,
-    location_id bigint(20) unsigned NOT NULL,
-    field_name varchar(255) DEFAULT NULL,
-    url_found text NOT NULL,
-    context text DEFAULT NULL,
-    PRIMARY KEY (id),
-    KEY attachment_id (attachment_id),
-    KEY location_type (location_type),
-    KEY location_id (location_id)
+// Sketch: build batched LIKE clauses and execute once per table
+$patterns = $this->build_like_patterns($variation_to_attachment);
+$sql = $wpdb->prepare(
+    "SELECT ID, post_type FROM {$wpdb->posts}
+     WHERE post_status IN ('publish','draft','private')
+     AND (" . implode(' OR ', $patterns['posts']) . ")",
+    ...$patterns['params']
 );
 ```
-
-**Analysis**: Our schema serves different purpose (reference tracking vs file metadata) but could benefit from compound indexes and InnoDB engine specification.
-
-#### UPSERT Implementation Gap
-**Research Pattern**:
-```php
-$sql = "INSERT INTO {$table_name}
-        (attachment_id, file_hash, file_size, last_updated)
-        VALUES (%d, %s, %d, %s)
-        ON DUPLICATE KEY UPDATE
-        file_hash = %s, file_size = %d, last_updated = %s";
-```
-
-**Our Current Pattern**:
-```php
-// We use: DELETE existing + INSERT new
-$wpdb->delete($this->index_table, ['attachment_id' => $attachment_id], ['%d']);
-// Then separate INSERT operations
-```
-
-**Improvement**: Implement UPSERT pattern for 50% faster individual updates.
-
-### Production Insights
-
-#### **Memory Management Validation**
-> "Use memory_get_usage(true) rather than memory_get_usage() to get the actual allocated memory from the system... explicitly unset large variables and call gc_collect_cycles() to force garbage collection, recovering 10-15% of memory per item"
-
-**Our Implementation**: ✅ We set memory limits and have timeout protection
-**Enhancement**: Add memory monitoring and garbage collection between items
-
-#### **Performance Monitoring Framework**
-Research provides comprehensive monitoring class with threshold detection:
-```php
-class Performance_Monitor {
-    private static $thresholds = array(
-        'ajax_response' => 2.0,
-        'database_query' => 0.5,
-        'index_lookup' => 0.1,
-    );
-    // Implementation tracks duration, queries, memory with violation logging
-}
-```
-
-**Our Implementation**: ❌ No automated performance monitoring
-**Opportunity**: Implement performance monitoring to detect regressions automatically
-
-#### **Audit Logging Architecture**
-> "Implement a dual-table structure with a main audit log table storing event metadata and a separate changes table storing granular before/after values"
-
-**Our Implementation**: ✅ We have backup system and error tracking
-**Enhancement**: Could implement more granular audit logging for compliance
-
-### Cross-Research Validation
-
-#### **Batch Processing Confirmation**
-| Research Source | Recommended Batch Size | Our Implementation | Status |
-|----------------|----------------------|-------------------|---------|
-| External Research #1 | 25-50 files | 25 files | ✅ **OPTIMAL** |
-| External Research #2 | 25 files (Action Scheduler) | 25 files | ✅ **VALIDATED** |
-
-#### **Performance Expectations Alignment**
-| Metric | Research Target | Our Current Reality | Gap |
-|--------|----------------|-------------------|-----|
-| Index Lookup | < 0.1 seconds | Unknown (no monitoring) | Need monitoring |
-| Database Query | < 0.5 seconds | Unknown (no monitoring) | Need monitoring |
-| AJAX Response | < 2.0 seconds | 20+ minutes (Force Rebuild) | **CRITICAL GAP** |
-
-#### **Architecture Pattern Validation**
-- ✅ **Index-based approach**: Both researches validate our architectural choice
-- ✅ **Batch processing**: Our 25-file batches align with production recommendations
-- ✅ **WordPress-native**: Both emphasize using core WordPress functions
-- ⚠️ **Incremental updates**: Both researches emphasize this missing capability
-- ❌ **Performance monitoring**: Critical gap in our implementation
-
-### Implementation Roadmap Integration
-
-#### **Priority 1: Complete Batch Variation Generator (Immediate)**
-- Addresses the 48s/attachment bottleneck we're currently experiencing
-- Validated by both research sources as highest impact optimization
-
-#### **Priority 2: Implement UPSERT Pattern (High Impact)**
-```php
-// New implementation for individual index updates
-public function upsert_attachment_usage($attachment_id, $location_type, $location_id, $url_found) {
-    global $wpdb;
-
-    $sql = "INSERT INTO {$this->index_table}
-            (attachment_id, location_type, location_id, url_found, context)
-            VALUES (%d, %s, %d, %s, %s)
-            ON DUPLICATE KEY UPDATE
-            url_found = %s, context = %s, updated_at = NOW()";
-
-    return $wpdb->query($wpdb->prepare($sql,
-        $attachment_id, $location_type, $location_id, $url_found, $context,
-        $url_found, $context
-    ));
-}
-```
-
-#### **Priority 3: Add Performance Monitoring (Production Safety)**
-```php
-// Implement monitoring for our critical operations
-Performance_Monitor::track('force_rebuild', function() {
-    return $this->build_optimized_complete_index(true);
-});
-
-Performance_Monitor::track('index_lookup', function() use ($attachment_id) {
-    return $this->get_attachment_usage($attachment_id);
-});
-```
-
-#### **Priority 4: Incremental Index Updates (Long-term)**
-```php
-// Hook-based incremental updates
-add_action('edit_attachment', [$this, 'update_single_attachment_index'], 10, 1);
-add_action('add_attachment', [$this, 'update_single_attachment_index'], 10, 1);
-add_action('delete_attachment', [$this, 'remove_attachment_from_index'], 10, 1);
-```
-
-### Strategic Insights
-
-#### **Verification-First Pattern Application**
-The research's "verify-then-commit" pattern could transform our Force Rebuild reliability:
-```php
-public function verified_force_rebuild() {
-    $this->start_transaction();
-    $this->capture_original_state();
-    $result = $this->build_optimized_complete_index(true);
-
-    if ($this->verify_rebuild_completeness()) {
-        $this->commit_transaction();
-        return $result;
-    } else {
-        $this->rollback_transaction();
-        throw new Exception("Verification failed, rebuild rolled back");
-    }
-}
-```
-
-#### **Production Reliability Framework**
-Research emphasizes layered approach:
-1. ✅ **Database optimization** (we have custom index table)
-2. ⚠️ **Caching layer** (we could add transient caching)
-3. ✅ **Batch processing** (implemented with proper sizing)
-4. ⚠️ **Verification systems** (partial implementation)
-5. ❌ **Performance monitoring** (missing entirely)
-
-### Conclusion
-
-This research provides **production-validated patterns** that directly complement our current optimization work:
-
-1. **Validates our architecture**: Index-based approach and batch processing confirmed as correct
-2. **Identifies optimization gaps**: UPSERT patterns, performance monitoring, incremental updates
-3. **Provides production frameworks**: Monitoring classes, audit patterns, verification systems
-4. **Confirms our priorities**: Batch variation generator remains highest impact
-
-**Key Insight**: Our current 20+ minute Force Rebuild time exceeds research recommendations by **10-40x** (research targets 0.1-2.0 seconds for operations). This confirms that our batch variation generator optimization is not just nice-to-have but **critical for production viability**.
-
-**Recommended Integration**: Implement batch variation generator first (addresses immediate crisis), then add performance monitoring (prevents future regressions), then UPSERT patterns (ongoing optimization), then incremental updates (long-term enhancement).
-
----
-
-## External Research: Production-Ready WordPress Media Optimization (Revised Edition)
-
-**Source**: "WordPress Media File Renaming Optimization: Production-Ready Strategies for 500-1000 Image Libraries (Revised Edition)"
-**Date Reviewed**: October 2, 2025
-**Summary**: Comprehensive revised research with critical corrections about Elementor JSON storage, WordPress serialization behavior, GUID immutability, and dual-table indexing architecture. Provides production-tested patterns with compensating-action rollback and format-specific processing.
-
-### Critical Corrections from Original Research
-
-#### **1. Elementor Data Format Correction**
-**Original Misconception**: "Elementor stores page data as serialized PHP arrays"
-**Revised Truth**: "Elementor stores page data as JSON in `_elementor_data` meta, not PHP serialized arrays"
-
-**Impact on Our Implementation**: ✅ Our system already handles JSON correctly through recursive string replacement
-**Enhancement Needed**: Could add specific Elementor JSON parsing for more targeted updates
-
-#### **2. WordPress Serialization Behavior**
-**Critical Correction**: "`get_post_meta()` with single=true automatically unserializes data. Never use `is_serialized()` on retrieved values"
-
-**Our Current Implementation**: ✅ We use `maybe_unserialize()` correctly, which handles both cases
-**Validation**: Our approach is already aligned with WordPress best practices
-
-#### **3. GUID Immutability Principle**
-**Critical Correction**: "Never modify the GUID field. WordPress GUIDs are permanent identifiers that should remain unchanged even when files are renamed"
-
-**Our Implementation Review**: Need to verify we're not modifying GUIDs in our rename process
-**Action Required**: Audit our rename system to ensure GUID preservation
-
-### Dual-Table Architecture Enhancement
-
-#### **Research Recommendation**: Separate Tables for Metadata vs Usage
-```sql
--- Attachment metadata (one row per attachment)
-CREATE TABLE wp_media_index (
-    attachment_id BIGINT UNSIGNED PRIMARY KEY,
-    file_path VARCHAR(255) NOT NULL,
-    file_hash CHAR(32) NULL,
-    meta_json JSON NULL,
-    last_updated DATETIME NOT NULL
-) ENGINE=InnoDB;
-
--- Usage tracking (multiple rows per attachment)
-CREATE TABLE wp_media_usage (
-    usage_id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-    attachment_id BIGINT UNSIGNED NOT NULL,
-    context ENUM('post','meta','option','widget','menu') NOT NULL,
-    object_id BIGINT UNSIGNED NULL,
-    meta_key VARCHAR(191) NULL,
-    option_name VARCHAR(191) NULL,
-    location VARCHAR(32) NOT NULL,
-    value_hash CHAR(32) NULL,
-    last_seen DATETIME NOT NULL,
-    UNIQUE KEY unique_usage (attachment_id, context, object_id, meta_key, option_name, location)
-) ENGINE=InnoDB;
-```
-
-**Our Current Schema**: Single table approach
-**Enhancement Opportunity**: Could migrate to dual-table for better scalability and performance
-
-#### **Benefits of Dual-Table Approach**:
-- **O(1) attachment lookups** vs O(k) usage lookups
-- **Multiple usage tracking** per attachment
-- **Better indexing** for specific query patterns
-- **Separate optimization** for metadata vs usage queries
-
-### Advanced UPSERT Patterns
-
-#### **Research Provides Production-Ready UPSERT Implementation**:
-```php
-// Bulk UPSERT for 50-100x performance improvement
-function bulk_upsert_usage($usage_records) {
-    $values = array();
-    $placeholders = array();
-
-    foreach ($usage_records as $record) {
-        $placeholders[] = "(%d, %s, %d, %s, %s, %s, %s, NOW())";
-        array_push($values,
-            $record['attachment_id'],
-            $record['context'],
-            $record['object_id'],
-            $record['meta_key'],
-            $record['option_name'],
-            $record['location'],
-            md5($record['value'])
-        );
-    }
-
-    $sql = "INSERT INTO {$table} (...) VALUES " . implode(',', $placeholders) . "
-            ON DUPLICATE KEY UPDATE
-            value_hash = VALUES(value_hash),
-            last_seen = NOW()";
-
-    return $wpdb->query($wpdb->prepare($sql, $values));
-}
-```
-
-**Our Implementation Gap**: We use DELETE + INSERT pattern
-**Optimization Potential**: Implementing bulk UPSERT could provide 50-100x improvement for batch operations
-
-### Format-Specific Processing Enhancements
-
-#### **Elementor JSON Handler**:
-```php
-function update_elementor_urls($post_id, $old_url, $new_url) {
-    $elementor_data = get_post_meta($post_id, '_elementor_data', true);
-    $data = json_decode($elementor_data, true);
-
-    $walker = function(&$node) use (&$walker, $old_url, $new_url, &$changed) {
-        if (is_array($node)) {
-            foreach ($node as $key => &$value) {
-                if ($key === 'url' && is_string($value) && strpos($value, $old_url) !== false) {
-                    $value = str_replace($old_url, $new_url, $value);
-                    $changed = true;
-                }
-                $walker($value);
-            }
-        }
-    };
-
-    $walker($data);
-    return update_post_meta($post_id, '_elementor_data', wp_json_encode($data));
-}
-```
-
-**Our Implementation**: Generic recursive replacement across all content
-**Enhancement**: Could add format-specific handlers for better precision
-
-#### **SVG Special Handling**:
-```php
-function handle_svg_rename($attachment_id, $new_filename) {
-    $mime_type = get_post_mime_type($attachment_id);
-
-    if ($mime_type !== 'image/svg+xml') {
-        return false;
-    }
-
-    // Skip thumbnail operations for SVGs
-    remove_filter('wp_generate_attachment_metadata', 'wp_create_image_subsizes');
-    // ... simplified processing
-}
-```
-
-**Current Reality**: SVGs causing 48s processing times in our system
-**Solution**: Implement SVG-specific fast path as research suggests
-
-### Compensating-Action Rollback System
-
-#### **Research Insight**: Replace Database Transactions with Action Logging
-```php
-class MediaOperationManager {
-    private $operations_log = array();
-
-    public function record_action($operation_id, $action_type, $data) {
-        $this->operations_log[$operation_id]['actions'][] = array(
-            'type' => $action_type,
-            'data' => $data,
-            'reversible' => $this->get_reversal_action($action_type, $data)
-        );
-    }
-
-    public function rollback_operation($operation_id) {
-        $actions = array_reverse($this->operations_log[$operation_id]['actions']);
-        foreach ($actions as $action) {
-            if ($action['reversible']) {
-                $this->apply_reversal($action['reversible']);
-            }
-        }
-    }
-}
-```
-
-**Our Implementation**: File backups + verification
-**Enhancement**: Could add action-based rollback for more granular recovery
-
-### Performance Monitoring Framework
-
-#### **Research Provides Comprehensive Monitoring**:
-```php
-class PerformanceMonitor {
-    private static $thresholds = array(
-        'index_lookup' => 0.1,      // 100ms for index queries
-        'single_update' => 0.5,     // 500ms for single file update
-        'batch_operation' => 5.0,   // 5 seconds per batch
-        'ajax_response' => 2.0      // 2 seconds for AJAX
-    );
-
-    public static function track($operation_type, callable $callback) {
-        // Track duration, memory, queries
-        // Log violations to transient for admin display
-        // Return original callback result
-    }
-}
-```
-
-**Our Current Reality**: No performance monitoring
-**Critical Need**: Our Force Rebuild taking 33+ minutes vs 2-second target (990x slower)
-
-### Cross-Research Architecture Validation
-
-#### **Convergent Recommendations Across All Sources**:
-| Feature | Research #1 | Research #2 | Revised Research | Our Status |
-|---------|-------------|-------------|------------------|------------|
-| **Index-based approach** | ✅ Recommended | ✅ Validated | ✅ Dual-table design | ✅ Implemented |
-| **Batch processing (25 files)** | ✅ Optimal | ✅ Production-tested | ✅ Resource-managed | ✅ Implemented |
-| **UPSERT patterns** | ❌ Not covered | ✅ 50% improvement | ✅ Bulk 50-100x improvement | ❌ Missing |
-| **Format-specific handling** | ❌ Generic only | ❌ Not covered | ✅ JSON/Serialized/Blocks | ⚠️ Partial |
-| **Performance monitoring** | ❌ Not covered | ✅ Threshold detection | ✅ Comprehensive framework | ❌ Missing |
-| **Rollback mechanisms** | ❌ Not covered | ✅ Transaction-based | ✅ Compensating-actions | ⚠️ File-based only |
-
-### Implementation Roadmap Update
-
-#### **Priority 1: Batch Variation Generator (Immediate Crisis)**
-- **All research sources converge**: This is the critical bottleneck fix
-- **Expected impact**: 33+ minutes → 1-2 minutes (95% improvement)
-- **Risk**: Low with fallback mechanisms
-
-#### **Priority 2: SVG Fast Path (High Impact)**
-```php
-// Implement SVG-specific processing
-if (get_post_mime_type($attachment_id) === 'image/svg+xml') {
-    return $this->process_svg_fast_path($attachment_id);
-}
-```
-- **Problem**: SVGs taking 48s each in our system
-- **Solution**: Skip thumbnail generation, simplified URL handling
-- **Expected impact**: 48s → 2-3s per SVG (95% improvement)
-
-#### **Priority 3: Performance Monitoring (Production Safety)**
-```php
-// Wrap critical operations with monitoring
-PerformanceMonitor::track('force_rebuild', function() {
-    return $this->build_optimized_complete_index(true);
-});
-```
-- **Current gap**: No visibility into performance regressions
-- **Benefit**: Automated detection of slowdowns before they become crises
-
-#### **Priority 4: UPSERT Implementation (Optimization)**
-- **Current**: DELETE + INSERT (slower)
-- **Research**: Bulk UPSERT for 50-100x improvement
-- **Implementation**: Replace individual operations with batch UPSERT
-
-#### **Priority 5: Dual-Table Migration (Long-term Enhancement)**
-- **Current**: Single index table
-- **Research**: Separate metadata and usage tables
-- **Benefit**: Better scalability and query optimization
-
-### Production Insights
-
-#### **Memory Management Validation**:
-Research confirms our approach:
-- ✅ **90% memory threshold** - matches our current settings
-- ✅ **Garbage collection** - could add `gc_collect_cycles()` between items
-- ✅ **Adaptive batch sizing** - could implement based on available memory
-
-#### **Resource Monitoring**:
-Research provides specific thresholds:
-- **Index lookup**: < 0.1 seconds (our target: unknown)
-- **AJAX response**: < 2.0 seconds (our reality: 33+ minutes)
-- **Single update**: < 0.5 seconds (our target: unknown)
-
-### Strategic Implications
-
-#### **Architecture Validation**:
-The revised research **strongly validates** our core architectural decisions while identifying specific optimization opportunities:
-
-1. ✅ **Index-based approach**: Confirmed as correct by all sources
-2. ✅ **Batch processing**: Our 25-file batches are optimal
-3. ✅ **WordPress-native functions**: Avoiding serialization pitfalls
-4. ⚠️ **Performance gaps**: Need monitoring and SVG optimization
-5. ❌ **Missing optimizations**: UPSERT, dual-table, compensating actions
-
-#### **Risk Assessment Update**:
-The research reduces implementation risk by providing:
-- **Production-tested patterns** from high-scale plugins
-- **Specific code examples** with proper error handling
-- **Performance benchmarks** for validation
-- **Fallback strategies** for rollback scenarios
-
-### Conclusion
-
-The revised research provides **critical corrections** that improve our understanding while validating our core approach. Key insights:
-
-1. **Our architecture is fundamentally sound** - validated by multiple independent sources
-2. **Our current crisis (33+ minute Force Rebuild) has known solutions** - batch variation generator + SVG fast path
-3. **Our implementation gaps are well-defined** - performance monitoring, UPSERT patterns, format-specific processing
-4. **Production reliability patterns exist** - compensating actions, dual-table schemas, threshold monitoring
-
-**Most Critical Finding**: Our 33+ minute Force Rebuild time is **990x slower** than research recommendations (2 seconds target). This confirms that optimization is not optional but **critical for production viability**.
-
-**Recommended Action**: Implement batch variation generator immediately, followed by SVG fast path and performance monitoring. The research provides all the patterns needed for a production-ready solution.
-
----
-
-## Document Maintenance
-
-### Last Updated
-- **Date**: October 2, 2025
-- **Author**: Development Team
-- **Version**: 1.0
-- **Status**: Active Development
-
-### Update Schedule
-- **Weekly**: Performance benchmarks and current optimization status
-- **Monthly**: New research findings and experimental results
-- **Quarterly**: Architecture reviews and long-term planning
-- **As-needed**: Critical issues and breakthrough discoveries
-
-### Related Documentation
-- Main documentation: `MSH_IMAGE_OPTIMIZER_DOCUMENTATION.md`
-- Project overview: `CLAUDE.md`
-- Troubleshooting: See main documentation Section "Troubleshooting"
-- Code examples: See main documentation implementation sections
-
----
-
-*This R&D document is a living resource for the MSH Image Optimizer project. It captures both successful optimizations and failed experiments to guide future development and prevent repeating solved problems.*
-
----
-
-## 🎯 COMPREHENSIVE FINDINGS SUMMARY: Research Analysis & Implementation Roadmap
-
-**Document Created**: October 2, 2025
-**Context**: Analysis of three external research sources plus internal code review
-**Current Crisis**: Force Rebuild performance inconsistent - conflicting reports need instrumentation to resolve
-
-### Research Sources Analyzed
-
-1. **Research #1**: "Managing Image References When Renaming Media Files in WordPress"
-   - Focus: WordPress media renaming challenges, serialized data, URL variations
-   - Key insight: Index-based approach, O(N + M) vs O(N×DatabaseSize) optimization
-
-2. **Research #2**: "Production-Ready Strategies for 500-1000 Image Libraries"
-   - Focus: Performance monitoring, UPSERT patterns, batch processing thresholds
-   - Key insight: Sub-second performance through proper database indexing
-
-3. **Research #3**: "Production-Ready Strategies (Revised Edition)"
-   - Focus: Critical corrections, dual-table architecture, format-specific processing
-   - Key insight: Elementor JSON storage, GUID immutability, compensating-action rollback
-
-4. **Internal Code Review**: Current implementation analysis against R&D proposals
-   - Key insight: Confirmed exact bottleneck location and validation of proposed solutions
-
----
-
-### 🏆 CONVERGENT RECOMMENDATIONS (All Sources Agree)
-
-#### **1. Index-Based Architecture ✅ VALIDATED**
-**All Sources Confirm**: Custom database indexing is the correct approach
-- **Research #1**: "Build an index of image usages... scanning entire database for each rename would be extremely slow"
-- **Research #2**: "Properly indexed single-row updates achieve 5-10x performance improvements"
-- **Research #3**: "Dual-table structure with metadata vs usage separation"
-- **Our Implementation**: ✅ `wp_msh_image_usage_index` table correctly implemented
-
-#### **2. Batch Processing (25 Files) ✅ OPTIMAL**
-**All Sources Converge**: 25-file batches are production-optimal
-- **Research #1**: "~1,500 URL variations for 219 images – roughly 6–7 variants per image"
-- **Research #2**: "WooCommerce's Action Scheduler uses default batch size of 25 actions"
-- **Research #3**: "Process 25-50 files at a time... stays under ~5 seconds prevents timeout"
-- **Our Implementation**: ✅ Using 25-file batches - **PERFECT ALIGNMENT**
-
-#### **3. Batch Variation Generation ⚠️ CRITICAL BOTTLENECK**
-**All Sources Identify**: Individual queries are the performance killer
-- **Research #1**: "O(N×DatabaseSize) with naive approach... O(N + M) with index"
-- **Research #2**: "Single-query execution... cutting operation time in half"
-- **Research #3**: "Bulk UPSERT for 50-100x performance improvement"
-- **Internal Review**: "219 metadata lookups plus filesystem checks" confirmed as bottleneck
-- **Our Gap**: ❌ Still using individual `get_all_variations()` calls (219 DB queries)
-
-#### **4. WordPress-Native Functions ✅ CORRECT**
-**All Sources Emphasize**: Use WordPress core functions properly
-- **Research #1**: "Serialized strings include length values... dangerous search-and-replace"
-- **Research #2**: "Use WordPress core functions for serialization handling"
-- **Research #3**: "`get_post_meta()` with single=true automatically unserializes"
-- **Our Implementation**: ✅ Using `maybe_unserialize()` and proper meta functions
-
----
-
-### ⚡ HIGHEST IMPACT OPTIMIZATIONS (Immediate Implementation)
-
-#### **Priority 1: Batch Variation Generator Implementation**
-**Unanimous Research Consensus**: This is the critical fix
-```php
-// CURRENT (SLOW): O(N×DatabaseSize) - 219 individual queries
-foreach ($attachments as $attachment) {
-    $variations = $detector->get_all_variations($attachment->ID); // 30-50s each
-}
-
-// RESEARCH SOLUTION: O(N + M) - 2 total queries
-class MSH_Batch_Variation_Generator {
-    public function get_all_variations_batch($attachment_ids) {
-        // Single query for all metadata (replaces 219 individual queries)
-        $all_metadata = $wpdb->get_results("SELECT post_id, meta_value FROM wp_postmeta WHERE meta_key = '_wp_attachment_metadata' AND post_id IN (...)");
-
-        // Single query for all file paths
-        $all_files = $wpdb->get_results("SELECT post_id, meta_value FROM wp_postmeta WHERE meta_key = '_wp_attached_file' AND post_id IN (...)");
-
-        // Generate all variations in memory (no more DB calls)
-        return $this->generate_variations_from_batch_data($all_metadata, $all_files);
-    }
-}
-```
-
-**Expected Impact**: 33+ minutes → 1-2 minutes (95% improvement)
-**Risk Level**: ⭐⭐ (LOW) - Read-only optimization with fallback capability
-**Implementation Status**: Ready - R&D provides complete architecture
-
-#### **Priority 2: SVG Fast Path Processing**
-**Research Validation**: SVG files causing disproportionate delays
-```php
-// Implement SVG-specific processing to avoid 48s delays
-if (get_post_mime_type($attachment_id) === 'image/svg+xml') {
-    return $this->process_svg_fast_path($attachment_id); // Skip thumbnails, simplified handling
-}
-```
-
-**Expected Impact**: 48s per SVG → 2-3s per SVG (95% improvement)
-**Research Source**: All three sources mention SVG performance issues
-**Our Reality**: Experiencing exact 30-50s delays described in research
-
----
-
-### 🔍 IDENTIFIED CONTRADICTIONS & DISCREPANCIES
-
-#### **1. Database Transaction Approach**
-**Contradiction Found**:
-- **Research #2**: "Transaction-based rollback for safety"
-- **Research #3**: "Replace database transactions with compensating-action rollback"
-
-**Analysis**: Research #3 provides more sophisticated approach for WordPress context where some operations (file moves, external API calls) can't be rolled back via database transactions.
-
-**Recommendation**: Use Research #3's compensating-action pattern for complex operations, database transactions for simple index updates.
-
-#### **2. UPSERT Implementation Scope**
-**Discrepancy in Optimization Magnitude**:
-- **Research #2**: "50% improvement with UPSERT patterns"
-- **Research #3**: "50-100x improvement with bulk UPSERT"
-
-**Analysis**: Research #2 refers to individual UPSERT vs DELETE+INSERT. Research #3 refers to bulk batch UPSERT vs individual operations.
-
-**Resolution**: Both are correct for different scales. Individual UPSERT = 50% improvement. Bulk batch UPSERT = 50-100x improvement.
-
-#### **3. Elementor Storage Format**
-**Critical Correction**:
-- **Research #1**: Assumed PHP serialization for all WordPress data
-- **Research #3**: "Elementor stores data as JSON, not serialized arrays"
-
-**Impact**: Our current recursive string replacement works for JSON, but could be optimized with JSON-specific parsing.
-
-**Resolution**: Use Research #3's corrected understanding. Add format-specific handlers.
-
-#### **4. Performance Monitoring Thresholds**
-**Variance in Targets**:
-- **Research #2**: "0.5 seconds for database queries, 2.0 seconds for AJAX responses"
-- **Research #3**: "0.1 seconds for index lookups, 5.0 seconds per batch operation"
-
-**Analysis**: Different thresholds for different operation types. Research #3 provides more granular breakdown.
-
-**Resolution**: Use Research #3's comprehensive framework with operation-specific thresholds.
-
----
-
-### 📊 IMPLEMENTATION GAPS ANALYSIS
-
-#### **Critical Gaps (Blocking Production Viability)**
-| Feature | Research Recommendation | Our Current Status | Impact Level |
-|---------|------------------------|-------------------|-------------|
-| **Batch Variation Generation** | ✅ All sources | ❌ Missing | **CRITICAL** - 990x slower than target |
-| **Performance Monitoring** | ✅ Research #2 & #3 | ❌ Missing | **HIGH** - No visibility into regressions |
-| **SVG Fast Path** | ✅ Research #3 | ❌ Missing | **HIGH** - 48s delays per SVG |
-
-#### **Optimization Gaps (Performance Enhancement)**
-| Feature | Research Recommendation | Our Current Status | Impact Level |
-|---------|------------------------|-------------------|-------------|
-| **UPSERT Patterns** | ✅ Research #2 & #3 | ❌ Using DELETE+INSERT | **MEDIUM** - 50-100x improvement available |
-| **Format-Specific Processing** | ✅ Research #3 | ⚠️ Generic only | **MEDIUM** - Better precision possible |
-| **Incremental Updates** | ✅ Research #2 & #3 | ❌ Full rebuilds only | **MEDIUM** - Eliminate rebuild needs |
-
-#### **Architecture Gaps (Long-term Enhancement)**
-| Feature | Research Recommendation | Our Current Status | Impact Level |
-|---------|------------------------|-------------------|-------------|
-| **Dual-Table Schema** | ✅ Research #3 | ❌ Single table | **LOW** - Better scalability |
-| **Compensating Actions** | ✅ Research #3 | ⚠️ File backups only | **LOW** - Better rollback granularity |
-| **Memory Management** | ✅ All sources | ⚠️ Basic limits only | **LOW** - Garbage collection optimization |
-
----
-
-### 🎯 UNIFIED IMPLEMENTATION ROADMAP
-
-#### **Phase 1: Failure Analysis & Instrumentation (Immediate - This Week)**
-**Goal**: Establish reliable baseline and identify actual failure mode
-
-**⚠️ PREREQUISITE**: Before any optimization, we must resolve contradictory performance data
-
-1. **Add Comprehensive Instrumentation**
-   ```php
-   // Log every stage with timing and attachment details
-   class MSH_Force_Rebuild_Instrumenter {
-       public function instrument_force_rebuild() {
-           $this->log_start_conditions();
-           $this->add_per_attachment_logging();
-           $this->add_timeout_detection();
-           $this->add_failure_rollback();
-       }
-   }
-   ```
-   - Log time per stage (initialization, attachment processing, completion)
-   - Record last attachment processed before any failure
-   - Capture metadata dump for problematic attachments
-
-2. **Add Hard Stop/Rollback Mechanism**
-   - Detect timeout conditions before system failure
-   - Record exact attachment causing halt
-   - Implement graceful rollback to previous state
-   - Preserve partial progress for analysis
-
-3. **Pathological Data Detection**
-   - Test Force Rebuild on subset (first 25 attachments)
-   - Identify if failure is: single SVG, data corruption, or systemic loop
-   - Dump metadata for any attachment taking >10 seconds
-
-4. **Establish Reproducible Failure Pattern**
-   - Run instrumented Force Rebuild 3 times
-   - Document consistent failure points
-   - Identify which scenario is real: 7-10min success vs 33+min failure
-
-**Success Metrics**:
-- Reproducible failure logging with exact attachment causing halt
-- Clear understanding of whether issue is pathological file or systemic
-- Reliable baseline timing that can be consistently reproduced
-- Evidence-based decision on whether batch variation generator is needed
-
-**Phase 1A: Instrumentation Results Analysis**
-Only after Phase 1 completion:
-- If single pathological file: Implement file-specific handling
-- If systemic performance issue: Proceed with batch variation generator
-- If data corruption: Implement data validation and cleanup
-- If completion possible: Optimize existing path vs rewrite
-
-#### **Phase 2: Production Monitoring (Next Week)**
-**Goal**: Prevent future performance regressions
-
-1. **Implement Performance Monitoring Framework**
-   - Threshold detection (0.1s index, 2.0s AJAX, 5.0s batch)
-   - Automated alerts for violations
-   - Historical performance tracking
-
-2. **Add Memory Management**
-   - Garbage collection between items
-   - Adaptive batch sizing based on available memory
-   - Memory usage logging
-
-#### **Phase 3: Database Optimization (Following Week)**
-**Goal**: Optimize ongoing operations
-
-1. **Implement UPSERT Patterns**
-   - Replace DELETE+INSERT with single UPSERT
-   - Implement bulk UPSERT for batch operations
-   - Expected: 50-100x improvement for updates
-
-2. **Add Incremental Index Updates**
-   - Hook into WordPress save actions
-   - Update only changed attachments
-   - Reduce need for full rebuilds
-
-#### **Phase 4: Advanced Features (Future)**
-**Goal**: Production-ready enhancement features
-
-1. **Format-Specific Processing**
-   - Elementor JSON parser
-   - ACF serialized data handler
-   - Gutenberg block processor
-
-2. **Dual-Table Architecture Migration**
-   - Separate metadata and usage tables
-   - Better query optimization
-   - Enhanced scalability
-
-3. **Compensating-Action Rollback**
-   - Action-based rollback system
-   - Granular operation recovery
-   - Enhanced reliability
-
----
-
-### 📈 PERFORMANCE PROJECTIONS
-
-#### **Current State (CONTRADICTORY DATA - NEEDS RESOLUTION)**
-```
-Force Rebuild Performance - CONFLICTING REPORTS:
-├── Earlier Benchmark: 7-10 minutes, 219/219 attachments (100% success)
-├── Recent Failure: 33+ minutes, 151/219 attachments (69% failure)
-├── Individual File: Unknown - cannot complete baseline run
-├── Database Queries: 219+ individual queries (theoretical)
-└── Status: CANNOT ESTABLISH RELIABLE BASELINE
-```
+- Consolidate patterns per table and execute a single prepared query per batch.
+- Measure query time vs. previous nested loops and log results for regression tracking.
+
+**Phase 2: Post-Optimisation Validation**
+- Compare new index output with legacy method to ensure parity.
+- Add fallback to legacy scan if the batched query path throws errors.
+
+**Phase 3: Secondary Enhancements**
+- SVG fast-path if profiling still shows outliers.
+- Consider reducing batch size to 25 once new scans are in place to match research recommendations.
+
+#### 🔒 Risk Analysis: Table Scan Optimisation
+
+**Security & Stability Risks: ⭐⭐ (Moderate)**
+- **Query Complexity**: Large `LIKE`/`REGEXP` clauses can be slow or hit SQL limits; chunk patterns and use prepared statements to mitigate.
+- **Result Parity**: Any missed matches would undermine rename safety; retain automated diffing and backups during rollout.
+- **Resource Usage**: Set-based queries may increase peak memory/CPU; profile on staging before production rollout.
+
+**Execution Risks:**
+- **Pattern Explosion**: Large `LIKE`/`REGEXP` clauses can exceed practical limits; chunk variation lists (e.g., 25–50 patterns) and iterate.
+- **False Positives**: Broad patterns risk matching unrelated strings; constrain expressions to filename boundaries and verify replacements.
+- **Schema Assumptions**: Posts/options tables can hold unexpected encodings; retain automated diffing and backups while introducing the new path.
+
+**Content Integrity & SEO Risks: ⭐ (Very Low)**
+- Set-based scans remain read-only; rename operations still rely on verified replacements.
+- Existing backup/verification systems continue protecting content before any write occurs.
+- No customer-facing URLs change; improvements are limited to admin tooling performance.
 
 **⚠️ CRITICAL ISSUE**: Document contains contradictory performance data:
 - Line 588: "7-10 min" with "219/219" completion
@@ -1950,12 +962,12 @@ Optimized Force Rebuild Performance:
 #### **Implementation Risks by Phase**
 | Phase | Feature | Risk Level | Mitigation Strategy |
 |-------|---------|------------|---------------------|
-| **1** | Batch Variation Generator | ⭐⭐ (LOW) | Fallback to current method, staging validation |
-| **1** | SVG Fast Path | ⭐ (VERY LOW) | Additive feature, no breaking changes |
-| **2** | Performance Monitoring | ⭐ (VERY LOW) | Read-only tracking, no functional impact |
-| **3** | UPSERT Implementation | ⭐⭐ (LOW) | Database pattern, well-tested approach |
-| **3** | Incremental Updates | ⭐⭐⭐ (MEDIUM) | Complex hook integration, thorough testing |
-| **4** | Dual-Table Migration | ⭐⭐⭐⭐ (HIGH) | Major schema change, extensive migration |
+| **1** | Table Scan Optimisation | ⭐⭐⭐ (MEDIUM) | Develop set-based queries behind a feature flag; diff results against legacy loops |
+| **1** | Instrumentation & Monitoring | ⭐ (VERY LOW) | Read-only logging; guard behind capability checks |
+| **2** | SVG Fast Path | ⭐⭐ (LOW) | Limit to SVG mime types and retain legacy processing fallback |
+| **2** | Batch Variation Generator (optional) | ⭐⭐ (LOW) | Keep legacy variation path available; deploy only if profiling still shows need |
+| **3** | UPSERT Implementation | ⭐⭐ (LOW) | Use well-tested SQL patterns staged before production rollout |
+| **4** | Dual-Table Migration | ⭐⭐⭐⭐ (HIGH) | Plan migration scripts and backups prior to deployment |
 
 #### **Business Impact Risks**
 - **SEO Impact**: ⭐ (VERY LOW) - No URL changes, improved admin performance
@@ -1969,14 +981,14 @@ Optimized Force Rebuild Performance:
 
 #### **Key Research Validations**
 1. **Architecture Choice Validated**: All research sources confirm index-based approach is correct
-2. **Batch Size Optimal**: Our 25-file batches align perfectly with production recommendations
+2. **Batch Size Review**: Default 50-file batches still exceed research target; revisit after table-scan fix
 3. **Performance Crisis Confirmed**: 33+ minutes is 990x slower than production targets
-4. **Solution Path Clear**: Batch variation generator addresses root cause identified by all sources
+4. **Solution Path Clear**: Table scan optimisation plus GUID protection deliver the biggest near-term wins
 
 #### **Critical Success Factors**
-1. **Staging Validation**: Test batch generator against exact production dataset
-2. **Fallback Mechanisms**: Maintain ability to revert to current working method
-3. **Performance Monitoring**: Implement before optimization to track improvements
+1. **Staging Validation**: Prove the table-scan optimisation on the production dataset snapshot before go-live
+2. **Fallback Mechanisms**: Maintain the legacy nested-loop path for emergency rollback
+3. **Performance Monitoring**: Implement before optimisation to capture baseline and regression data
 4. **Incremental Deployment**: Phase rollout reduces risk while delivering value
 
 #### **Long-term Sustainability**
@@ -1992,9 +1004,9 @@ Optimized Force Rebuild Performance:
 #### **High Confidence Implementation Plan**
 **The convergence of four independent research sources provides exceptional confidence in our optimization roadmap**:
 
-1. ✅ **Problem Correctly Identified**: All sources confirm batch variation generation as critical bottleneck
-2. ✅ **Solution Architecturally Sound**: Index-based approach validated by all research
-3. ✅ **Performance Targets Achievable**: 95% improvement aligns with research projections
+1. ✅ **Problem Correctly Identified**: Research and profiling converge on table-scan loops as the major bottleneck
+2. ✅ **Solution Architecturally Sound**: Set-based scanning keeps the index architecture while matching research guidance
+3. ✅ **Performance Targets Achievable**: 85–90% reduction is realistic once loops are replaced with aggregated queries
 4. ✅ **Risk Mitigation Comprehensive**: Fallback strategies and staging validation planned
 5. ✅ **Production Patterns Available**: Research provides tested code examples and patterns
 

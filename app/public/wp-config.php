@@ -73,6 +73,14 @@ $table_prefix = 'wp_';
 
 /* Add any custom values between this line and the "stop editing" line. */
 
+if (!defined('MSH_INDEX_PROFILING')) {
+    define('MSH_INDEX_PROFILING', true);
+}
+
+if (!defined('MSH_INDEX_USE_SET_SCAN')) {
+    define('MSH_INDEX_USE_SET_SCAN', true);
+}
+
 
 
 /**

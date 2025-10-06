@@ -71,6 +71,8 @@ require_once get_stylesheet_directory() . '/inc/class-msh-url-variation-detector
 require_once get_stylesheet_directory() . '/inc/class-msh-backup-verification-system.php';
 require_once get_stylesheet_directory() . '/inc/class-msh-image-usage-index.php';
 require_once get_stylesheet_directory() . '/inc/class-msh-targeted-replacement-engine.php';
+require_once get_stylesheet_directory() . '/inc/class-msh-safe-rename-cli.php';
+require_once get_stylesheet_directory() . '/inc/class-msh-content-usage-lookup.php';
 
 require_once get_stylesheet_directory() . '/inc/msh-navigation-functions.php';
 
@@ -79,6 +81,7 @@ require_once get_stylesheet_directory() . '/inc/register-reviews-post-type.php';
 
 MSH_Safe_Rename_System::get_instance();
 MSH_Image_Usage_Index::get_instance();
+MSH_Content_Usage_Lookup::get_instance();
 
 // Debug navigation menu URLs
 require_once get_stylesheet_directory() . '/debug-nav-menu-urls.php';
@@ -142,10 +145,10 @@ function msh_enqueue_typography() {
         null
     );
     
-    // 2. Adobe Fonts - Brand Kit (Futura PT + FF Real Text Pro)
+    // 2. Adobe Fonts - Bree
     wp_enqueue_style(
-        'adobe-fonts-brand', 
-        'https://use.typekit.net/gac6jnd.css', 
+        'adobe-fonts-bree', 
+        'https://use.typekit.net/fkz3nwu.css', 
         [], 
         null
     );
@@ -154,7 +157,7 @@ function msh_enqueue_typography() {
     wp_enqueue_style(
         'msh-typography', 
         get_stylesheet_directory_uri() . '/assets/css/typography.css', 
-        ['google-fonts-source-sans', 'adobe-fonts-brand'], 
+        ['google-fonts-source-sans', 'adobe-fonts-bree'], 
         '1.0.0'
     );
     
@@ -858,7 +861,7 @@ function msh_healthcare_privacy_compliance() {
 // Also hook into Slider Revolution's initialization
 add_filter('revslider_fe_before_init', function() {
     add_action('wp_enqueue_scripts', function() {
-        wp_enqueue_style('adobe-fonts-brand', 'https://use.typekit.net/gac6jnd.css', [], null);
+        wp_enqueue_style('adobe-fonts-bree', 'https://use.typekit.net/fkz3nwu.css', [], null);
         wp_enqueue_style('google-fonts-source', 'https://fonts.googleapis.com/css2?family=Source+Sans+Pro:wght@300;400;600;700&display=swap', [], null);
     }, 1);
 });
@@ -1343,3 +1346,633 @@ function fix_svg_display($response, $attachment, $meta) {
     return $response;
 }
 add_filter('wp_prepare_attachment_for_js', 'fix_svg_display', 10, 3);
+
+
+if (!function_exists('msh_media_collect_usage')) {
+    function msh_media_collect_usage($attachment_id, $limit = 5) {
+        global $wpdb;
+
+        $usage_details = [];
+        $is_used = false;
+
+        // Featured image usage in published posts/pages.
+        $featured = $wpdb->get_results($wpdb->prepare(
+            "SELECT posts.ID, posts.post_title, posts.post_type, posts.post_status
+             FROM {$wpdb->postmeta} meta
+             INNER JOIN {$wpdb->posts} posts ON posts.ID = meta.post_id
+             WHERE meta.meta_key = '_thumbnail_id' AND meta.meta_value = %d
+             ORDER BY posts.post_date DESC
+             LIMIT %d",
+            $attachment_id,
+            $limit
+        ));
+
+        foreach ($featured as $post) {
+            $usage_details[] = [
+                'context' => 'featured',
+                'title' => $post->post_title,
+                'post_type' => $post->post_type,
+                'status' => $post->post_status,
+                'post_id' => $post->ID,
+            ];
+        }
+
+        if (!empty($featured)) {
+            $is_used = true;
+        }
+
+        // Content usage by filename reference.
+        $file_path = get_post_meta($attachment_id, '_wp_attached_file', true);
+        if ($file_path) {
+            $filename = basename($file_path);
+            $content_posts = $wpdb->get_results($wpdb->prepare(
+                "SELECT ID, post_title, post_type, post_status
+                 FROM {$wpdb->posts}
+                 WHERE post_content LIKE %s
+                 ORDER BY post_date DESC
+                 LIMIT %d",
+                '%' . $wpdb->esc_like($filename) . '%',
+                $limit
+            ));
+
+            foreach ($content_posts as $post) {
+                $usage_details[] = [
+                    'context' => 'content',
+                    'title' => $post->post_title,
+                    'post_type' => $post->post_type,
+                    'status' => $post->post_status,
+                    'post_id' => $post->ID,
+                ];
+            }
+
+            if (!empty($content_posts)) {
+                $is_used = true;
+            }
+        }
+
+        return [
+            'is_used' => $is_used,
+            'details' => $usage_details,
+        ];
+    }
+}
+
+if (!class_exists('MSH_Smart_Usage_Detector')) {
+    class MSH_Smart_Usage_Detector {
+        private static $builder_cache = [];
+        private static $widget_cache = null;
+        private static $option_cache = null;
+
+        /**
+         * Get cached builder usage details for an attachment.
+         */
+        public static function get_usage_details($attachment_id) {
+            if (isset(self::$builder_cache[$attachment_id])) {
+                return self::$builder_cache[$attachment_id];
+            }
+
+            $details = [
+                'elementor' => self::scan_elementor_usage($attachment_id),
+                'acf'       => self::scan_acf_usage($attachment_id),
+                'widgets'   => self::scan_widget_usage($attachment_id),
+                'options'   => self::scan_theme_options_usage($attachment_id),
+            ];
+
+            $contexts = [];
+            foreach ($details as $context => $matches) {
+                foreach ($matches as $match) {
+                    $contexts[] = [
+                        'context' => $context,
+                        'location' => $match,
+                    ];
+                }
+            }
+
+            $result = [
+                'contexts' => $contexts,
+                'is_used'  => !empty($contexts),
+            ];
+
+            self::$builder_cache[$attachment_id] = $result;
+            return $result;
+        }
+
+        /**
+         * Elementor/Gutenberg usage by ID lookup in meta.
+         */
+        private static function scan_elementor_usage($attachment_id) {
+            global $wpdb;
+
+            $matches = [];
+            $pattern = '%"id":' . intval($attachment_id) . '%';
+
+            $rows = $wpdb->get_results(
+                $wpdb->prepare(
+                    "SELECT post_id FROM {$wpdb->postmeta} WHERE meta_key = '_elementor_data' AND meta_value LIKE %s LIMIT 5",
+                    $pattern
+                )
+            );
+
+            foreach ($rows as $row) {
+                $title = get_the_title($row->post_id);
+                $matches[] = sprintf(__('Elementor content: %s (#%d)', 'medicross-child'), $title, $row->post_id);
+            }
+
+            // Gutenberg block usage (wp:image JSON contains id)
+            $gutenberg = $wpdb->get_results(
+                $wpdb->prepare(
+                    "SELECT ID, post_title FROM {$wpdb->posts} WHERE post_status = 'publish' AND post_content LIKE %s LIMIT 5",
+                    '%"id":' . intval($attachment_id) . '%'
+                )
+            );
+
+            foreach ($gutenberg as $post) {
+                $matches[] = sprintf(__('Gutenberg content: %s (#%d)', 'medicross-child'), $post->post_title, $post->ID);
+            }
+
+            return $matches;
+        }
+
+        /**
+         * ACF/custom fields: direct meta value matching.
+         */
+        private static function scan_acf_usage($attachment_id) {
+            global $wpdb;
+
+            $matches = [];
+            $id_string = (string) $attachment_id;
+
+            $meta_rows = $wpdb->get_results(
+                $wpdb->prepare(
+                    "SELECT post_id, meta_key FROM {$wpdb->postmeta} WHERE meta_value = %s LIMIT 10",
+                    $id_string
+                )
+            );
+
+            foreach ($meta_rows as $row) {
+                $title = get_the_title($row->post_id);
+                $matches[] = sprintf(__('Custom field %s on %s (#%d)', 'medicross-child'), $row->meta_key, $title, $row->post_id);
+            }
+
+            return $matches;
+        }
+
+        /**
+         * Widget usage: check sidebars/widgets options once per request.
+         */
+        private static function scan_widget_usage($attachment_id) {
+            if (null === self::$widget_cache) {
+                self::$widget_cache = get_option('sidebars_widgets');
+                if (!is_array(self::$widget_cache)) {
+                    self::$widget_cache = [];
+                }
+            }
+
+            $matches = [];
+            $attachment_url = wp_get_attachment_url($attachment_id);
+            $filename = basename(get_attached_file($attachment_id));
+
+            foreach (self::$widget_cache as $sidebar => $widgets) {
+                if (!is_array($widgets) || 'wp_inactive_widgets' === $sidebar) {
+                    continue;
+                }
+
+                foreach ($widgets as $widget_id) {
+                    $option_name = 'widget_' . preg_replace('/-\d+$/', '', $widget_id);
+                    $instance_id = (int) substr(strrchr($widget_id, '-'), 1);
+                    $options = get_option($option_name);
+                    if (!is_array($options) || !isset($options[$instance_id])) {
+                        continue;
+                    }
+
+                    $data = maybe_serialize($options[$instance_id]);
+                    if ($data && (
+                        ($attachment_url && false !== strpos($data, $attachment_url)) ||
+                        ($filename && false !== strpos($data, $filename)) ||
+                        false !== strpos($data, (string) $attachment_id)
+                    )) {
+                        $matches[] = sprintf(__('Widget %s in %s', 'medicross-child'), $option_name, $sidebar);
+                    }
+                }
+            }
+
+            return $matches;
+        }
+
+        /**
+         * Theme options/site settings references.
+         */
+        private static function scan_theme_options_usage($attachment_id) {
+            if (null === self::$option_cache) {
+                global $wpdb;
+                self::$option_cache = $wpdb->get_results(
+                    "SELECT option_name, option_value FROM {$wpdb->options} WHERE option_name LIKE 'theme_mods_%' OR option_name IN ('site_logo','site_icon')"
+                );
+            }
+
+            $matches = [];
+            $attachment_url = wp_get_attachment_url($attachment_id);
+            $needle_id = (string) $attachment_id;
+            $needle_url = $attachment_url ? $attachment_url : '';
+
+            foreach (self::$option_cache as $option) {
+                $value = maybe_serialize($option->option_value);
+                if (($needle_url && false !== strpos($value, $needle_url)) || false !== strpos($value, $needle_id)) {
+                    $matches[] = sprintf(__('Theme option %s', 'medicross-child'), $option->option_name);
+                }
+            }
+
+            return $matches;
+        }
+    }
+}
+
+if (!function_exists('msh_media_scan_progress_key')) {
+    function msh_media_scan_progress_key() {
+        $user_id = get_current_user_id();
+        $suffix = $user_id ? $user_id : 'guest';
+        return 'msh_scan_progress_' . $suffix;
+    }
+}
+
+if (!function_exists('msh_media_scan_results_key')) {
+    function msh_media_scan_results_key() {
+        $user_id = get_current_user_id();
+        $suffix = $user_id ? $user_id : 'guest';
+        return 'msh_scan_results_' . $suffix;
+    }
+}
+
+add_action('wp_ajax_msh_scan_content_chunk', 'msh_handle_scan_content_chunk');
+function msh_handle_scan_content_chunk() {
+    if (!check_ajax_referer('msh_media_cleanup', 'nonce', false)) {
+        wp_send_json_error(['message' => __('Security check failed.', 'medicross-child')]);
+    }
+
+    if (!current_user_can('manage_options')) {
+        wp_send_json_error(['message' => __('Permission denied.', 'medicross-child')]);
+    }
+
+    $offset = isset($_POST['offset']) ? max(0, intval($_POST['offset'])) : 0;
+    $chunk_size = 50;
+
+    $progress_key = msh_media_scan_progress_key();
+    $results_key = msh_media_scan_results_key();
+
+    global $wpdb;
+
+    $progress_state = get_transient($progress_key);
+    $total_images = 0;
+
+    if ($offset === 0 || !is_array($progress_state) || empty($progress_state['total'])) {
+        $total_images = (int) $wpdb->get_var("
+            SELECT COUNT(*)
+            FROM {$wpdb->posts}
+            WHERE post_type = 'attachment'
+              AND post_mime_type LIKE 'image/%'
+        ");
+    } else {
+        $total_images = (int) $progress_state['total'];
+    }
+
+    if ($offset === 0) {
+        delete_transient($results_key);
+        $progress_state = [
+            'status' => 'processing',
+            'current' => 0,
+            'total' => $total_images,
+            'message' => __('Starting content scan...', 'medicross-child'),
+        ];
+        set_transient($progress_key, $progress_state, 300);
+    } elseif (!is_array($progress_state)) {
+        $progress_state = [
+            'status' => 'processing',
+            'current' => min($offset, $total_images),
+            'total' => $total_images,
+            'message' => __('Resuming content scan...', 'medicross-child'),
+        ];
+        set_transient($progress_key, $progress_state, 300);
+    }
+
+    $images = $wpdb->get_results(
+        $wpdb->prepare("
+            SELECT p.ID, p.post_title, p.post_date, p.post_status, pm.meta_value AS file_path
+            FROM {$wpdb->posts} p
+            INNER JOIN {$wpdb->postmeta} pm ON p.ID = pm.post_id AND pm.meta_key = '_wp_attached_file'
+            WHERE p.post_type = 'attachment'
+              AND p.post_mime_type LIKE 'image/%'
+              AND pm.meta_value IS NOT NULL
+              AND pm.meta_value <> ''
+            ORDER BY p.ID ASC
+            LIMIT %d OFFSET %d
+        ", $chunk_size, $offset)
+    );
+
+    if (empty($images)) {
+        $summary_state = [
+            'status' => 'complete',
+            'current' => $total_images,
+            'total' => $total_images,
+            'message' => __('Content scan complete.', 'medicross-child'),
+        ];
+        set_transient($progress_key, $summary_state, 60);
+
+        $results = get_transient($results_key);
+        delete_transient($results_key);
+
+        wp_send_json_success([
+            'complete' => true,
+            'results' => is_array($results) ? $results : [],
+            'total' => $total_images,
+        ]);
+    }
+
+    if (!class_exists('MSH_Hash_Cache_Manager')) {
+        $hash_manager_path = __DIR__ . '/inc/class-msh-hash-cache-manager.php';
+        if (file_exists($hash_manager_path)) {
+            require_once $hash_manager_path;
+        }
+    }
+
+    $hash_manager = class_exists('MSH_Hash_Cache_Manager') ? new MSH_Hash_Cache_Manager() : null;
+
+    $chunk_hashes = [];
+
+    foreach ($images as $image) {
+        $hash = false;
+
+        if ($hash_manager) {
+            $hash = $hash_manager->get_file_hash($image->ID);
+        } else {
+            $file_path = get_attached_file($image->ID);
+            if ($file_path && file_exists($file_path)) {
+                $hash = md5_file($file_path);
+            }
+        }
+
+        if (!$hash) {
+            continue;
+        }
+
+        $usage_info = msh_media_collect_usage($image->ID);
+        $analysis = MSH_Media_Cleanup::analyze_filename($image->file_path);
+
+        $chunk_hashes[$image->ID] = [
+            'hash' => $hash,
+            'data' => [
+                'ID' => (int) $image->ID,
+                'post_title' => $image->post_title,
+                'post_date' => $image->post_date,
+                'post_status' => $image->post_status,
+                'file_path' => $image->file_path,
+                'base_name' => $analysis['base_name'] ?? '',
+                'original_base' => $analysis['original_base'] ?? '',
+                'duplicate_patterns' => $analysis['patterns'] ?? [],
+            ],
+            'thumb_url' => wp_get_attachment_thumb_url($image->ID) ?: '',
+            'full_url' => wp_get_attachment_url($image->ID) ?: '',
+            'usage' => $usage_info,
+        ];
+    }
+
+    $existing = get_transient($results_key);
+    if (!is_array($existing)) {
+        $existing = [];
+    }
+
+    $existing = array_replace($existing, $chunk_hashes);
+    set_transient($results_key, $existing, 600);
+
+    $processed_total = min($offset + count($images), max($total_images, count($existing)));
+
+    $progress_state = [
+        'status' => 'processing',
+        'current' => $processed_total,
+        'total' => $total_images,
+        'message' => sprintf(__('Processing image %1$d of %2$d...', 'medicross-child'), $processed_total, max(1, $total_images)),
+    ];
+    set_transient($progress_key, $progress_state, 300);
+
+    wp_send_json_success([
+        'complete' => false,
+        'processed' => count($images),
+        'offset' => $offset + $chunk_size,
+        'chunk_results' => $chunk_hashes,
+        'progress' => [
+            'current' => $processed_total,
+            'total' => $total_images,
+        ],
+    ]);
+}
+
+add_action('wp_ajax_msh_get_scan_progress', 'msh_handle_scan_progress');
+function msh_handle_scan_progress() {
+    if (!check_ajax_referer('msh_media_cleanup', 'nonce', false)) {
+        wp_send_json_error(['message' => __('Security check failed.', 'medicross-child')]);
+    }
+
+    $progress = get_transient(msh_media_scan_progress_key());
+
+    if (!$progress) {
+        wp_send_json_success(['status' => 'idle']);
+    }
+
+    wp_send_json_success($progress);
+}
+
+add_action('wp_ajax_msh_check_capabilities', 'msh_handle_capability_check');
+function msh_handle_capability_check() {
+    if (!check_ajax_referer('msh_media_cleanup', 'nonce', false)) {
+        wp_send_json_error(['message' => __('Security check failed.', 'medicross-child')]);
+    }
+
+    if (!class_exists('MSH_Hash_Cache_Manager')) {
+        $hash_manager_path = __DIR__ . '/inc/class-msh-hash-cache-manager.php';
+        if (file_exists($hash_manager_path)) {
+            require_once $hash_manager_path;
+        }
+    }
+
+    $capabilities = class_exists('MSH_Hash_Cache_Manager') ? MSH_Hash_Cache_Manager::check_dependencies() : [];
+
+    wp_send_json_success([
+        'can_detect_exact' => true,
+        'can_detect_similar' => !empty($capabilities['imagick_compare']),
+        'dependencies' => $capabilities,
+    ]);
+}
+
+add_action('wp_ajax_msh_verify_usage_group', 'msh_handle_verify_usage_group');
+function msh_handle_verify_usage_group() {
+    if (!check_ajax_referer('msh_media_cleanup', 'nonce', false)) {
+        wp_send_json_error(['message' => __('Security check failed.', 'medicross-child')]);
+    }
+
+    if (!current_user_can('manage_options')) {
+        wp_send_json_error(['message' => __('Permission denied.', 'medicross-child')]);
+    }
+
+    $attachment_ids = isset($_POST['attachment_ids']) ? array_map('intval', (array) $_POST['attachment_ids']) : [];
+    $level = isset($_POST['level']) ? sanitize_text_field($_POST['level']) : 'medium';
+
+    if (empty($attachment_ids)) {
+        wp_send_json_error(['message' => __('No attachments provided.', 'medicross-child')]);
+    }
+
+    $response = [];
+    foreach ($attachment_ids as $attachment_id) {
+        if (!$attachment_id) {
+            continue;
+        }
+
+        $builder_usage = MSH_Smart_Usage_Detector::get_usage_details($attachment_id);
+
+        $contexts = $builder_usage['contexts'];
+        $is_used = $builder_usage['is_used'];
+
+        // Deep mode: also run fallback scan for raw URLs or filenames across posts/options.
+        if ('deep' === $level) {
+            $deep_matches = msh_media_collect_usage($attachment_id, 10);
+            if (!empty($deep_matches['details'])) {
+                foreach ($deep_matches['details'] as $detail) {
+                    $contexts[] = [
+                        'context' => $detail['type'],
+                        'location' => isset($detail['location']) ? $detail['location'] : ($detail['title'] ?? ''),
+                    ];
+                }
+            }
+            if (!empty($deep_matches['is_used'])) {
+                $is_used = true;
+            }
+        }
+
+        $response[$attachment_id] = [
+            'is_used' => $is_used,
+            'contexts' => $contexts,
+        ];
+    }
+
+    wp_send_json_success(['usage' => $response]);
+}
+
+// EMERGENCY IMAGE REDIRECT FIX - TEMPORARY
+// Added: October 2025 - Remove after permanent fix
+// Required because .htaccess doesn't work on Nginx servers
+// DISABLED 2025-10-01: Rename system now working correctly
+$msh_enable_emergency_redirects = true; // Set to true to re-enable if needed
+if ($msh_enable_emergency_redirects) {
+    add_action('template_redirect', 'msh_emergency_image_redirect');
+}
+function msh_emergency_image_redirect() {
+    if (is_404()) {
+        $request_uri = $_SERVER['REQUEST_URI'];
+
+        // Pattern 1: *-photo.png → *-hamilton.png
+        if (preg_match('/\/wp-content\/uploads\/(.*)([^\/]+)-photo\.(png|jpg|jpeg|webp)$/i', $request_uri, $matches)) {
+            $old_uri = str_replace('-photo.', '-hamilton.', $request_uri);
+            $old_file = ABSPATH . ltrim($old_uri, '/');
+
+            if (file_exists($old_file)) {
+                wp_redirect($old_uri, 301);
+                exit;
+            }
+        }
+
+        // Pattern 2: *-injuries-* → *-injury-*
+        if (preg_match('/\/wp-content\/uploads\/(.*)([^\/]+)-injuries-([^\/]+)\.(png|jpg|jpeg|webp)$/i', $request_uri, $matches)) {
+            $old_uri = str_replace('-injuries-', '-injury-', $request_uri);
+            $old_file = ABSPATH . ltrim($old_uri, '/');
+
+            if (file_exists($old_file)) {
+                wp_redirect($old_uri, 301);
+                exit;
+            }
+        }
+
+        // Pattern 3: *-services-* → *-service-*
+        if (preg_match('/\/wp-content\/uploads\/(.*)([^\/]+)-services-([^\/]+)\.(png|jpg|jpeg|webp)$/i', $request_uri, $matches)) {
+            $old_uri = str_replace('-services-', '-service-', $request_uri);
+            $old_file = ABSPATH . ltrim($old_uri, '/');
+
+            if (file_exists($old_file)) {
+                wp_redirect($old_uri, 301);
+                exit;
+            }
+        }
+
+        // COMPLETE broken images fix - 51 smart-matched redirects (59% of all broken references)
+        $specific_redirects = [
+            '/wp-content/uploads/2024/09/main-street-health-healthcare-work-related-injuries-icon-hamilton-13443.png' => '/wp-content/uploads/2024/09/main-street-health-healthcare-work-related-injuries-1024x743.png',
+            '/wp-content/uploads/2025/09/chronic-pain-photo.png' => '/wp-content/uploads/2025/09/chronic-pain-photo.webp',
+            '/wp-content/uploads/2024/09/motor-injuries-photo.png' => '/wp-content/uploads/2024/09/motor-injuries-photo.webp',
+            '/wp-content/uploads/2025/09/a-healthcare-professional-assists-a-patient-experi-2025-03-09-11-52-55-utc-scaled.jpg' => '/wp-content/uploads/2025/09/a-healthcare-professional-assists-a-patient-experi-2025-03-09-11-52-55-utc-scaled.webp',
+            '/wp-content/uploads/2025/09/first-responders-scaled-1-1-1-1-1.webp' => '/wp-content/uploads/2025/09/first-responders-scaled-1-1-1-120x104.webp',
+            '/wp-content/uploads/2025/09/male-patients-consulted-physiotherapists-with-low-2025-01-10-22-33-51-utc-scaled.jpg' => '/wp-content/uploads/2025/09/male-patients-consulted-physiotherapists-with-low-2025-01-10-22-33-51-utc-scaled.webp',
+            '/wp-content/uploads/2025/09/crop-medical-practitioner-bandaging-foot-of-patien-2025-01-29-07-51-33-utc-scaled.jpg' => '/wp-content/uploads/2025/09/crop-medical-practitioner-bandaging-foot-of-patien-2025-01-29-07-51-33-utc-scaled.webp',
+            '/wp-content/uploads/2025/09/landing-page_GettyImages-1343539369-1-2.png' => '/wp-content/uploads/2025/09/landing-page_GettyImages-1343539369-1-2.webp',
+            '/wp-content/uploads/2025/09/anatomical-model-of-human-head-with-vascular-struc-2025-09-14-15-13-16-utc-scaled.jpg' => '/wp-content/uploads/2025/09/anatomical-model-of-human-head-with-vascular-struc-2025-09-14-15-13-16-utc-scaled.webp',
+            '/wp-content/uploads/2025/09/senior-woman-holding-her-painful-knee-2024-09-14-19-15-13-utc-scaled.jpg' => '/wp-content/uploads/2025/09/senior-woman-holding-her-painful-knee-2024-09-14-19-15-13-utc-scaled.webp',
+            '/wp-content/uploads/2025/09/woman-in-office-experiences-wrist-pain-while-using-2025-03-25-07-01-10-utc-scaled.jpg' => '/wp-content/uploads/2025/09/woman-in-office-experiences-wrist-pain-while-using-2025-03-25-07-01-10-utc-scaled.webp',
+            '/wp-content/uploads/2025/09/woman-training-her-back-with-a-pec-deck-machine-2025-04-02-07-51-30-utc-scaled.jpg' => '/wp-content/uploads/2025/09/woman-training-her-back-with-a-pec-deck-machine-2025-04-02-07-51-30-utc-scaled.webp',
+            '/wp-content/uploads/2025/09/dental-problems-young-indian-man-touching-cheek-2025-03-17-22-16-31-utc-scaled.jpg' => '/wp-content/uploads/2025/09/dental-problems-young-indian-man-touching-cheek-2025-03-17-22-16-31-utc-scaled.webp',
+            '/wp-content/uploads/2025/08/chevron.png' => '/wp-content/uploads/2025/08/patient-testimonial-chevron-icon-hamilton-80x64.png',
+            '/wp-content/uploads/2024/08/ic2.png' => '/wp-content/uploads/2024/08/ic2.webp',
+            '/wp-content/uploads/2024/08/msh-healthcare-3148.webp' => '/wp-content/uploads/2024/08/main-street-health-healthcare-cm3.webp',
+            '/wp-content/uploads/2024/08/cm4.webp' => '/wp-content/uploads/2024/08/cm7.webp',
+            '/wp-content/uploads/2024/08/cm2.webp' => '/wp-content/uploads/2024/08/cm7.webp',
+            '/wp-content/uploads/2024/08/vr2.webp' => '/wp-content/uploads/2024/08/vr9.webp',
+            '/wp-content/uploads/2024/08/vr3.webp' => '/wp-content/uploads/2024/08/vr9.webp',
+            '/wp-content/uploads/2024/08/vr4.webp' => '/wp-content/uploads/2024/08/vr9.webp',
+            '/wp-content/uploads/2024/08/vr5.webp' => '/wp-content/uploads/2024/08/vr9.webp',
+            '/wp-content/uploads/2024/08/vr8.webp' => '/wp-content/uploads/2024/08/vr9.webp',
+            '/wp-content/uploads/2024/08/vr9.jpg' => '/wp-content/uploads/2024/08/vr9.webp',
+            '/wp-content/uploads/2024/09/case4-410x520.webp' => '/wp-content/uploads/2024/09/case5-410x520.webp',
+            '/wp-content/uploads/2024/09/case3-410x520.webp' => '/wp-content/uploads/2024/09/case5-410x520.webp',
+            '/wp-content/uploads/2024/09/case2-410x520.webp' => '/wp-content/uploads/2024/09/case5-410x520.webp',
+            '/wp-content/uploads/2024/09/case1-410x520.webp' => '/wp-content/uploads/2024/09/case5-410x520.webp',
+            '/wp-content/uploads/2024/09/case4-600x290.webp' => '/wp-content/uploads/2024/09/case5-600x290.webp',
+            '/wp-content/uploads/2024/09/case3-600x290.webp' => '/wp-content/uploads/2024/09/case5-600x290.webp',
+            '/wp-content/uploads/2024/09/case2-600x290.webp' => '/wp-content/uploads/2024/09/case5-600x290.webp',
+            '/wp-content/uploads/2024/09/case1-600x290.webp' => '/wp-content/uploads/2024/09/case5-600x290.webp',
+            '/wp-content/uploads/2024/09/case4-752x542.webp' => '/wp-content/uploads/2024/09/case5-752x542.webp',
+            '/wp-content/uploads/2024/09/case3-752x542.webp' => '/wp-content/uploads/2024/09/case5-752x542.webp',
+            '/wp-content/uploads/2024/09/case2-752x542.webp' => '/wp-content/uploads/2024/09/case5-752x542.webp',
+            '/wp-content/uploads/2024/09/case1-752x542.webp' => '/wp-content/uploads/2024/09/case5-752x542.webp',
+            '/wp-content/uploads/2024/07/rehabilitation-hamilton-icon-hamilton-207.png' => '/wp-content/uploads/2024/07/rehabilitation-hamilton-icon-hamilton-207.webp',
+            '/wp-content/uploads/2024/07/main-street-logo-hamilton.png' => '/wp-content/uploads/2024/07/main-street-logo-hamilton.webp',
+            '/wp-content/uploads/2024/10/home-1-300x212.webp' => '/wp-content/uploads/2024/10/h3-3-300x135.webp',
+            '/wp-content/uploads/2024/10/home-2-300x212.webp' => '/wp-content/uploads/2024/10/h3-3-300x135.webp',
+            '/wp-content/uploads/2024/10/home-3.webp' => '/wp-content/uploads/2024/10/h3-3.webp',
+            '/wp-content/uploads/2024/10/home-3-300x212.webp' => '/wp-content/uploads/2024/10/h3-3-300x135.webp',
+            '/wp-content/uploads/2024/10/home-4-300x212.webp' => '/wp-content/uploads/2024/10/h3-3-300x135.webp',
+            '/wp-content/uploads/2024/10/home-5.webp' => '/wp-content/uploads/2024/10/h4-5.webp',
+            '/wp-content/uploads/2024/10/home-5-300x212.webp' => '/wp-content/uploads/2024/10/h3-3-300x135.webp',
+            '/wp-content/uploads/2024/07/msh-healthcare-219.webp' => '/wp-content/uploads/2024/07/main-street-health-healthcare-bl2-746x334.webp',
+            '/wp-content/uploads/2025/08/patient-testimonial-chevron-hamilton.png' => '/wp-content/uploads/2025/08/patient-testimonial-chevron-icon-hamilton.png',
+            '/wp-content/uploads/2024/09/physiotherapy-hamilton-landing-page-gettyimages.png' => '/wp-content/uploads/2024/09/physiotherapy-hamilton-landing-page-gettyimages-700x700.png',
+            '/wp-content/uploads/2025/08/Summer-review.png' => '/wp-content/uploads/2025/08/Summer-review.webp',
+            '/wp-content/uploads/2025/08/Kiera-review.png' => '/wp-content/uploads/2025/08/Kiera-review.webp',
+            '/wp-content/uploads/2024/08/main-street-logo-hamilton-2065.png' => '/wp-content/uploads/2024/08/main-street-logo-hamilton-2065.webp',
+
+            // Additional redirects for remaining 12 broken files - Added 2025-10-01
+            '/wp-content/uploads/2025/09/Prakash-Patel-1.webp' => '/wp-content/uploads/2025/09/Prakash-Patel-1.png',
+            '/wp-content/uploads/2024/09/physiotherapy-hamilton-landing-page-gettyimages.png' => '/wp-content/uploads/2024/09/cardiovascular-health-testing-equipment-hamilton.webp',
+            '/wp-content/uploads/2025/08/patient-testimonial-chevron-hamilton.png' => '/wp-content/uploads/2025/08/patient-testimonial-chevron-icon-hamilton.webp',
+            '/wp-content/uploads/2025/08/patient-testimonial-kiera-review-hamilton-14419.png' => '/wp-content/uploads/2025/08/patient-testimonial-kiera-review-hamilton.webp',
+            '/wp-content/uploads/2025/08/patient-testimonial-summer-review-hamilton-14418.png' => '/wp-content/uploads/2025/08/patient-testimonial-summer-review-hamilton.webp',
+            '/wp-content/uploads/2025/08/chronic-pain-hamilton-icon-hamilton.png' => '/wp-content/uploads/2025/08/chronic-pain-hamilton-icon-hamilton.webp',
+            '/wp-content/uploads/2024/09/car-accidents-icon.png' => '/wp-content/uploads/2025/08/work-related-injuries-icon-hamilton-13443.webp',
+            '/wp-content/uploads/2025/09/concussion-icon-hamilton.svg' => '/wp-content/uploads/2025/09/concussion-assessment-testing-hamilton.webp',
+            '/wp-content/uploads/2025/09/physio-hamilton-icon-hamilton.svg' => '/wp-content/uploads/2025/09/rehabilitation-physiotherapy-19888.webp',
+            '/wp-content/uploads/2025/09/rehabilitation-hamilton-icon-hamilton-14614.svg' => '/wp-content/uploads/2025/09/rehabilitation-hamilton-chronic-hamilton.webp',
+        ];
+
+        if (isset($specific_redirects[$request_uri])) {
+            $target_file = ABSPATH . ltrim($specific_redirects[$request_uri], '/');
+            if (file_exists($target_file)) {
+                wp_redirect($specific_redirects[$request_uri], 301);
+                exit;
+            }
+        }
+    }
+}

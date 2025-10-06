@@ -77,6 +77,8 @@ class MSH_URL_Variation_Detector {
 
         // Absolute URL
         $variations[] = $url;
+        $variations[] = urldecode($url);
+        $variations[] = html_entity_decode($url, ENT_QUOTES, 'UTF-8');
 
         // Relative URL (from uploads directory)
         $relative = str_replace($this->base_url, '', $url);
@@ -97,6 +99,19 @@ class MSH_URL_Variation_Detector {
         if ($path) {
             $variations[] = $path;
             $variations[] = str_replace($this->base_path, '', $path);
+        }
+
+        // Generated permutations based on filename normalisation
+        $permutations = $this->generate_filename_permutations(basename($url));
+        if (!empty($permutations)) {
+            $dirname_url = trailingslashit(pathinfo($url, PATHINFO_DIRNAME));
+            $relative_dir = trailingslashit(str_replace($this->base_url, '', $dirname_url));
+            foreach ($permutations as $permutation) {
+                $variations[] = $permutation;
+                $variations[] = $dirname_url . $permutation;
+                $variations[] = $relative_dir . $permutation;
+                $variations[] = '/' . ltrim($relative_dir . $permutation, '/');
+            }
         }
 
         return $variations;
@@ -143,6 +158,65 @@ class MSH_URL_Variation_Detector {
         }
 
         return $pathinfo['dirname'] . '/' . $pathinfo['filename'] . '.webp';
+    }
+
+    /**
+     * Build permutations of a filename to catch CDN/rename variants.
+     */
+    private function generate_filename_permutations($filename) {
+        $results = [];
+
+        if (empty($filename)) {
+            return $results;
+        }
+
+        $info = pathinfo($filename);
+        $name = $info['filename'] ?? $filename;
+        $extension = isset($info['extension']) && $info['extension'] !== '' ? '.' . $info['extension'] : '';
+
+        $candidates = [];
+        $base = $name;
+
+        $candidates[] = $base;
+        $candidates[] = strtolower($base);
+        $candidates[] = strtoupper($base);
+        $candidates[] = $this->strip_wp_resize_suffix($base);
+        $candidates[] = $this->strip_numeric_suffix($base);
+        $candidates[] = $this->strip_wp_resize_suffix($this->strip_numeric_suffix($base));
+
+        if (!function_exists('sanitize_title')) {
+            require_once ABSPATH . 'wp-includes/formatting.php';
+        }
+
+        $candidates[] = sanitize_title($base);
+        $candidates[] = str_replace(['_', ' '], '-', $base);
+        $candidates[] = str_replace(['_', ' '], '', $base);
+
+        $decoded = html_entity_decode($base, ENT_QUOTES, 'UTF-8');
+        if ($decoded !== $base) {
+            $candidates[] = $decoded;
+            $candidates[] = sanitize_title($decoded);
+        }
+
+        $candidates = array_filter(array_unique($candidates));
+
+        foreach ($candidates as $candidate) {
+            $results[] = $candidate . $extension;
+            $results[] = $candidate;
+        }
+
+        return array_unique($results);
+    }
+
+    private function strip_wp_resize_suffix($name) {
+        $stripped = preg_replace('/-(scaled|rotated)(?:-[0-9x]+)*/i', '', $name);
+        $stripped = preg_replace('/(-copy)+$/i', '', $stripped);
+        return $stripped ?: $name;
+    }
+
+    private function strip_numeric_suffix($name) {
+        $stripped = preg_replace('/(-\d+)+$/', '', $name);
+        return $stripped ?: $name;
     }
 
     /**

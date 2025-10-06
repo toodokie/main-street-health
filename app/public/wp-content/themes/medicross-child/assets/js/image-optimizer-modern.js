@@ -193,6 +193,39 @@
             $('#optimize-selected').on('click', () => Optimization.runSelected());
             $('#apply-filename-suggestions').on('click', () => UI.applyAllFilenameSuggestions());
             $('#verify-webp-status').on('click', () => WebPVerification.runVerification());
+            $('#view-orphan-list').on('click', (e) => {
+                e.preventDefault();
+                UI.toggleOrphanList();
+            });
+
+            $('#trigger-incremental-refresh').on('click', async (e) => {
+                e.preventDefault();
+                const $btn = $(e.currentTarget);
+                $btn.prop('disabled', true).text('Queueing...');
+
+                try {
+                    const response = await $.ajax({
+                        url: mshImageOptimizer.ajaxurl,
+                        type: 'POST',
+                        data: {
+                            action: 'msh_trigger_incremental_refresh',
+                            nonce: mshImageOptimizer.nonce
+                        }
+                    });
+
+                    if (response.success) {
+                        alert(response.data.message + '\nScheduled for: ' + response.data.scheduled_for);
+                        UI.updateIndexStatus({...CONFIG.indexStats, queued_attachments: response.data.pending_jobs});
+                    } else {
+                        alert('Failed to queue refresh: ' + (response.data || 'Unknown error'));
+                    }
+                } catch (error) {
+                    alert('Error queueing refresh: ' + error.message);
+                } finally {
+                    $btn.prop('disabled', false).text('Trigger Incremental Refresh');
+                }
+            });
+
             $('#rebuild-usage-index').on('click', (e) => {
                 e.preventDefault();
                 const force = e.shiftKey;
@@ -260,6 +293,7 @@
                 e.preventDefault();
                 DuplicateCleanup.testConnection();
             });
+            $('#visual-similarity-scan').on('click', () => DuplicateCleanup.runVisualSimilarityScan());
             $('#quick-duplicate-scan').on('click', () => DuplicateCleanup.runQuickScan());
             $('#full-library-scan').on('click', () => DuplicateCleanup.runDeepScan());
 
@@ -1206,25 +1240,249 @@
         }
 
         static updateIndexStatus(summary) {
+            const stats = summary || {};
             let summaryText = 'Not built';
             let timestampText = '';
+            let healthState = 'not-built';
+            let healthBadgeText = mshImageOptimizer.strings?.indexNotBuilt || 'Not Built';
 
-            if (summary && (summary.total_entries || summary.indexed_attachments)) {
-                const totalEntries = summary.total_entries ?? 0;
-                const attachments = summary.indexed_attachments ?? 0;
+            const totalEntries = stats.total_entries ?? 0;
+            const attachments = stats.indexed_attachments ?? 0;
+            const orphanCount = stats.orphaned_entries ?? 0;
+            const derivedCount = stats.derived_count ?? 0;
+
+            if (totalEntries || attachments) {
                 summaryText = `${totalEntries} entries across ${attachments} attachment${attachments === 1 ? '' : 's'}`;
 
-                if (summary.last_update_display) {
-                    timestampText = `Last updated: ${summary.last_update_display}`;
-                } else if (summary.last_update_raw) {
-                    timestampText = `Last updated: ${summary.last_update_raw}`;
+                const queuedCount = stats.queued_attachments ?? 0;
+                const pendingJobs = stats.scheduler?.pending_jobs ?? stats.pending_jobs ?? 0;
+
+                if (queuedCount > 0 || pendingJobs > 0) {
+                    healthState = 'queued';
+                    healthBadgeText = mshImageOptimizer.strings?.indexQueued || 'Queued';
+                } else if (orphanCount > 5) {
+                    healthState = 'attention';
+                    healthBadgeText = mshImageOptimizer.strings?.indexAttention || 'Attention';
+                } else if (totalEntries > 0) {
+                    healthState = 'healthy';
+                    healthBadgeText = mshImageOptimizer.strings?.indexHealthy || 'Healthy';
                 }
+
+                if (pendingJobs === 1 && queuedCount === 0) {
+                    $('#index-queue-warning')
+                        .text(mshImageOptimizer.strings?.queueInfo || 'Background refresh queued; no action needed unless jobs pile up.')
+                        .show();
+                } else if (queuedCount > 0 || pendingJobs > 1) {
+                    $('#index-queue-warning')
+                        .text((mshImageOptimizer.strings?.queueWarning || 'Background indexing in progress') + ` (${queuedCount || pendingJobs} pending)`)
+                        .show();
+                } else {
+                    $('#index-queue-warning').hide();
+                }
+
+                const totalFlagged = orphanCount + derivedCount;
+                const $cleanupBtn = $('#cleanup-orphans');
+                const $orphanChip = $('#orphan-chip');
+
+                if (orphanCount > 0) {
+                    $cleanupBtn.show();
+                    $orphanChip.text(orphanCount).show();
+                } else {
+                    $cleanupBtn.hide();
+                    $orphanChip.hide();
+                }
+
+                if (totalFlagged > 0) {
+                    $('#view-orphan-list').show();
+                } else {
+                    $('#view-orphan-list').hide();
+                    $('#index-orphan-panel').hide().empty();
+                }
+
+                const byContext = Array.isArray(stats.by_context) ? stats.by_context : [];
+                let postsCount = 0;
+                let metaCount = 0;
+                let optionsCount = 0;
+
+                byContext.forEach((ctx) => {
+                    const type = ctx.context_type || ctx.type;
+                    const count = parseInt(ctx.count, 10) || 0;
+                    if (type === 'content') postsCount = count;
+                    else if (type === 'postmeta') metaCount = count;
+                    else if (type === 'options') optionsCount = count;
+                });
+
+                const total = postsCount + metaCount + optionsCount;
+                if (total > 0) {
+                    const postsPercent = (postsCount / total * 100).toFixed(1);
+                    const metaPercent = (metaCount / total * 100).toFixed(1);
+                    const optionsPercent = (optionsCount / total * 100).toFixed(1);
+
+                    $('.index-mix-segment.posts').css('width', postsPercent + '%');
+                    $('.index-mix-segment.meta').css('width', metaPercent + '%');
+                    $('.index-mix-segment.options').css('width', optionsPercent + '%');
+
+                    $('#mix-posts-count').text(postsCount);
+                    $('#mix-meta-count').text(metaCount);
+                    $('#mix-options-count').text(optionsCount);
+                }
+
+                if (stats.last_update_display) {
+                    timestampText = `Last updated: ${stats.last_update_display}`;
+                } else if (stats.last_update_raw) {
+                    timestampText = `Last updated: ${stats.last_update_raw}`;
+                }
+            } else {
+                $('#index-queue-warning').hide();
+                $('#cleanup-orphans').hide();
+                $('#orphan-chip').hide();
+                $('#view-orphan-list').hide();
+                $('#index-orphan-panel').hide().empty();
             }
+
+            const $badge = $('#index-health-badge');
+            $badge.removeClass('healthy queued attention').addClass(healthState).text(healthBadgeText);
 
             $('#index-status-summary').text(summaryText);
             $('#index-last-updated').text(timestampText);
 
-            CONFIG.indexStats = summary || null;
+            CONFIG.indexStats = stats || null;
+            this.updateOrphanToggleLabel(stats);
+            this.renderOrphanList(stats);
+        }
+
+        static updateOrphanToggleLabel(summary) {
+            const $button = $('#view-orphan-list');
+            if (!$button.length) {
+                return;
+            }
+
+            const orphanCount = summary?.orphaned_entries ?? 0;
+            const derivedCount = summary?.derived_count ?? 0;
+            const total = orphanCount + derivedCount;
+
+            if (total <= 0) {
+                $button.hide();
+                return;
+            }
+
+            const isVisible = $('#index-orphan-panel').is(':visible');
+            const viewText = mshImageOptimizer.strings?.viewOrphans || 'View Orphan List';
+            const hideText = mshImageOptimizer.strings?.hideOrphans || 'Hide Orphan List';
+            let countLabel = '';
+            if (orphanCount > 0 && derivedCount > 0) {
+                countLabel = ` (${orphanCount} • ${derivedCount} alt)`;
+            } else if (orphanCount > 0) {
+                countLabel = ` (${orphanCount})`;
+            } else if (derivedCount > 0) {
+                countLabel = ` (${derivedCount} alt)`;
+            }
+
+            const label = isVisible ? hideText : `${viewText}${countLabel}`;
+            $button.text(label).show();
+        }
+
+        static renderOrphanList(summary) {
+            const $panel = $('#index-orphan-panel');
+            if (!$panel.length) {
+                return;
+            }
+
+            const orphanCount = summary?.orphaned_entries ?? 0;
+            const derivedCount = summary?.derived_count ?? 0;
+            const orphanPreview = Array.isArray(summary?.orphan_preview) ? summary.orphan_preview : [];
+            const derivedPreview = Array.isArray(summary?.derived_preview) ? summary.derived_preview : [];
+
+            if (orphanCount <= 0 && derivedCount <= 0) {
+                $panel.hide().empty();
+                return;
+            }
+
+            const sections = [];
+
+            if (orphanCount > 0) {
+                if (orphanPreview.length === 0) {
+                    const emptyMessage = mshImageOptimizer.strings?.noOrphans || 'No orphaned attachments detected.';
+                    sections.push(`<p style="margin: 0; font-size: 13px; color: #4b5563;">${UI.escapeHtml(emptyMessage)}</p>`);
+                } else {
+                    const itemsHtml = orphanPreview.map((item) => {
+                        const id = item?.ID ?? item?.id ?? 0;
+                        const title = item?.title ? UI.escapeHtml(item.title) : UI.escapeHtml(`Attachment #${id}`);
+                        const editUrl = item?.edit_url || item?.editUrl || '';
+                        const link = editUrl ? `<a href="${UI.escapeHtml(editUrl)}" target="_blank" rel="noopener noreferrer">${title}</a>` : title;
+                        const details = [];
+                        if (item?.file_path) {
+                            details.push(UI.escapeHtml(item.file_path));
+                        }
+                        if (item?.mime) {
+                            details.push(UI.escapeHtml(item.mime));
+                        }
+                        return `<li>${link}${details.length ? ` <span style="color:#6b7280;">(${details.join(' • ')})</span>` : ''}</li>`;
+                    }).join('');
+
+                    let footer = '';
+                    if (orphanCount > orphanPreview.length) {
+                        const remaining = orphanCount - orphanPreview.length;
+                        footer = `<p style="margin-top:8px;font-size:12px;color:#6b7280;">${UI.escapeHtml(`${remaining} additional orphan${remaining === 1 ? '' : 's'} not shown.`)}</p>`;
+                    }
+
+                    sections.push(`<h4 style="margin:0 0 6px 0; color:#b91c1c;">${UI.escapeHtml(mshImageOptimizer.strings?.orphanWarning || 'Orphaned entries detected - references to deleted attachments')}</h4><ul>${itemsHtml}</ul>${footer}`);
+                }
+            }
+
+            if (derivedCount > 0) {
+                const headingMargin = orphanCount > 0 ? '16px' : '0';
+                if (derivedPreview.length === 0) {
+                    const info = mshImageOptimizer.strings?.derivedInfo || 'Alternate formats detected.';
+                    sections.push(`<p style="margin:${headingMargin} 0 0; font-size: 13px; color: #2563eb;">${UI.escapeHtml(info)}</p>`);
+                } else {
+                    const itemsHtml = derivedPreview.map((item) => {
+                        const id = item?.ID ?? 0;
+                        const title = item?.title ? UI.escapeHtml(item.title) : UI.escapeHtml(`Attachment #${id}`);
+                        const editUrl = item?.edit_url || '';
+                        const link = editUrl ? `<a href="${UI.escapeHtml(editUrl)}" target="_blank" rel="noopener noreferrer">${title}</a>` : title;
+                        const parent = item?.parent_id ? ` → #${item.parent_id}` : '';
+                        return `<li>${link}${parent ? `<span style="color:#6b7280;">${parent}</span>` : ''}</li>`;
+                    }).join('');
+
+                    sections.push(`<h4 style="margin:${headingMargin} 0 6px 0; color:#2563eb;">${UI.escapeHtml(mshImageOptimizer.strings?.derivedHeading || 'Derived copies (alternate formats)')}</h4><ul>${itemsHtml}</ul>`);
+                }
+            }
+
+            if (sections.length === 0) {
+                const emptyMessage = mshImageOptimizer.strings?.noOrphans || 'No orphaned attachments detected.';
+                $panel.html(`<p style="margin: 0; font-size: 13px; color: #4b5563;">${UI.escapeHtml(emptyMessage)}</p>`);
+            } else {
+                $panel.html(sections.join(''));
+            }
+        }
+
+        static toggleOrphanList(forceState = null) {
+            const $panel = $('#index-orphan-panel');
+            if (!$panel.length) {
+                return;
+            }
+
+            const summary = CONFIG.indexStats || {};
+            const orphanCount = summary?.orphaned_entries ?? 0;
+            const derivedCount = summary?.derived_count ?? 0;
+            if (orphanCount <= 0 && derivedCount <= 0) {
+                $panel.hide();
+                $('#view-orphan-list').hide();
+                return;
+            }
+
+            this.renderOrphanList(summary);
+
+            let shouldShow;
+            if (forceState === null) {
+                shouldShow = !$panel.is(':visible');
+            } else {
+                shouldShow = Boolean(forceState);
+            }
+
+            $panel.toggle(shouldShow);
+            this.updateOrphanToggleLabel(summary);
         }
 
         static playCompletionSound() {
@@ -1630,17 +1888,69 @@
                 return null;
             }
 
+            if (summary.summary) {
+                const base = this.normalizeSummary(summary.summary);
+                if (!base) {
+                    return null;
+                }
+
+                if (Array.isArray(summary.by_context)) {
+                    base.by_context = summary.by_context.map((ctx) => ({
+                        context_type: ctx.context_type || ctx.type || '',
+                        count: parseInt(ctx.count, 10) || 0,
+                    }));
+                }
+
+                if (summary.orphans) {
+                    base.orphaned_entries = parseInt(summary.orphans.count, 10) || 0;
+                    base.orphan_preview = Array.isArray(summary.orphans.items) ? summary.orphans.items : [];
+                }
+
+                if (summary.last_update_display && !base.last_update_display) {
+                    base.last_update_display = summary.last_update_display;
+                }
+
+                if (summary.last_update_raw && !base.last_update_raw) {
+                    base.last_update_raw = summary.last_update_raw;
+                }
+
+                if (summary.queued_attachments !== undefined) {
+                    base.queued_attachments = parseInt(summary.queued_attachments, 10) || 0;
+                }
+
+                if (summary.pending_jobs !== undefined) {
+                    base.pending_jobs = parseInt(summary.pending_jobs, 10) || 0;
+                }
+
+                if (summary.scheduler) {
+                    base.scheduler = summary.scheduler;
+                }
+
+                return base;
+            }
+
             const toInt = (value) => {
                 const parsed = parseInt(value, 10);
                 return Number.isNaN(parsed) ? 0 : parsed;
             };
 
+            const byContext = Array.isArray(summary.by_context) ? summary.by_context.map((ctx) => ({
+                context_type: ctx.context_type || ctx.type || '',
+                count: toInt(ctx.count),
+            })) : [];
+
             return {
                 total_entries: toInt(summary.total_entries ?? summary.totalEntries),
                 indexed_attachments: toInt(summary.indexed_attachments ?? summary.indexedAttachments),
                 unique_locations: toInt(summary.unique_locations ?? summary.uniqueLocations),
-                last_update_raw: summary.last_update_raw || summary.last_update || null,
-                last_update_display: summary.last_update_display || null,
+                last_update_raw: summary.last_update_raw || summary.last_update || summary.lastUpdated || null,
+                last_update_display: summary.last_update_display || summary.lastUpdateDisplay || null,
+                by_context: byContext,
+                orphaned_entries: toInt(summary.orphaned_entries ?? summary.orphanCount ?? 0),
+                orphan_preview: Array.isArray(summary.orphan_preview) ? summary.orphan_preview : [],
+                queued_attachments: toInt(summary.queued_attachments ?? 0),
+                pending_jobs: toInt(summary.pending_jobs ?? 0),
+                scheduler: summary.scheduler || null,
             };
         }
 
@@ -1966,6 +2276,127 @@
             this.fetchScanChunk(0);
         },
 
+        async runVisualSimilarityScan() {
+            if (AppState.processing) {
+                UI.updateLog('Another process is running. Please wait...', 'step2');
+                return;
+            }
+
+            AppState.processing = true;
+
+            try {
+                UI.updateLog('Starting visual similarity scan (MD5 + Perceptual + Filename detection)...', 'step2');
+                UI.showProgressModal('Visual Similarity Scan', 'Initializing scan...', 0);
+
+                // Start the scan
+                const initResponse = await $.ajax({
+                    url: mshImageOptimizer.ajaxurl,
+                    type: 'POST',
+                    data: {
+                        action: 'msh_visual_similarity_scan_start',
+                        nonce: mshImageOptimizer.cleanup_nonce
+                    }
+                });
+
+                if (!initResponse || !initResponse.success) {
+                    const initMessage = initResponse?.data?.message || initResponse?.data || 'Failed to initialize scan';
+                    throw new Error(initMessage);
+                }
+
+                UI.updateLog('Scan initialized. Processing batches...', 'step2');
+
+                // Process batches
+                let completed = false;
+                let batchCount = 0;
+                const maxBatches = 100; // Safety limit
+
+                while (!completed && batchCount < maxBatches) {
+                    const batchResponse = await $.ajax({
+                        url: mshImageOptimizer.ajaxurl,
+                        type: 'POST',
+                        data: {
+                            action: 'msh_visual_similarity_scan_batch',
+                            nonce: mshImageOptimizer.cleanup_nonce
+                        }
+                    });
+
+                    if (!batchResponse || !batchResponse.success) {
+                        const batchMessage = batchResponse?.data?.message || batchResponse?.data || 'Batch processing failed';
+                        throw new Error(batchMessage);
+                    }
+
+                    const data = batchResponse.data;
+                    completed = Boolean(data.completed || data.complete);
+                    const progressSnapshot = data.progress || {};
+                    const processed = data.processed || progressSnapshot.current || 0;
+                    const total = data.total || progressSnapshot.total || 0;
+                    const percent = Number.isFinite(progressSnapshot.percent)
+                        ? progressSnapshot.percent
+                        : (total > 0 ? Math.min(100, Math.round((processed / total) * 100)) : 0);
+
+                    UI.updateProgressModal(
+                        'Visual Similarity Scan',
+                        `Processing: ${processed}/${total} attachments`,
+                        percent
+                    );
+
+                    batchCount++;
+
+                    if (!completed) {
+                        await new Promise(resolve => setTimeout(resolve, 100)); // Small delay between batches
+                    }
+                }
+
+                // Get final results
+                const resultsResponse = await $.ajax({
+                    url: mshImageOptimizer.ajaxurl,
+                    type: 'POST',
+                    data: {
+                        action: 'msh_visual_similarity_scan_results',
+                        nonce: mshImageOptimizer.cleanup_nonce
+                    }
+                });
+
+                if (resultsResponse && resultsResponse.success) {
+                    const payload = resultsResponse.data?.results || resultsResponse.data;
+                    this.displayVisualSimilarityResults(payload);
+                    const totalGroups = payload?.groups ? payload.groups.length : (payload?.total_groups || 0);
+                    const summary = payload?.summary || {};
+                    const totalDuplicates = summary.total_duplicates
+                        ?? payload?.total_duplicates
+                        ?? (Array.isArray(payload?.groups)
+                            ? payload.groups.reduce((sum, group) => {
+                                const files = Array.isArray(group?.files) ? group.files : [];
+                                return sum + Math.max(files.length - 1, 0);
+                            }, 0)
+                            : 0);
+                    UI.updateLog(`✅ Visual similarity scan complete: ${totalGroups} groups found with ${totalDuplicates} potential duplicates`, 'step2');
+                } else {
+                    const resultMessage = resultsResponse?.data?.message || 'Failed to retrieve scan results';
+                    throw new Error(resultMessage);
+                }
+
+            } catch (error) {
+                console.error('Visual similarity scan error:', error);
+                const message = error?.message || error?.responseText || 'Unknown error';
+                UI.updateLog('❌ Visual similarity scan error: ' + message, 'step2');
+            } finally {
+                AppState.processing = false;
+                UI.hideProgressModal();
+            }
+        },
+
+        displayVisualSimilarityResults(data) {
+            const resultPayload = data?.results || data;
+            if (!resultPayload) {
+                UI.updateLog('Visual similarity results unavailable. Please rerun the scan.', 'step2');
+                return;
+            }
+
+            // Use the same display method as other scans, but add detection method badges
+            this.displayDuplicateResults(resultPayload, 'Visual Similarity Scan');
+        },
+
         fetchScanChunk(offset) {
             $.ajax({
                 url: mshImageOptimizer.ajaxurl,
@@ -2259,7 +2690,6 @@
                                         const fileCount = fileList.length;
                                         const usedCount = group.used_count || 0;
                                         const unusedCount = group.unused_count || 0;
-                                        const hasUsage = usedCount > 0;
                                         const totalSize = group.total_size || 'Unknown';
                                         let statusLabel = 'Unused';
                                         let statusColor = '#46b450';
@@ -2270,6 +2700,7 @@
                                             statusLabel = 'Mixed';
                                             statusColor = '#c28b00';
                                         }
+
                                         const usageEntries = [];
                                         fileList.forEach((file) => {
                                             const usageItems = Array.isArray(file.usage) ? file.usage : [];
@@ -2280,15 +2711,57 @@
                                                 usageEntries.push(entry);
                                             });
                                         });
+
                                         const usageSummary = usageEntries.length
                                             ? usageEntries.slice(0, 3).map((entry) => {
                                                 const contextLabel = entry.context ? entry.context : 'content';
                                                 return `${UI.escapeHtml(entry.title)} (${UI.escapeHtml(contextLabel)})`;
                                             }).join('; ') + (usageEntries.length > 3 ? ` +${usageEntries.length - 3} more` : '')
                                             : 'No usage detected';
+
+                                        const groupTitle = group.label
+                                            ? UI.escapeHtml(group.label)
+                                            : UI.escapeHtml(group.confidence_label || `Group ${index + 1}`);
+
+                                        const detectionBadges = Array.isArray(group.detection_badges) && group.detection_badges.length
+                                            ? `<div style="margin-top:4px;display:flex;flex-wrap:wrap;gap:4px;">${group.detection_badges.map((badge) => {
+                                                const label = UI.escapeHtml(badge.label || 'Match');
+                                                const variant = badge.variant || 'neutral';
+                                                const palette = {
+                                                    success: { bg: '#dcfce7', color: '#166534' },
+                                                    warning: { bg: '#fef3c7', color: '#92400e' },
+                                                    info: { bg: '#e0f2fe', color: '#0c4a6e' },
+                                                    danger: { bg: '#fee2e2', color: '#b91c1c' },
+                                                    neutral: { bg: '#eef2ff', color: '#1d2327' },
+                                                };
+                                                const theme = palette[variant] || palette.neutral;
+                                                return `<span style="display:inline-block;padding:2px 6px;border-radius:10px;background:${theme.bg};color:${theme.color};font-size:10px;">${label}</span>`;
+                                            }).join('')}</div>`
+                                            : (group.detection_method
+                                                ? `<span style="display:inline-block;padding:2px 6px;border-radius:12px;background:#eef2ff;color:#1d2327;font-size:10px;margin-top:4px;">${UI.escapeHtml(group.detection_method)}</span>`
+                                                : '');
+
+                                        const confidenceBadge = group.confidence_label
+                                            ? `<div style="margin-top:4px;font-size:11px;color:#374151;"><strong>${UI.escapeHtml(group.confidence_label)}</strong>${group.confidence_note ? ` · ${UI.escapeHtml(group.confidence_note)}` : ''}</div>`
+                                            : '';
+
+                                        const similarityBadge = group.similarity_label
+                                            ? `<div style="margin-top:2px;font-size:11px;color:#4b5563;">${UI.escapeHtml(group.similarity_label)}</div>`
+                                            : '';
+
+                                        const patternBadges = Array.isArray(group.pattern_labels) && group.pattern_labels.length
+                                            ? `<div style="margin-top:4px;display:flex;flex-wrap:wrap;gap:4px;">${group.pattern_labels.map((label) => `<span style="display:inline-block;padding:2px 6px;border-radius:10px;background:#f3f4f6;color:#424242;font-size:10px;">${UI.escapeHtml(label)}</span>`).join('')}</div>`
+                                            : '';
+
                                         return `
                                         <tr data-group-index="${index}">
-                                            <td style="padding: 5px;">${index + 1}</td>
+                                            <td style="padding: 5px;">
+                                                <div style="font-weight:600;">${index + 1}. ${groupTitle}</div>
+                                                ${detectionBadges}
+                                                ${confidenceBadge}
+                                                ${similarityBadge}
+                                                ${patternBadges}
+                                            </td>
                                             <td style="padding: 5px;">${fileCount} files</td>
                                             <td style="padding: 5px;">${totalSize}</td>
                                             <td style="padding: 5px;">
