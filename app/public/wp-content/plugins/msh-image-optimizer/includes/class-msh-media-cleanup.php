@@ -1454,8 +1454,6 @@ class MSH_Media_Cleanup {
             return $hash_result;
         }
 
-        $palette_signature = $perceptual_manager->get_palette_signature($attachment_id);
-
         $record = [
             'ID'              => $attachment_id,
             'post_title'      => $attachment->post_title,
@@ -1473,7 +1471,6 @@ class MSH_Media_Cleanup {
             'phash_time'      => (int) get_post_meta($attachment_id, MSH_Perceptual_Hash::META_TIME, true),
             'phash_modified'  => (int) get_post_meta($attachment_id, MSH_Perceptual_Hash::META_MODIFIED, true),
             'base_name'       => self::normalize_base_filename((string) $file_path),
-            'palette_signature' => $palette_signature,
         ];
 
         $state['records'][$attachment_id] = $record;
@@ -1649,45 +1646,13 @@ class MSH_Media_Cleanup {
             $confidence_tier = isset($metrics['primary_tier']) ? $metrics['primary_tier'] : 'possible';
             $distance_bits = isset($metrics['min_distance']) ? (int) $metrics['min_distance'] : null;
             $similarity_score = isset($metrics['primary_score']) ? (float) $metrics['primary_score'] : null;
-            $color_variance = isset($group['color_variance']) ? $group['color_variance'] : null;
-
-            $confidence_note = $this->confidence_note_for_tier($confidence_tier, $distance_bits);
-            $detection_badges = $this->build_detection_badges('perceptual_hash', $confidence_tier, $similarity_score, $distance_bits);
-
-            if ($color_variance) {
-                $max_level = isset($color_variance['max_level']) ? (string) $color_variance['max_level'] : 'none';
-                $max_score = isset($color_variance['max_score']) ? (float) $color_variance['max_score'] : 0.0;
-
-                if ('severe' === $max_level || $max_score >= 0.55) {
-                    $detection_badges[] = [
-                        'label' => __('Color variant', 'medicross-child'),
-                        'variant' => 'warning',
-                        'icon' => 'visual',
-                    ];
-                    $confidence_note .= ($confidence_note ? ' ' : '') . __('Significant color shift detected; treat as a separate asset.', 'medicross-child');
-                } elseif ('high' === $max_level || $max_score >= 0.42) {
-                    $detection_badges[] = [
-                        'label' => __('Color variance', 'medicross-child'),
-                        'variant' => 'warning',
-                        'icon' => 'visual',
-                    ];
-                    $confidence_note .= ($confidence_note ? ' ' : '') . __('Strong color change detected; double-check before cleanup.', 'medicross-child');
-                } elseif ('medium' === $max_level || $max_score >= 0.3) {
-                    $detection_badges[] = [
-                        'label' => __('Color shift', 'medicross-child'),
-                        'variant' => 'info',
-                        'icon' => 'visual',
-                    ];
-                    $confidence_note .= ($confidence_note ? ' ' : '') . __('Noticeable color change detected.', 'medicross-child');
-                }
-            }
 
             $formatted[] = [
                 'group_key'         => $this->build_group_key('visual', $group['attachment_ids']),
                 'detection_method'  => 'perceptual_hash',
                 'confidence_tier'   => $confidence_tier,
                 'confidence_label'  => $this->confidence_label_for_tier($confidence_tier),
-                'confidence_note'   => $confidence_note,
+                'confidence_note'   => $this->confidence_note_for_tier($confidence_tier, $distance_bits),
                 'distance_bits'     => $distance_bits,
                 'similarity_score'  => $similarity_score,
                 'similarity_label'  => $this->similarity_label($similarity_score),
@@ -1697,9 +1662,8 @@ class MSH_Media_Cleanup {
                 'cleanup_potential' => isset($analysis['cleanup_potential']) ? $analysis['cleanup_potential'] : max(count($files) - 1, 0),
                 'published_count'   => isset($analysis['published_count']) ? $analysis['published_count'] : 0,
                 'total_count'       => count($files),
-                'detection_badges'  => $detection_badges,
+                'detection_badges'  => $this->build_detection_badges('perceptual_hash', $confidence_tier, $similarity_score, $distance_bits),
                 'pairs'             => isset($group['pairs']) ? $group['pairs'] : [],
-                'color_variance'    => $color_variance,
             ];
         }
 

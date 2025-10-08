@@ -2898,8 +2898,6 @@
             this.currentScanType = scanType || '';
             this.reviewSelections = {};
 
-            this.initializeUsageState(this.currentGroupList);
-
             const statsImagesScanned = results.debug_info?.images_analyzed
                 || results.processed
                 || results.total_images
@@ -2941,20 +2939,43 @@
                                         <th style="padding: 5px; text-align: left;">Files</th>
                                         <th style="padding: 5px; text-align: left;">Size</th>
                                         <th style="padding: 5px; text-align: left;">Usage</th>
-                                        <th style="padding: 5px; text-align: left; min-width: 220px;">Actions</th>
+                                        <th style="padding: 5px; text-align: left;">Actions</th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     ${normalizedGroups.map((group, index) => {
                                         const fileList = Array.isArray(group.files) ? group.files : (Array.isArray(group.images) ? group.images : []);
                                         const fileCount = fileList.length;
+                                        const usedCount = group.used_count || 0;
+                                        const unusedCount = group.unused_count || 0;
                                         const totalSize = group.total_size || 'Unknown';
-                                        const usageStatus = this.getGroupUsageStatus(group, fileList);
-                                        const usageSummaryText = this.buildUsageSummary(index);
-                                        const usageSummary = UI.escapeHtml(usageSummaryText);
-                                        const refreshLabel = this.buildUsageRefreshLabel(group);
-                                        const statusColor = usageStatus.color || '#6b7280';
-                                        const statusLabel = UI.escapeHtml(usageStatus.label || 'Not reviewed');
+                                        let statusLabel = 'Unused';
+                                        let statusColor = '#46b450';
+                                        if (usedCount > 0 && unusedCount === 0) {
+                                            statusLabel = 'In Use';
+                                            statusColor = '#d63638';
+                                        } else if (usedCount > 0 && unusedCount > 0) {
+                                            statusLabel = 'Mixed';
+                                            statusColor = '#c28b00';
+                                        }
+
+                                        const usageEntries = [];
+                                        fileList.forEach((file) => {
+                                            const usageItems = Array.isArray(file.usage) ? file.usage : [];
+                                            usageItems.forEach((entry) => {
+                                                if (!entry || !entry.title) {
+                                                    return;
+                                                }
+                                                usageEntries.push(entry);
+                                            });
+                                        });
+
+                                        const usageSummary = usageEntries.length
+                                            ? usageEntries.slice(0, 3).map((entry) => {
+                                                const contextLabel = entry.context ? entry.context : 'content';
+                                                return `${UI.escapeHtml(entry.title)} (${UI.escapeHtml(contextLabel)})`;
+                                            }).join('; ') + (usageEntries.length > 3 ? ` +${usageEntries.length - 3} more` : '')
+                                            : 'No usage detected';
 
                                         const groupTitle = group.label
                                             ? UI.escapeHtml(group.label)
@@ -2991,7 +3012,7 @@
 
                                         return `
                                         <tr data-group-index="${index}">
-                                            <td style="padding: 5px; min-width: 220px;">
+                                            <td style="padding: 5px;">
                                                 <div style="font-weight:600;">${index + 1}. ${groupTitle}</div>
                                                 ${detectionBadges}
                                                 ${confidenceBadge}
@@ -3001,16 +3022,14 @@
                                             <td style="padding: 5px;">${fileCount} files</td>
                                             <td style="padding: 5px;">${totalSize}</td>
                                             <td style="padding: 5px;">
-                                                <div class="duplicate-usage-status" data-usage-status="${index}">
-                                                    <span class="duplicate-usage-status-label usage-status-${usageStatus.slug || 'pending'}" style="color: ${statusColor};">${statusLabel}</span>
-                                                </div>
+                                                <div><span style="color: ${statusColor};">${statusLabel}</span></div>
                                                 <div class="duplicate-usage-summary" data-usage-summary="${index}" style="margin-top: 4px; font-size: 11px; color: #555;">${usageSummary}</div>
-                                                <div class="duplicate-usage-refresh" data-usage-refresh="${index}" style="margin-top: 2px; font-size: 10px; color: #6b7280;">${UI.escapeHtml(refreshLabel)}</div>
                                             </td>
-                                            <td style="padding: 5px; min-width: 220px;">
+                                            <td style="padding: 5px;">
                                                 <div style="display:flex;flex-direction:column;gap:4px;align-items:flex-start;">
                                                     <button class="button button-small duplicate-review-button" data-group="${index}">Review</button>
-                                                    <button class="button button-secondary button-small duplicate-verify-deep" data-group="${index}">Deep scan</button>
+                                                    <button class="button button-secondary button-small duplicate-verify-builders" data-group="${index}">Check builders</button>
+                                                    <button class="button button-link duplicate-verify-deep" data-group="${index}">Deep scan</button>
                                                     <div class="duplicate-plan-indicator status-pending" data-plan-indicator="${index}">Not reviewed</div>
                                                 </div>
                                             </td>
@@ -3043,6 +3062,16 @@
                 if (!Number.isNaN(index)) {
                     this.showReviewModal(index);
                 }
+            });
+
+            $resultsContainer.find('.duplicate-verify-builders').on('click', (event) => {
+                event.preventDefault();
+                const $button = $(event.currentTarget);
+                const index = parseInt($button.data('group'), 10);
+                if (Number.isNaN(index)) {
+                    return;
+                }
+                this.verifyGroupUsage(index, 'medium', $button);
             });
 
             $resultsContainer.find('.duplicate-verify-deep').on('click', (event) => {
@@ -3080,224 +3109,20 @@
             const autoGroups = normalizedGroups.map((group, index) => ({ group, index }))
                 .filter(({ group }) => {
                     const fileList = Array.isArray(group.files) ? group.files : (Array.isArray(group.images) ? group.images : []);
-                    const hasAttachments = fileList.some((file) => (file.id || file.ID));
-                    if (!hasAttachments) {
-                        return false;
-                    }
-                    const usageStatus = this.getGroupUsageStatus(group, fileList);
-                    return !usageStatus.verified;
+                    return fileList.some((file) => !file.is_used);
                 });
 
-            autoGroups.forEach(({ index }, position) => {
+            autoGroups.forEach(({ index }) => {
                 setTimeout(() => {
                     this.verifyGroupUsage(index, 'medium', null, true);
-                }, position * 200);
+                }, index * 150);
             });
 
             $step2LogSection.show();
             this.updateCleanupPlanSummary();
         },
 
-        initializeUsageState(groups) {
-            if (!Array.isArray(groups)) {
-                return;
-            }
-
-            groups.forEach((group) => {
-                const fileList = Array.isArray(group.files)
-                    ? group.files
-                    : (Array.isArray(group.images) ? group.images : []);
-
-                if (!Array.isArray(fileList) || !fileList.length) {
-                    group.usage_verified = Boolean(group.usage_verified);
-                    group.used_count = parseInt(group.used_count || 0, 10) || 0;
-                    group.unused_count = parseInt(group.unused_count || 0, 10) || 0;
-                    const rawTimestamp = group.usage_refreshed_at;
-                    if (rawTimestamp) {
-                        const parsedTimestamp = new Date(rawTimestamp);
-                        if (!Number.isNaN(parsedTimestamp.getTime())) {
-                            group.usage_refreshed_at = parsedTimestamp.toISOString();
-                        } else {
-                            const numericTimestamp = Number(rawTimestamp);
-                            const numericDate = new Date(numericTimestamp);
-                            group.usage_refreshed_at = Number.isNaN(numericDate.getTime()) ? null : numericDate.toISOString();
-                        }
-                    } else {
-                        group.usage_refreshed_at = null;
-                    }
-                    group.last_usage_level = group.last_usage_level === 'deep' ? 'deep' : 'auto';
-                    return;
-                }
-
-                let usedCount = 0;
-                let hasUsageDetails = false;
-
-                fileList.forEach((file, index) => {
-                    if (!file || 'object' !== typeof file) {
-                        return;
-                    }
-
-                    const normalizedUsage = Array.isArray(file.usage)
-                        ? file.usage.filter((entry) => entry && entry.title)
-                        : (file.usage && Array.isArray(file.usage.details)
-                            ? file.usage.details.filter((entry) => entry && entry.title)
-                            : []);
-
-                    if (!Array.isArray(file.usage)) {
-                        file.usage = normalizedUsage;
-                    } else {
-                        file.usage = normalizedUsage;
-                    }
-
-                    if (normalizedUsage.length) {
-                        hasUsageDetails = true;
-                    }
-
-                    const isUsed = Boolean(file.is_used || normalizedUsage.length);
-                    fileList[index].is_used = isUsed;
-
-                    if (isUsed) {
-                        usedCount += 1;
-                    }
-                });
-
-                const unusedCount = Math.max(fileList.length - usedCount, 0);
-                const groupHasUsageFlag = Boolean(group.has_usage);
-                const existingVerification = typeof group.usage_verified === 'boolean'
-                    ? group.usage_verified
-                    : false;
-
-                const verified = existingVerification || hasUsageDetails || usedCount > 0 || groupHasUsageFlag;
-
-                group.usage_verified = verified;
-                group.used_count = verified ? usedCount : (parseInt(group.used_count || 0, 10) || 0);
-                group.unused_count = verified ? unusedCount : (parseInt(group.unused_count || fileList.length, 10) || fileList.length);
-
-                const rawTimestamp = group.usage_refreshed_at;
-                if (rawTimestamp) {
-                    const parsedTimestamp = new Date(rawTimestamp);
-                    if (!Number.isNaN(parsedTimestamp.getTime())) {
-                        group.usage_refreshed_at = parsedTimestamp.toISOString();
-                    } else {
-                        const numericTimestamp = Number(rawTimestamp);
-                        const numericDate = new Date(numericTimestamp);
-                        group.usage_refreshed_at = Number.isNaN(numericDate.getTime()) ? null : numericDate.toISOString();
-                    }
-                } else {
-                    group.usage_refreshed_at = null;
-                }
-
-                group.last_usage_level = group.last_usage_level === 'deep' ? 'deep' : 'auto';
-            });
-        },
-
-        getGroupUsageStatus(group, fileList = null) {
-            if (!group) {
-                return {
-                    label: 'Not reviewed',
-                    color: '#6b7280',
-                    slug: 'pending',
-                    verified: false,
-                    usedCount: 0,
-                    unusedCount: 0,
-                };
-            }
-
-            const files = fileList
-                || (Array.isArray(group.files) ? group.files : (Array.isArray(group.images) ? group.images : []))
-                || [];
-
-            const parsedUsed = Number.parseInt(group.used_count, 10);
-            const usedCount = Number.isNaN(parsedUsed) ? 0 : Math.max(0, parsedUsed);
-
-            const parsedUnused = Number.parseInt(group.unused_count, 10);
-            const unusedCount = Number.isNaN(parsedUnused)
-                ? (Array.isArray(files) ? files.length : 0)
-                : Math.max(0, parsedUnused);
-
-            const verified = Boolean(group.usage_verified);
-
-            if (!verified) {
-                return {
-                    label: 'Not reviewed',
-                    color: '#6b7280',
-                    slug: 'pending',
-                    verified: false,
-                    usedCount,
-                    unusedCount,
-                };
-            }
-
-            if (usedCount > 0 && unusedCount === 0) {
-                return {
-                    label: 'In Use',
-                    color: '#d63638',
-                    slug: 'in-use',
-                    verified: true,
-                    usedCount,
-                    unusedCount,
-                };
-            }
-
-            if (usedCount > 0 && unusedCount > 0) {
-                return {
-                    label: 'Mixed',
-                    color: '#c28b00',
-                    slug: 'mixed',
-                    verified: true,
-                    usedCount,
-                    unusedCount,
-                };
-            }
-
-            return {
-                label: 'Unused',
-                color: '#46b450',
-                slug: 'unused',
-                verified: true,
-                usedCount,
-                unusedCount,
-            };
-        },
-
-        refreshUsageDisplays(groupIndex) {
-            this.updateUsageStatusDisplay(groupIndex);
-            const summaryText = this.buildUsageSummary(groupIndex);
-            $(`.duplicate-usage-summary[data-usage-summary="${groupIndex}"]`).text(summaryText);
-        },
-
-        updateUsageStatusDisplay(groupIndex) {
-            const group = this.currentGroupList[groupIndex];
-            const status = this.getGroupUsageStatus(group);
-            const $status = $(`.duplicate-usage-status[data-usage-status="${groupIndex}"]`);
-
-            if (!$status.length) {
-                return;
-            }
-
-            const $label = $status.find('.duplicate-usage-status-label');
-            const color = status.color || '#6b7280';
-            const labelText = status.label || 'Not reviewed';
-            const slug = status.slug || 'pending';
-            const statusClasses = 'usage-status-pending usage-status-in-use usage-status-mixed usage-status-unused';
-
-            if ($label.length) {
-                $label
-                    .removeClass(statusClasses)
-                    .addClass(`usage-status-${slug}`)
-                    .css('color', color)
-                    .text(labelText);
-            } else {
-                $status
-                    .removeClass(statusClasses)
-                    .addClass(`usage-status-${slug}`)
-                    .css('color', color)
-                    .text(labelText);
-            }
-
-            const refreshLabel = this.buildUsageRefreshLabel(group);
-            $(`.duplicate-usage-refresh[data-usage-refresh="${groupIndex}"]`).text(refreshLabel);
-        },
+        
 
         showReviewModal(groupIndex) {
             if (!Array.isArray(this.currentGroupList) || this.currentGroupList.length === 0) {
@@ -3610,17 +3435,11 @@
                 return;
             }
 
-            let $targetButton = $();
-            if ($button && $button.length) {
-                $targetButton = $button;
-            } else if (level === 'deep') {
-                $targetButton = $(`.duplicate-verify-deep[data-group="${groupIndex}"]`);
-            }
-
+            const $targetButton = $button || $(`.duplicate-verify-${level === 'deep' ? 'deep' : 'builders'}[data-group="${groupIndex}"]`);
             const originalLabel = $targetButton.length ? $targetButton.text() : '';
 
             if ($targetButton.length) {
-                $targetButton.prop('disabled', true).text(level === 'deep' ? 'Scanning…' : 'Refreshing…');
+                $targetButton.prop('disabled', true).text(level === 'deep' ? 'Scanning…' : 'Checking…');
             }
 
             $.ajax({
@@ -3657,42 +3476,19 @@
                         file.usage = [];
                     }
                     file.usage = file.usage.concat(mappedUsage);
-                    if (file.usage.length > 1) {
-                        const deduped = [];
-                        const seenUsage = new Set();
-                        file.usage.forEach((entry) => {
-                            if (!entry || !entry.title) {
-                                return;
-                            }
-                            const key = `${entry.title}::${entry.context || ''}`;
-                            if (!seenUsage.has(key)) {
-                                seenUsage.add(key);
-                                deduped.push(entry);
-                            }
-                        });
-                        file.usage = deduped;
-                    }
-                    const existingIsUsed = Boolean(file.is_used);
-                    const mappedIsUsed = existingIsUsed || Boolean(usageMap[fileId].is_used) || mappedUsage.length > 0;
-                    file.is_used = mappedIsUsed;
+                    file.is_used = file.is_used || Boolean(usageMap[fileId].is_used);
 
-                    if (mappedIsUsed) {
+                    if (file.is_used) {
                         groupHasUsage = true;
                         usedCount += 1;
                     }
                 });
 
                 const totalFiles = files.length;
-                const actualUsedCount = files.reduce((count, file) => (file && file.is_used ? count + 1 : count), 0);
-                const resolvedUnusedCount = Math.max(totalFiles - actualUsedCount, 0);
-                groupHasUsage = groupHasUsage || actualUsedCount > 0;
-
+                const unusedCount = Math.max(totalFiles - usedCount, 0);
                 group.has_usage = groupHasUsage;
-                group.used_count = actualUsedCount;
-                group.unused_count = resolvedUnusedCount;
-                group.usage_verified = true;
-                group.last_usage_level = level === 'deep' ? 'deep' : 'auto';
-                group.usage_refreshed_at = new Date().toISOString();
+                group.used_count = usedCount;
+                group.unused_count = unusedCount;
 
                 // Remove any files that were previously flagged for removal but are now marked as used
                 const currentSelection = (this.reviewSelections || {})[groupIndex];
@@ -3706,14 +3502,15 @@
                 }
 
                 // Update usage summary text for the row
-                this.refreshUsageDisplays(groupIndex);
+                const summaryText = this.buildUsageSummary(groupIndex);
+                $(`.duplicate-usage-summary[data-usage-summary="${groupIndex}"]`).text(summaryText);
 
                 this.updateCleanupPlanSummary();
 
                 if (!silent) {
                     UI.updateLog(level === 'deep'
                         ? `Deep scan complete for group ${groupIndex + 1}`
-                        : `Usage refresh complete for group ${groupIndex + 1}`, 'step2');
+                        : `Builder usage check complete for group ${groupIndex + 1}`, 'step2');
 
                     UI.playCompletionSound();
                 }
@@ -3723,22 +3520,13 @@
                 UI.playAlertSound();
             }).always(() => {
                 if ($targetButton.length) {
-                    const fallbackLabel = level === 'deep' ? 'Deep scan' : 'Refresh usage';
-                    $targetButton.prop('disabled', false).text(originalLabel || fallbackLabel);
+                    $targetButton.prop('disabled', false).text(originalLabel || 'Check builders');
                 }
             });
         },
 
         buildUsageSummary(groupIndex) {
             const group = this.currentGroupList[groupIndex];
-            if (!group) {
-                return 'Usage check pending';
-            }
-
-            if (!group.usage_verified) {
-                return 'Usage check pending';
-            }
-
             const files = Array.isArray(group.files) ? group.files : (Array.isArray(group.images) ? group.images : []);
 
             const usageEntries = [];
@@ -3756,47 +3544,6 @@
 
             const summary = usageEntries.slice(0, 3).join('; ');
             return usageEntries.length > 3 ? `${summary} +${usageEntries.length - 3} more` : summary;
-        },
-
-        buildUsageRefreshLabel(group) {
-            if (!group) {
-                return 'Auto refresh pending...';
-            }
-
-            const methodKey = group.last_usage_level === 'deep' ? 'deep scan' : 'auto refresh';
-            const timestamp = group.usage_refreshed_at;
-
-            if (!timestamp) {
-                return group.usage_verified ? `Updated recently (${methodKey})` : 'Auto refresh pending...';
-            }
-
-            const parsed = new Date(timestamp);
-            if (Number.isNaN(parsed.getTime())) {
-                return `Updated recently (${methodKey})`;
-            }
-
-            const now = Date.now();
-            const diff = now - parsed.getTime();
-            let baseLabel;
-
-            if (diff < 30000) {
-                baseLabel = 'Updated just now';
-            } else if (diff < 60000) {
-                baseLabel = 'Updated less than a minute ago';
-            } else if (diff < 3600000) {
-                const minutes = Math.round(diff / 60000);
-                baseLabel = `Updated ${minutes} min${minutes === 1 ? '' : 's'} ago`;
-            } else {
-                const nowDate = new Date(now);
-                const sameDay = parsed.toDateString() === nowDate.toDateString();
-                if (sameDay) {
-                    baseLabel = `Updated at ${parsed.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`;
-                } else {
-                    baseLabel = `Updated ${parsed.toLocaleDateString()} ${parsed.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`;
-                }
-            }
-
-            return `${baseLabel} (${methodKey})`;
         },
 
         updateCleanupPlanSummary() {

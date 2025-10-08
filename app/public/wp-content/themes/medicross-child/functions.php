@@ -55,33 +55,35 @@ add_action('wp_head', function() {
 // Include MSH Navigation Widget and Functions
 require_once get_stylesheet_directory() . '/inc/class-msh-navigation-widget.php';
 
-// Include MSH Image Optimizer
-require_once get_stylesheet_directory() . '/inc/class-msh-image-optimizer.php';
-require_once get_stylesheet_directory() . '/admin/image-optimizer-admin.php';
+// Include MSH Image Optimizer (fallback when plugin is inactive)
+if (!defined('MSH_IO_PLUGIN_FILE')) {
+    require_once get_stylesheet_directory() . '/inc/class-msh-image-optimizer.php';
+    require_once get_stylesheet_directory() . '/admin/image-optimizer-admin.php';
+
+    // Include MSH Media Cleanup & Rename stack
+    require_once get_stylesheet_directory() . '/inc/class-msh-media-cleanup.php';
+    require_once get_stylesheet_directory() . '/inc/class-msh-safe-rename-system.php';
+    require_once get_stylesheet_directory() . '/inc/class-msh-url-variation-detector.php';
+    require_once get_stylesheet_directory() . '/inc/class-msh-backup-verification-system.php';
+    require_once get_stylesheet_directory() . '/inc/class-msh-image-usage-index.php';
+    require_once get_stylesheet_directory() . '/inc/class-msh-targeted-replacement-engine.php';
+    require_once get_stylesheet_directory() . '/inc/class-msh-safe-rename-cli.php';
+    require_once get_stylesheet_directory() . '/inc/class-msh-content-usage-lookup.php';
+}
 
 // Include MSH WebP Delivery System
 require_once get_stylesheet_directory() . '/inc/class-msh-webp-delivery.php';
-
-// Include MSH Media Cleanup Tool
-require_once get_stylesheet_directory() . '/inc/class-msh-media-cleanup.php';
-require_once get_stylesheet_directory() . '/inc/class-msh-safe-rename-system.php';
-
-// Include Enhanced Safe Rename System Components
-require_once get_stylesheet_directory() . '/inc/class-msh-url-variation-detector.php';
-require_once get_stylesheet_directory() . '/inc/class-msh-backup-verification-system.php';
-require_once get_stylesheet_directory() . '/inc/class-msh-image-usage-index.php';
-require_once get_stylesheet_directory() . '/inc/class-msh-targeted-replacement-engine.php';
-require_once get_stylesheet_directory() . '/inc/class-msh-safe-rename-cli.php';
-require_once get_stylesheet_directory() . '/inc/class-msh-content-usage-lookup.php';
 
 require_once get_stylesheet_directory() . '/inc/msh-navigation-functions.php';
 
 // Register Reviews custom post type
 require_once get_stylesheet_directory() . '/inc/register-reviews-post-type.php';
 
-MSH_Safe_Rename_System::get_instance();
-MSH_Image_Usage_Index::get_instance();
-MSH_Content_Usage_Lookup::get_instance();
+if (!defined('MSH_IO_PLUGIN_FILE')) {
+    MSH_Safe_Rename_System::get_instance();
+    MSH_Image_Usage_Index::get_instance();
+    MSH_Content_Usage_Lookup::get_instance();
+}
 
 // Debug navigation menu URLs
 require_once get_stylesheet_directory() . '/debug-nav-menu-urls.php';

@@ -8,10 +8,6 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-if (!class_exists('MSH_Safe_Rename_System')) {
-    require_once get_stylesheet_directory() . '/inc/class-msh-safe-rename-system.php';
-}
-
 class MSH_Contextual_Meta_Generator {
     private $business_name = 'Main Street Health';
     private $location = 'Hamilton';
@@ -1504,8 +1500,8 @@ class MSH_Image_Optimizer {
         add_action('wp_ajax_msh_save_filename_suggestion', array($this, 'ajax_save_filename_suggestion'));
         add_action('wp_ajax_msh_remove_filename_suggestion', array($this, 'ajax_remove_filename_suggestion'));
         add_action('wp_ajax_msh_accept_filename_suggestion', array($this, 'ajax_accept_filename_suggestion'));
-        add_action('wp_ajax_msh_reject_filename_suggestion', array($this, 'ajax_reject_filename_suggestion'));
         add_action('wp_ajax_msh_toggle_file_rename', array($this, 'ajax_toggle_file_rename'));
+        add_action('wp_ajax_msh_reject_filename_suggestion', array($this, 'ajax_reject_filename_suggestion'));
         add_action('wp_ajax_msh_preview_meta_text', array($this, 'ajax_preview_meta_text'));
         add_action('wp_ajax_msh_save_edited_meta', array($this, 'ajax_save_edited_meta'));
         add_action('wp_ajax_msh_update_context', array($this, 'ajax_update_context'));
@@ -4333,14 +4329,11 @@ class MSH_Image_Optimizer {
         return $result;
     }
 
-    /**
-     * AJAX handler to toggle safe file renaming feature
-     */
     public function ajax_toggle_file_rename() {
         check_ajax_referer('msh_toggle_file_rename', 'nonce');
 
         if (!current_user_can('manage_options')) {
-            wp_send_json_error(['message' => __('Unauthorized.', 'medicross-child')], 403);
+            wp_send_json_error(['message' => __('Unauthorized.', 'msh-image-optimizer')], 403);
         }
 
         $enabled = isset($_POST['enabled']) && (string) $_POST['enabled'] === '1' ? '1' : '0';
