@@ -43,10 +43,6 @@ class MSH_Image_Optimizer_Admin {
             null
         );
 
-        if (!class_exists('MSH_Image_Usage_Index')) {
-            require_once get_stylesheet_directory() . '/inc/class-msh-image-usage-index.php';
-        }
-
         $index_summary = null;
         if (class_exists('MSH_Image_Usage_Index')) {
             $usage_index = MSH_Image_Usage_Index::get_instance();
@@ -59,9 +55,9 @@ class MSH_Image_Optimizer_Admin {
 
         wp_enqueue_script(
             'msh-image-optimizer-modern',
-            get_stylesheet_directory_uri() . '/assets/js/image-optimizer-modern.js',
+            trailingslashit(MSH_IO_ASSETS_URL) . 'js/image-optimizer-modern.js',
             array('jquery'),
-            '2.0.1-' . time(),
+            MSH_Image_Optimizer_Plugin::VERSION,
             true
         );
         
@@ -94,9 +90,9 @@ class MSH_Image_Optimizer_Admin {
         
         wp_enqueue_style(
             'msh-image-optimizer-admin',
-            get_stylesheet_directory_uri() . '/assets/css/image-optimizer-admin.css',
+            trailingslashit(MSH_IO_ASSETS_URL) . 'css/image-optimizer-admin.css',
             array('msh-image-optimizer-fonts'),
-            '1.0.1-' . time()
+            MSH_Image_Optimizer_Plugin::VERSION
         );
     }
     

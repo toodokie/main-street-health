@@ -9,10 +9,12 @@
 
 ### Critical Issues Found:
 1. ❌ **No GPL License** - Missing license headers and LICENSE file
-2. ❌ **100+ error_log() statements** - Production debug code present
-3. ⚠️ **Security gaps** - Some areas need hardening
-4. ❌ **No i18n/l10n** - Not internationalized for translation
-5. ⚠️ **Hard-coded business data** - Not portable for distribution
+2. ❌ **Plugin bootstrap & lifecycle hooks incomplete** - No central loader, activation/deactivation routines, or controlled hook order
+3. ❌ **100+ error_log() statements** - Production debug code present
+4. ⚠️ **Security gaps** - Database access and sanitization still need a hardening pass
+5. ❌ **No i18n/l10n** - Not internationalized for translation
+6. ⚠️ **Hard-coded business data** - Not portable for distribution
+7. ⚠️ **Batch processing lacks memory guard & pre-filtering** - Current pipeline times out on large Elementor datasets
 
 ---
 
@@ -125,7 +127,91 @@ grep -n "wpdb->query\|wpdb->get_results\|wpdb->get_var" class-msh-*.php
 
 ---
 
-### 3. External Communication ⚠️ **NEEDS AUDIT**
+### 3. Plugin Architecture & Lifecycle ❌ **NOT READY**
+
+**WordPress.org Requirements:**
+- Provide a single plugin bootstrap file with standard header metadata
+- Register hooks during the appropriate WordPress loading stages
+- Implement activation/deactivation handlers for setup and cleanup
+- Avoid executing logic before WordPress core has initialized
+
+**Current Status:**
+- ❌ Code currently runs from the child theme context; no standalone plugin loader
+- ❌ No activation/deactivation routines to create tables, schedule cron jobs, or flush rewrites
+- ⚠️ Hook registration order is fragmented, making lifecycle verification difficult
+
+**Required Actions:**
+1. Create `msh-image-optimizer.php` with GPL header metadata and instantiate `MSH_Media_Index_Manager`.
+2. Centralize hook registration inside a controller class:
+   ```php
+   class MSH_Media_Index_Manager {
+       public function init() {
+           add_action( 'plugins_loaded', array( $this, 'load_dependencies' ), 5 );
+           add_action( 'init', array( $this, 'register_tables' ) );
+           add_action( 'admin_init', array( $this, 'maybe_create_tables' ) );
+       }
+
+       public static function activate() {
+           self::create_tables();
+           self::schedule_cron_events();
+           flush_rewrite_rules();
+       }
+
+       public static function deactivate() {
+           self::unschedule_cron_events();
+       }
+   }
+   ```
+3. Wire activation/deactivation with `register_activation_hook()` / `register_deactivation_hook()`.
+4. Add upgrade scaffolding (`msh_image_optimizer_install()`) that checks a stored DB version for future migrations.
+
+**Estimated Work:** 4-6 hours
+
+---
+
+### 4. Database Schema & Storage ⚠️ **PARTIAL**
+
+**WordPress.org Requirements:**
+- Use `$wpdb->prefix` tables created via `dbDelta()`
+- Match WordPress charset/collation settings
+- Provide primary keys and supporting indexes
+- Track schema versions for safe upgrades
+
+**Current Status:**
+- ❌ No installation routine to create dedicated lookup tables
+- ⚠️ Heavy reliance on large postmeta rows causes 465-second scans across 3,253 Elementor entries
+- ❌ No schema version tracking or upgrade path
+
+**Required Actions:**
+1. Run `msh_create_tables()` on activation using `dbDelta()`:
+   ```php
+   function msh_create_tables() {
+       global $wpdb;
+       $charset_collate = $wpdb->get_charset_collate();
+       $sql = "CREATE TABLE {$wpdb->prefix}media_index (
+           attachment_id BIGINT(20) UNSIGNED NOT NULL,
+           file_path VARCHAR(255) NOT NULL,
+           file_hash CHAR(32) DEFAULT NULL,
+           meta_json LONGTEXT DEFAULT NULL,
+           last_updated DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+           PRIMARY KEY (attachment_id),
+           KEY file_path_idx (file_path)
+       ) $charset_collate;";
+
+       require_once ABSPATH . 'wp-admin/includes/upgrade.php';
+       dbDelta( $sql );
+       update_option( 'msh_db_version', '1.0.0' );
+   }
+   ```
+2. Store the schema version and implement incremental upgrades when the plugin updates.
+3. Repoint heavy variation/postmeta data into the indexed table to avoid repeated full-table scans.
+4. Document licensing for any bundled SQL or migrations.
+
+**Estimated Work:** 3-5 hours
+
+---
+
+### 5. External Communication ⚠️ **NEEDS AUDIT**
 
 **WordPress.org Requirements:**
 - No external server contact without explicit user consent
@@ -155,7 +241,7 @@ grep -n "wpdb->query\|wpdb->get_results\|wpdb->get_var" class-msh-*.php
 
 ---
 
-### 4. No Phone-Home / Tracking ✅ **LIKELY COMPLIANT**
+### 6. No Phone-Home / Tracking ✅ **LIKELY COMPLIANT**
 
 **WordPress.org Requirements:**
 - No unauthorized external requests
@@ -434,6 +520,78 @@ npm run build:plugin
 
 ---
 
+## ⚙️ RESOURCE MANAGEMENT & BATCH PROCESSING ⚠️ **NEEDS WORK**
+
+**WordPress.org Expectations:**
+- Bulk operations must run within shared-hosting limits
+- Use background or AJAX batching to avoid request timeouts
+- Monitor memory usage and fail gracefully
+- Provide admins with progress feedback and recovery paths
+
+**Current Status:**
+- ❌ Postmeta variation scan takes 465 seconds and times out on attachment 147
+- ⚠️ Only 68% (149 of 219) attachments finish before memory exhaustion
+- ❌ No runtime memory guard or emergency cache cleanup
+- ⚠️ Batch processing runs as a single blocking request with no resumable cursor
+
+**Required Actions:**
+1. Implement variation pre-filtering to strip the 96% of unused postmeta permutations before deep scans.
+2. Build an authenticated AJAX pipeline:
+   ```php
+   add_action( 'wp_ajax_msh_process_batch', 'msh_ajax_process_batch' );
+   function msh_ajax_process_batch() {
+       if ( ! wp_verify_nonce( $_POST['nonce'], 'msh_media_index' ) ) {
+           wp_send_json_error( array( 'message' => __( 'Security check failed.', 'msh-image-optimizer' ) ) );
+       }
+       if ( ! current_user_can( 'manage_options' ) ) {
+           wp_send_json_error( array( 'message' => __( 'Insufficient permissions.', 'msh-image-optimizer' ) ) );
+       }
+
+       $batch_number = isset( $_POST['batch'] ) ? absint( $_POST['batch'] ) : 0;
+       $processor    = new MSH_Batch_Processor();
+       $result       = $processor->process_batch( $batch_number, 25 );
+
+       wp_send_json_success( $result );
+   }
+   ```
+3. Wrap expensive loops with a reusable memory monitor:
+   ```php
+   class MSH_Memory_Monitor {
+       private $threshold_percentage = 0.75;
+       private $memory_limit;
+
+       public function __construct() {
+           $this->memory_limit = $this->parse_memory_limit();
+       }
+
+       public function check_memory( $operation = '' ) {
+           $usage = memory_get_usage( true );
+           if ( $usage / $this->memory_limit > $this->threshold_percentage ) {
+               error_log( sprintf( 'MSH memory warning: %s', $operation ) );
+               $this->emergency_cleanup();
+               return false;
+           }
+           return true;
+       }
+
+       private function emergency_cleanup() {
+           wp_cache_flush();
+           if ( function_exists( 'gc_collect_cycles' ) ) {
+               gc_collect_cycles();
+           }
+       }
+
+       private function parse_memory_limit() {
+           return wp_convert_hr_to_bytes( WP_MEMORY_LIMIT );
+       }
+   }
+   ```
+4. Persist batch cursors, processed counts, and error states so admins can resume workloads after failures.
+
+**Estimated Work:** 8-10 hours
+
+---
+
 ## 🔧 PORTABILITY FOR DISTRIBUTION
 
 ### Business-Specific Code Removal ❌ **CRITICAL**
@@ -474,15 +632,74 @@ private function get_location() {
 
 ---
 
+### Settings API Integration ❌ **NOT STARTED**
+
+**WordPress.org Requirements:**
+- Use the WordPress Settings API for option storage with sanitization callbacks
+- Register administrator pages via `add_options_page()` / `add_menu_page()`
+- Validate user input and enforce capability checks
+- Provide contextual guidance for performance-related settings
+
+**Current Status:**
+- ❌ No dedicated settings page; options are not stored in the database
+- ⚠️ Batch size, business profile, and consent toggles cannot be configured
+- ❌ No sanitization/validation callbacks defined
+
+**Required Actions:**
+1. Register settings and sections during `admin_init` and render them under a dedicated admin page.
+2. Provide validation/sanitization for each option (business info, batch size, feature toggles).
+3. Surface shared-hosting presets (10/25/50 items) so admins can tune performance safely.
+4. Add contextual help tabs or inline notices to explain memory guard behavior.
+
+**Implementation Reference:**
+```php
+class MSH_Settings {
+    public function init() {
+        add_action( 'admin_menu', array( $this, 'add_settings_page' ) );
+        add_action( 'admin_init', array( $this, 'register_settings' ) );
+    }
+
+    public function register_settings() {
+        register_setting(
+            'msh_media_settings',
+            'msh_options',
+            array( $this, 'validate_options' )
+        );
+
+        add_settings_section(
+            'msh_performance',
+            __( 'Performance Settings', 'msh-image-optimizer' ),
+            array( $this, 'performance_section_callback' ),
+            'msh-media-settings'
+        );
+
+        add_settings_field(
+            'batch_size',
+            __( 'Batch Size', 'msh-image-optimizer' ),
+            array( $this, 'batch_size_field_callback' ),
+            'msh-media-settings',
+            'msh_performance'
+        );
+    }
+}
+```
+
+**Estimated Work:** 5-7 hours (pairs with business data abstraction)
+
+---
+
 ## 📊 COMPLIANCE TIMELINE & EFFORT
 
 ### Phase 1: Critical Compliance (Must Do Before Distribution)
-**Total Estimated Time: 35-45 hours**
+**Total Estimated Time: 52-70 hours**
 
 | Task | Priority | Hours | Status |
 |------|----------|-------|--------|
 | Add GPL License (headers + file) | Critical | 2-3h | ❌ Not Started |
+| Establish plugin bootstrap & lifecycle hooks | Critical | 4-6h | ❌ Not Started |
+| Create custom tables & schema versioning | Critical | 3-5h | ❌ Not Started |
 | Remove 100+ error_log statements | Critical | 4-6h | ❌ Not Started |
+| Progressive batch pipeline & memory guard | Critical | 8-10h | ❌ Not Started |
 | Business data abstraction | Critical | 12-16h | ❌ Not Started |
 | Create readme.txt | Critical | 3-4h | ❌ Not Started |
 | Internationalization (i18n) | Critical | 10-12h | ❌ Not Started |
@@ -512,17 +729,46 @@ private function get_location() {
 
 ## 🎯 TOTAL EFFORT ESTIMATE
 
-**Minimum for WordPress.org Compliance: 57-81 hours**
-- Phase 1 (Critical): 35-45 hours
+**Minimum for WordPress.org Compliance: 74-106 hours**
+- Phase 1 (Critical): 52-70 hours
 - Phase 2 (Quality): 18-28 hours
 - Phase 3 (Distribution): 4-8 hours
 
 **Recommended Timeline:**
-- Week 1-2: Phase 1 (Critical compliance)
-- Week 3: Phase 2 (Quality & polish)
-- Week 4: Phase 3 (Distribution prep)
+- Week 1: GPL licensing, plugin bootstrap, and schema installation
+- Week 2: Progressive batch pipeline, memory guard, and variation pre-filtering
+- Week 3: Business data abstraction plus Settings API UI
+- Week 4: Phase 2 quality & polish tasks
+- Week 5: Distribution packaging, validation, and submission
 
-**Total Calendar Time: 3-4 weeks**
+**Total Calendar Time: 4-5 weeks**
+
+---
+
+## 📈 PERFORMANCE VALIDATION METRICS
+
+Benchmark the optimized pipeline against the profiling baseline before release.
+
+```php
+$performance_metrics = array(
+    'baseline' => array(
+        'total_duration' => 469.6,
+        'postmeta_scan' => 465.7,
+        'memory_peak' => 'timeout',
+        'success_rate' => '68%', // 149 of 219
+    ),
+    'target' => array(
+        'total_duration' => 50,
+        'postmeta_scan' => 40,
+        'memory_peak' => '256MB',
+        'success_rate' => '100%',
+    ),
+);
+```
+
+- Log each batch result (duration, memory usage, remaining items) to confirm the memory guard interventions.
+- Replay the workload on a clean staging site before resubmission to WordPress.org.
+- Document the before/after metrics in release notes and support documentation.
 
 ---
 
@@ -551,7 +797,7 @@ private function get_location() {
 ## ✅ RECOMMENDED ACTION PLAN
 
 ### Option A: WordPress.org Distribution (Public)
-1. Complete ALL compliance items (57-81 hours)
+1. Complete ALL compliance items (74-106 hours)
 2. Submit to WordPress.org
 3. Maintain ongoing support
 4. Build reputation in WP community
@@ -575,16 +821,16 @@ private function get_location() {
 **Given Current State:**
 1. **Current use case:** Private/client-specific deployment
 2. **Hard-coded business logic:** Not distribution-ready
-3. **Compliance effort:** 57-81 hours minimum
+3. **Compliance effort:** 74-106 hours minimum
 
 **Suggested Path:**
 1. ✅ **Keep current** child theme implementation for Main Street Health
 2. ⏳ **Wait for stabilization** (2-4 weeks as planned)
 3. 🔄 **Extract to plugin** with business abstraction
 4. 📊 **Evaluate distribution** after plugin extraction
-5. 🚀 **If distributing:** Complete compliance checklist (3-4 weeks additional)
+5. 🚀 **If distributing:** Complete compliance checklist (4-5 weeks additional)
 
-**Total Path to WordPress.org:** 6-8 weeks from today
+**Total Path to WordPress.org:** 7-9 weeks from today
 
 ---
 

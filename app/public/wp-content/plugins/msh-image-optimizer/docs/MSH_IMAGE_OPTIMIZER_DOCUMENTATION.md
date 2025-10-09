@@ -31,7 +31,6 @@ This handbook covers the production build of the Image Optimizer that ships with
    - Select the rows you want.  
    - Use the action that fits the workload (e.g. **Optimize Selected** or **Optimize High Priority**).  
    - Progress appears in the top-right log. You can continue browsing while the batch runs.
-   - When you apply filename suggestions, the optimizer only proceeds if the usage index has seen the file in published content—brand-new uploads (especially SVGs) must be referenced first, otherwise the rename step will safely abort.
 
 5. **Fine-tune metadata (only if needed)**  
    - Click **“Show Meta”** on any row.  
@@ -106,19 +105,7 @@ Once you are confident your published images are optimized, move to the **Duplic
 
 ---
 
-## 7. Supporting Research & Assets
-
-Keep these companion documents with the optimizer when migrating it into a standalone plugin. They capture the broader product, monetization, and technical research that informed the current build.
-
-- `app/public/COMPETITOR_ANALYSIS_AI_IMAGE_PLUGINS.md` – Competitive landscape for AI-driven media tools, including feature gaps we can close.
-- `app/public/AI_MONETIZATION_STRATEGY.md` – Revenue models and pricing guidance for commercializing the optimizer.
-- `AI-MEDIA-SETUP.md` – Original media automation rollout plan for Main Street Health.
-- `app/public/UI_MODERNIZATION_COMPLETE.md` – UI/UX modernization summary that explains current dashboard patterns.
-- `app/public/MSH_SAFE_RENAME_SYSTEM_COMPLETE.md` – Safe rename/usage index postmortem; critical for understanding guardrails.
-
----
-
-## 8. Document History
+## 7. Document History
 
 | Date | Change |
 | --- | --- |

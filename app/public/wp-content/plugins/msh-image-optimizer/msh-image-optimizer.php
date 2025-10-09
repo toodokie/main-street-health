@@ -54,10 +54,13 @@ final class MSH_Image_Optimizer_Plugin {
         require_once MSH_IO_PLUGIN_DIR . 'includes/class-msh-url-variation-detector.php';
         require_once MSH_IO_PLUGIN_DIR . 'includes/class-msh-targeted-replacement-engine.php';
         require_once MSH_IO_PLUGIN_DIR . 'includes/class-msh-backup-verification-system.php';
+        require_once MSH_IO_PLUGIN_DIR . 'includes/class-msh-hash-cache-manager.php';
         require_once MSH_IO_PLUGIN_DIR . 'includes/class-msh-image-usage-index.php';
         require_once MSH_IO_PLUGIN_DIR . 'includes/class-msh-content-usage-lookup.php';
+        require_once MSH_IO_PLUGIN_DIR . 'includes/class-msh-perceptual-hash.php';
         require_once MSH_IO_PLUGIN_DIR . 'includes/class-msh-safe-rename-cli.php';
         require_once MSH_IO_PLUGIN_DIR . 'includes/class-msh-media-cleanup.php';
+        require_once MSH_IO_PLUGIN_DIR . 'includes/class-msh-webp-delivery.php';
         require_once MSH_IO_PLUGIN_DIR . 'includes/class-msh-image-optimizer.php';
         require_once MSH_IO_PLUGIN_DIR . 'admin/image-optimizer-admin.php';
     }
